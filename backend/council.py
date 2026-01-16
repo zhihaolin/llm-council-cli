@@ -1,33 +1,72 @@
 """3-stage LLM Council orchestration."""
 
+import asyncio
 from typing import List, Dict, Any, Tuple
-from .openrouter import query_models_parallel, query_model
+from .openrouter import query_models_parallel, query_model, query_model_with_tools
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .search import SEARCH_TOOL, search_web, format_search_results
+
+
+async def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
+    """
+    Execute a tool and return the result as a string.
+
+    Args:
+        tool_name: Name of the tool to execute
+        tool_args: Arguments to pass to the tool
+
+    Returns:
+        String result of tool execution
+    """
+    if tool_name == "search_web":
+        query = tool_args.get("query", "")
+        search_response = await search_web(query)
+        return format_search_results(search_response)
+    else:
+        return f"Unknown tool: {tool_name}"
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
+    Models have access to web search tool and can decide when to use it.
+
     Args:
         user_query: The user's question
 
     Returns:
-        List of dicts with 'model' and 'response' keys
+        List of dicts with 'model', 'response', and optionally 'tool_calls_made' keys
     """
     messages = [{"role": "user", "content": user_query}]
+    tools = [SEARCH_TOOL]
 
-    # Query all models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    # Query all models in parallel with tool support
+    async def query_single_model(model: str) -> tuple:
+        response = await query_model_with_tools(
+            model=model,
+            messages=messages,
+            tools=tools,
+            tool_executor=execute_tool
+        )
+        return model, response
+
+    # Create tasks for all models
+    tasks = [query_single_model(model) for model in COUNCIL_MODELS]
+    results = await asyncio.gather(*tasks)
 
     # Format results
     stage1_results = []
-    for model, response in responses.items():
+    for model, response in results:
         if response is not None:  # Only include successful responses
-            stage1_results.append({
+            result = {
                 "model": model,
                 "response": response.get('content', '')
-            })
+            }
+            # Include tool calls info if any were made
+            if response.get('tool_calls_made'):
+                result['tool_calls_made'] = response['tool_calls_made']
+            stage1_results.append(result)
 
     return stage1_results
 

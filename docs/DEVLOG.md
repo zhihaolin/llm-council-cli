@@ -260,7 +260,82 @@ cli/
 ### Next Steps
 - [ ] Implement config file support
 - [ ] Add `--models` and `--chairman` CLI flags
-- [ ] v1.1: Web Search Integration
+- [x] v1.1: Web Search Integration
+
+---
+
+## 2026-01-16: v1.1 Web Search Integration
+
+### Session Goals
+- Implement web search capability for council models
+- Use Tavily API with tool calling so models decide when to search
+
+### What Was Done
+
+**1. Created `backend/search.py`**
+- Tavily API wrapper with `search_web()` async function
+- `SEARCH_TOOL` definition for OpenAI-style function calling
+- `format_search_results()` to convert search results to LLM-readable text
+
+**2. Updated `backend/openrouter.py`**
+- Added `query_model_with_tools()` function
+- Handles tool calling loop: model requests tool → execute → return results → get final response
+- Supports `max_tool_calls` parameter to prevent infinite loops
+- Returns `tool_calls_made` list in response for transparency
+
+**3. Updated `backend/council.py`**
+- Added `execute_tool()` function to dispatch tool calls to appropriate handlers
+- Modified `stage1_collect_responses()` to use `query_model_with_tools()`
+- Models now have access to `search_web` tool during Stage 1
+- Tool calls are tracked in stage1_results for each model
+
+**4. Updated `docs/PLAN.md`**
+- Documented the full v1.1 implementation plan before coding
+- Included tool definition format and calling flow
+
+### Architecture
+
+```
+User Query
+    │
+    ▼
+Stage 1: Query models WITH tools=[SEARCH_TOOL]
+    │
+    ├── Model decides: "I need current info"
+    │       ↓
+    │   Tool call: search_web(query)
+    │       ↓
+    │   Tavily API → Search results
+    │       ↓
+    │   Results sent back to model
+    │       ↓
+    │   Model generates final response
+    │
+    └── Model decides: "I know this" → Direct response
+    │
+    ▼
+Stage 2 & 3 (unchanged)
+```
+
+### Testing
+
+| Test | Command | Result |
+|------|---------|--------|
+| Weather query | `uv run python -m cli query "What is the current weather?"` | ✓ Models attempt to use search tool |
+| AI regulation | `uv run python -m cli query "AI regulation in 2026"` | ✓ Full 3-stage response |
+
+**Note:** Tool calling works correctly - models receive the tool definition and attempt to use it. To enable actual web searches, add `TAVILY_API_KEY=tvly-xxx` to `.env`.
+
+### Files Changed
+- `backend/search.py` - New file: Tavily wrapper and tool definition
+- `backend/openrouter.py` - Added `query_model_with_tools()`
+- `backend/council.py` - Integrated search tool into Stage 1
+- `docs/PLAN.md` - Documented v1.1 implementation plan
+
+### Next Steps
+- [ ] Add `TAVILY_API_KEY` to `.env` to enable live searches
+- [ ] Consider showing tool calls in CLI output
+- [ ] v1.2: Multi-Turn Debate Mode
 
 ---
 
