@@ -332,8 +332,10 @@ Stage 2 & 3 (unchanged)
 - `backend/council.py` - Integrated search tool into Stage 1
 - `docs/PLAN.md` - Documented v1.1 implementation plan
 
+### Post-Implementation Tuning
+- Increased `max_tool_calls` from 3 → 5 → 10 after testing showed models hitting the limit on complex queries
+
 ### Next Steps
-- [ ] Add `TAVILY_API_KEY` to `.env` to enable live searches
 - [ ] Consider showing tool calls in CLI output
 - [ ] v1.2: Multi-Turn Debate Mode
 
