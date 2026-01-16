@@ -182,6 +182,88 @@ cli/
 
 ---
 
+## 2025-01-16: TUI Fixes, Model Updates & Roadmap
+
+### Session Goals
+- Fix TUI bugs and test
+- Update council models
+- Review and update roadmap
+- Improve documentation
+
+### What Was Done
+
+**1. Fixed TUI Bugs**
+- Fixed `BadIdentifier` error - dots in widget IDs not allowed (e.g., `gpt-5.1`)
+- Changed to simple numeric IDs (`response-0`, `response-1`, etc.)
+- Updated Textual API usage for v7.x compatibility (context manager syntax)
+- Changed Stage views to `ScrollableContainer` for proper scrolling
+
+**2. Updated Color Scheme**
+- New dark navy/blue theme for TUI
+- Colors: `#1a1a2e` (background), `#16213e` (surface), `#0f3460` (primary), `#e94560` (accent)
+
+**3. Model Configuration**
+- Removed Grok from council (cost efficiency)
+- Updated GPT-5.1 → GPT-5.2
+
+**4. Roadmap Updates**
+- Added **v1.2: Multi-Turn Debate Mode** - Models will critique and respond to each other
+- Renumbered subsequent versions (v1.3-v1.7)
+
+**5. Documentation**
+- Rewrote README with Quick Start section
+- Added CLI usage instructions
+- Added "Running in New Terminal" section
+- Updated model examples to current config
+
+### Decisions Made
+
+| Decision | Reasoning |
+|----------|-----------|
+| Prefer simple CLI over TUI | User preference; TUI needs more polish |
+| Add Debate Mode to roadmap | More valuable than simple ranking; produces better answers |
+| Defer TUI styling | Functionality first, polish later |
+| Defer config file system | Already in plan, not blocking |
+
+### Issues Encountered
+
+| Issue | Resolution |
+|-------|------------|
+| TUI crash: BadIdentifier with dots | Use numeric IDs instead of model names |
+| TUI crash: TabbedContent API change | Use context manager syntax for Textual 7.x |
+| TUI color scheme "horrible" | Applied dark navy theme (still needs work) |
+
+### Files Changed
+- `cli/tui.py` - Fixed bugs, updated colors
+- `backend/config.py` - GPT-5.2, removed Grok
+- `docs/PLAN.md` - Added Debate Mode (v1.2)
+- `README.md` - Complete rewrite with Quick Start
+
+### Commits
+- `646fc23` - Implement Phase 2: Textual TUI
+- `d258d0f` - Fix TUI bugs and update to GPT-5.2
+- `5e13a43` - Update README and add Debate Mode to roadmap
+
+### Current Roadmap
+
+| Version | Feature | Status |
+|---------|---------|--------|
+| v1.0 | Basic CLI + TUI | ✓ Done |
+| v1.1 | Web Search Integration | Planned |
+| v1.2 | Multi-Turn Debate Mode | Planned |
+| v1.3 | Presets & Profiles | Planned |
+| v1.4 | Conversation History | Planned |
+| v1.5 | Streaming Responses | Planned |
+| v1.6 | Extended Tooling | Planned |
+| v1.7 | Local Models (Ollama) | Planned |
+
+### Next Steps
+- [ ] Implement config file support
+- [ ] Add `--models` and `--chairman` CLI flags
+- [ ] v1.1: Web Search Integration
+
+---
+
 *Template for future entries:*
 
 ```markdown
