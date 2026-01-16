@@ -193,21 +193,104 @@ llm-council = "cli.main:app"
 
 ### v1.1: Web Search Integration
 
-Enable council members to search the web before responding, providing up-to-date information.
+Enable council members to search the web when they need current information. Models decide when to search using tool calling.
 
-**Approach options:**
+**Decision: Tavily API + Tool Calling**
 
-| Option | Pros | Cons |
-|--------|------|------|
-| OpenRouter plugins | Native support if available | Limited to supported models |
-| Tavily API | Purpose-built for LLM search | Additional API key required |
-| Brave Search API | Good free tier | Additional API key required |
-| SearXNG (self-hosted) | Free, private | Requires hosting |
+- **Tavily**: Free tier 1,000 searches/month, built for LLM use
+- **Tool Calling**: Models decide when to search (not user-driven `--web-search` flag)
 
-**Implementation:**
-- Add `--web-search` flag to enable
-- Pre-query: Search web, include results in context
-- Or: Use models with native web access (e.g., Perplexity models on OpenRouter)
+**Architecture:**
+
+```
+User Query
+    │
+    ▼
+┌─────────────────────────────────────────────────────────┐
+│  Stage 1: Query models WITH search tool available       │
+│                                                         │
+│  Model sees: "What's the latest on X?"                  │
+│  Model decides: "I need current info" → calls search    │
+│  Your code: Executes Tavily search, returns results     │
+│  Model: Uses results to form response                   │
+└─────────────────────────────────────────────────────────┘
+    │
+    ▼
+  Stage 2 & 3 (normal flow)
+```
+
+**Files to create/modify:**
+
+1. **`backend/search.py`** (new)
+   - `SEARCH_TOOL` - Tool definition for function calling
+   - `search_web(query)` - Async function to call Tavily API
+   - `format_search_results()` - Format results for LLM context
+
+2. **`backend/openrouter.py`** (modify)
+   - Update `query_model()` to accept `tools` parameter
+   - Handle tool call responses (when model wants to use a tool)
+   - Execute tool, send results back, get final response
+
+3. **`backend/council.py`** (modify)
+   - Pass `SEARCH_TOOL` to models in Stage 1
+   - Handle the tool calling loop
+
+4. **`.env`** (update)
+   - Add `TAVILY_API_KEY=tvly-xxx`
+
+**Tool Definition:**
+
+```python
+SEARCH_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_web",
+        "description": "Search the web for current information. Use this when you need up-to-date information, recent events, current statistics, or facts you're unsure about.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query"
+                }
+            },
+            "required": ["query"]
+        }
+    }
+}
+```
+
+**Tool Calling Flow:**
+
+```
+1. Send request to OpenRouter with tools=[SEARCH_TOOL]
+2. Model response may include:
+   - Normal content (no tool needed)
+   - tool_calls: [{"function": {"name": "search_web", "arguments": {"query": "..."}}}]
+3. If tool_calls:
+   a. Parse the arguments
+   b. Execute search_web(query) → Tavily API
+   c. Send tool result back to model
+   d. Get final response with search context
+4. Return final response
+```
+
+**CLI Usage:**
+
+```bash
+# Web search is automatic - models decide when to use it
+uv run python -m cli query "What's the latest news on AI regulation?"
+
+# Model will automatically search if it needs current info
+# No --web-search flag needed
+```
+
+**Environment Setup:**
+
+```bash
+# Add to .env
+TAVILY_API_KEY=tvly-your-key-here
+```
 
 ### v1.2: Multi-Turn Debate Mode
 
