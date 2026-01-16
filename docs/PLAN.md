@@ -66,7 +66,7 @@ Models can be configured in three ways (in order of precedence):
 
 1. **CLI flags** (highest priority)
    ```bash
-   llm-council --models "openai/gpt-5.1,anthropic/claude-sonnet-4.5" \
+   llm-council --models "openai/gpt-5.2,anthropic/claude-sonnet-4.5" \
                --chairman "google/gemini-3-pro-preview" \
                "Your question"
    ```
@@ -74,10 +74,11 @@ Models can be configured in three ways (in order of precedence):
 2. **Config file** (`~/.config/llm-council/config.yaml`)
    ```yaml
    council_models:
-     - openai/gpt-5.1
+     - openai/gpt-5.2
      - google/gemini-3-pro-preview
      - anthropic/claude-sonnet-4.5
-     - x-ai/grok-4
+     - x-ai/grok-4.1-fast
+     - deepseek/deepseek-r1-0528
    chairman_model: google/gemini-3-pro-preview
    ```
 
@@ -98,19 +99,20 @@ Models can be configured in three ways (in order of precedence):
 
 ```
 llm-council-cli/
-├── backend/           # Existing - no changes needed
-│   ├── council.py
-│   ├── openrouter.py
-│   └── config.py
-├── cli/               # New CLI package
+├── backend/
+│   ├── council.py     # 3-stage council orchestration
+│   ├── openrouter.py  # OpenRouter API client + tool calling
+│   ├── search.py      # Tavily web search integration
+│   └── config.py      # Model configuration
+├── cli/
 │   ├── __init__.py
 │   ├── main.py        # Typer CLI entry point
-│   ├── tui.py         # Textual TUI application
-│   ├── widgets.py     # Custom Textual widgets
-│   ├── config.py      # Config loading (CLI > file > default)
-│   └── styles.tcss    # Textual CSS styling
-├── pyproject.toml     # Add typer, textual, rich deps
-└── PLAN.md            # This file
+│   └── tui.py         # Textual TUI application
+├── docs/
+│   ├── PLAN.md        # This file
+│   └── DEVLOG.md      # Development log
+├── pyproject.toml
+└── README.md
 ```
 
 ## Dependencies to Add
@@ -191,7 +193,7 @@ llm-council = "cli.main:app"
 
 ## Future Roadmap
 
-### v1.1: Web Search Integration
+### v1.1: Web Search Integration ✅ COMPLETE
 
 Enable council members to search the web when they need current information. Models decide when to search using tool calling.
 
@@ -349,13 +351,45 @@ llm-council preset list
 - Progressive rendering in TUI
 - Better perceived latency
 
-### v1.6: Extended Tooling
+### v1.6: File/Document Upload
+
+Enable attaching files to queries for the council to analyze.
+
+**Supported formats:**
+- Plain text: `.txt`, `.md`, `.py`, `.js`, `.json`, `.yaml`, `.csv`, code files
+- PDF: `.pdf` (using `pypdf`)
+- Word: `.docx` (using `python-docx`)
+- Ebook: `.epub` (using `ebooklib`)
+
+**CLI usage:**
+```bash
+# Single file
+uv run python -m cli query --file ./code.py "Review this"
+
+# Multiple files
+uv run python -m cli query --file ./a.py --file ./b.py "Compare these"
+
+# PDF/documents
+uv run python -m cli query --file ./report.pdf "Summarize this"
+```
+
+**Implementation:**
+- Add `--file` flag (repeatable) to CLI
+- Detect file type by extension
+- Extract text using appropriate library
+- Prepend file contents to user query
+
+### v1.7: Image Input
+
+- Multimodal support for vision-capable models
+- Base64 encoding for images
+- Formats: `.png`, `.jpg`, `.gif`, `.webp`
+
+### v1.8: Extended Tooling
 
 - **Code execution**: Let models run code to verify solutions
-- **File context**: `llm-council --file ./code.py "Review this"`
-- **Image input**: For vision-capable models
 
-### v1.7: Local Models
+### v1.9: Local Models
 
 - Support Ollama as a backend
 - Mix cloud + local models in same council
@@ -371,13 +405,6 @@ llm-council preset list
 
 ---
 
-## Open Questions
-
-1. Should we support conversation history in CLI mode? → **Roadmap v1.3**
-2. Stream responses or wait for complete response? → **Roadmap v1.4**
-3. Config file for models or just use existing `backend/config.py`? → **Yes, layered config**
-
----
-
 *Plan created: 2025-01-16*
-*Status: Ready for review*
+*Last updated: 2026-01-17*
+*Status: v1.1 complete, v1.2+ in roadmap*
