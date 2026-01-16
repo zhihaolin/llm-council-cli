@@ -335,6 +335,12 @@ Stage 2 & 3 (unchanged)
 ### Post-Implementation Tuning
 - Increased `max_tool_calls` from 3 → 5 → 10 after testing showed models hitting the limit on complex queries
 
+### Council Member Updates
+- Added `x-ai/grok-4.1-fast` (free on OpenRouter)
+- Added `deepseek/deepseek-r1-0528` (free, strong reasoning from China)
+- Tested `qwen/qwen3-32b` but removed - not competitive enough
+- Final 5-member council: GPT-5.2, Gemini 3 Pro, Claude Sonnet 4.5, Grok 4.1 Fast, DeepSeek R1
+
 ### Next Steps
 - [ ] Consider showing tool calls in CLI output
 - [ ] v1.2: Multi-Turn Debate Mode
