@@ -209,7 +209,37 @@ Enable council members to search the web before responding, providing up-to-date
 - Pre-query: Search web, include results in context
 - Or: Use models with native web access (e.g., Perplexity models on OpenRouter)
 
-### v1.2: Presets & Profiles
+### v1.2: Multi-Turn Debate Mode
+
+Enable models to challenge and respond to each other for deeper analysis.
+
+**Current flow (ranking only):**
+```
+Stage 1: Independent answers → Stage 2: Rank → Stage 3: Synthesize
+```
+
+**Debate flow:**
+```
+Round 1: Independent answers
+Round 2: Each model critiques others' answers
+Round 3: Models defend/revise their positions
+Round N: Continue until consensus or max rounds
+Final: Chairman synthesizes with full debate context
+```
+
+**Implementation:**
+- Add `--debate` flag to enable debate mode
+- Add `--rounds N` to set max debate rounds (default: 2)
+- Track position changes across rounds
+- Chairman considers debate quality, not just final positions
+
+**Usage:**
+```bash
+llm-council --debate "Is capitalism or socialism better for reducing poverty?"
+llm-council --debate --rounds 3 "Complex ethical question"
+```
+
+### v1.3: Presets & Profiles
 
 Save and load council configurations:
 
@@ -224,25 +254,25 @@ llm-council --preset coding-council "How do I optimize this SQL?"
 llm-council preset list
 ```
 
-### v1.3: Conversation History
+### v1.4: Conversation History
 
 - Persist conversations locally (SQLite or JSON)
 - Continue previous conversations: `llm-council --continue`
 - Browse history in TUI
 
-### v1.4: Streaming Responses
+### v1.5: Streaming Responses
 
 - Show tokens as they arrive (requires SSE support from OpenRouter)
 - Progressive rendering in TUI
 - Better perceived latency
 
-### v1.5: Extended Tooling
+### v1.6: Extended Tooling
 
 - **Code execution**: Let models run code to verify solutions
 - **File context**: `llm-council --file ./code.py "Review this"`
 - **Image input**: For vision-capable models
 
-### v1.6: Local Models
+### v1.7: Local Models
 
 - Support Ollama as a backend
 - Mix cloud + local models in same council
@@ -254,7 +284,6 @@ llm-council preset list
 - [ ] Export to markdown/PDF
 - [ ] Model performance analytics (track which models rank highest over time)
 - [ ] Custom ranking criteria (security, performance, readability, etc.)
-- [ ] Multi-turn council debates
 - [ ] Voice input/output
 
 ---

@@ -22,31 +22,28 @@ Instead of asking a question to a single LLM, you can group multiple LLMs into a
 
 ## What This Fork Adds
 
-- **CLI interface** - Query the council from your terminal: `llm-council "your question"`
-- **Rich TUI** - Interactive terminal UI with Textual (tabs, panels, progress indicators)
+- **CLI interface** - Query the council from your terminal
+- **Rich output** - Progress indicators, formatted tables, markdown rendering
+- **Interactive TUI** - Terminal UI with Textual (optional)
 - **Simple mode** - Pipe-friendly output for scripting
-- **Model configuration** - Select council members via CLI flags or config file
 
 See [docs/PLAN.md](docs/PLAN.md) for the full implementation roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development progress.
 
 ---
 
-## Setup
+## Quick Start
 
-### 1. Install Dependencies
+### 1. Clone and Install
 
-The project uses [uv](https://docs.astral.sh/uv/) for project management.
-
-**Backend:**
 ```bash
+git clone https://github.com/zhihaolin/llm-council-cli.git
+cd llm-council-cli
+
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
 uv sync
-```
-
-**Frontend (for web UI):**
-```bash
-cd frontend
-npm install
-cd ..
 ```
 
 ### 2. Configure API Key
@@ -54,29 +51,89 @@ cd ..
 Create a `.env` file in the project root:
 
 ```bash
-OPENROUTER_API_KEY=sk-or-v1-...
+echo "OPENROUTER_API_KEY=sk-or-v1-your-key-here" > .env
 ```
 
 Get your API key at [openrouter.ai](https://openrouter.ai/).
 
-### 3. Configure Models (Optional)
+### 3. Run the CLI
+
+```bash
+# Query the council
+uv run python -m cli query "What is the best programming language for beginners?"
+
+# Show current council configuration
+uv run python -m cli models
+```
+
+---
+
+## CLI Usage
+
+### Basic Query
+
+```bash
+uv run python -m cli query "Your question here"
+```
+
+This shows all 3 stages: individual responses, rankings, and final synthesis.
+
+### Output Options
+
+```bash
+# Simple output - just the final answer (no formatting)
+uv run python -m cli query -s "Quick question"
+
+# Final only - skip stages 1 & 2, show only chairman's synthesis
+uv run python -m cli query -f "Just give me the answer"
+```
+
+### Show Models
+
+```bash
+uv run python -m cli models
+```
+
+### Interactive TUI (Experimental)
+
+```bash
+uv run python -m cli interactive
+```
+
+---
+
+## Running in a New Terminal Session
+
+If you open a new terminal, navigate to the project and run:
+
+```bash
+cd /path/to/llm-council-cli
+uv run python -m cli query "Your question"
+```
+
+The `uv run` command automatically uses the project's virtual environment.
+
+---
+
+## Configure Models
 
 Edit `backend/config.py` to customize the council:
 
 ```python
 COUNCIL_MODELS = [
-    "openai/gpt-5.1",
+    "openai/gpt-5.2",
     "google/gemini-3-pro-preview",
     "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
 ]
 
 CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
 ```
 
-## Running the Application
+---
 
-### Web UI (Original)
+## Web UI (Original)
+
+The original web interface is still available:
 
 **Option 1: Use the start script**
 ```bash
@@ -93,32 +150,19 @@ uv run python -m backend.main
 Terminal 2 (Frontend):
 ```bash
 cd frontend
+npm install  # first time only
 npm run dev
 ```
 
 Then open http://localhost:5173 in your browser.
 
-### CLI (Coming Soon)
-
-```bash
-# Basic query
-llm-council "What is the best programming language for beginners?"
-
-# Simple output (just final answer)
-llm-council -s "Quick question"
-
-# Interactive TUI mode
-llm-council -i
-
-# Custom models
-llm-council --models "gpt-5,claude-4" --chairman "gemini-3" "Your question"
-```
+---
 
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
 - **Frontend:** React + Vite, react-markdown for rendering
-- **CLI:** Typer, Textual, Rich (coming soon)
+- **CLI:** Typer, Textual, Rich
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript
 
