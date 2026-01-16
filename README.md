@@ -27,7 +27,7 @@ Instead of asking a question to a single LLM, you can group multiple LLMs into a
 - **Simple mode** - Pipe-friendly output for scripting
 - **Model configuration** - Select council members via CLI flags or config file
 
-See [PLAN.md](PLAN.md) for the full implementation roadmap.
+See [docs/PLAN.md](docs/PLAN.md) for the full implementation roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development progress.
 
 ---
 
