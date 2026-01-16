@@ -1,18 +1,35 @@
-# LLM Council
+# LLM Council CLI
+
+> **Fork of [Andrej Karpathy's LLM Council](https://github.com/karpathy/llm-council)** - Extended with a terminal-based interface.
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+## Credits
 
-In a bit more detail, here is what happens when you submit a query:
+This project is based on the original [LLM Council](https://github.com/karpathy/llm-council) created by **[Andrej Karpathy](https://github.com/karpathy)**. All credit for the core concept and implementation goes to him. This fork adds a CLI/TUI interface for terminal users.
 
-1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
-2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+---
 
-## Vibe Code Alert
+## What is LLM Council?
 
-This project was 99% vibe coded as a fun Saturday hack because I wanted to explore and evaluate a number of LLMs side by side in the process of [reading books together with LLMs](https://x.com/karpathy/status/1990577951671509438). It's nice and useful to see multiple responses side by side, and also the cross-opinions of all LLMs on each other's outputs. I'm not going to support it in any way, it's provided here as is for other people's inspiration and I don't intend to improve it. Code is ephemeral now and libraries are over, ask your LLM to change it in whatever way you like.
+Instead of asking a question to a single LLM, you can group multiple LLMs into a "Council". This project sends your query to multiple LLMs, has them review and rank each other's work anonymously, and then a Chairman LLM produces the final response.
+
+**The 3-Stage Process:**
+
+1. **Stage 1: First opinions** - The query is sent to all LLMs individually, responses collected
+2. **Stage 2: Review** - Each LLM ranks the anonymized responses of others
+3. **Stage 3: Final response** - The Chairman synthesizes everything into a final answer
+
+## What This Fork Adds
+
+- **CLI interface** - Query the council from your terminal: `llm-council "your question"`
+- **Rich TUI** - Interactive terminal UI with Textual (tabs, panels, progress indicators)
+- **Simple mode** - Pipe-friendly output for scripting
+- **Model configuration** - Select council members via CLI flags or config file
+
+See [PLAN.md](PLAN.md) for the full implementation roadmap.
+
+---
 
 ## Setup
 
@@ -25,7 +42,7 @@ The project uses [uv](https://docs.astral.sh/uv/) for project management.
 uv sync
 ```
 
-**Frontend:**
+**Frontend (for web UI):**
 ```bash
 cd frontend
 npm install
@@ -40,7 +57,7 @@ Create a `.env` file in the project root:
 OPENROUTER_API_KEY=sk-or-v1-...
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+Get your API key at [openrouter.ai](https://openrouter.ai/).
 
 ### 3. Configure Models (Optional)
 
@@ -58,6 +75,8 @@ CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
 ```
 
 ## Running the Application
+
+### Web UI (Original)
 
 **Option 1: Use the start script**
 ```bash
@@ -79,9 +98,30 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+### CLI (Coming Soon)
+
+```bash
+# Basic query
+llm-council "What is the best programming language for beginners?"
+
+# Simple output (just final answer)
+llm-council -s "Quick question"
+
+# Interactive TUI mode
+llm-council -i
+
+# Custom models
+llm-council --models "gpt-5,claude-4" --chairman "gemini-3" "Your question"
+```
+
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
 - **Frontend:** React + Vite, react-markdown for rendering
+- **CLI:** Typer, Textual, Rich (coming soon)
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript
+
+## License
+
+This project inherits from the original [LLM Council](https://github.com/karpathy/llm-council) by Andrej Karpathy.
