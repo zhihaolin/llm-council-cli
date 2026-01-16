@@ -55,33 +55,40 @@ class StagePanel(Static):
         yield Label(f"Waiting for query...", id=f"{self.id}-content")
 
 
-class Stage1View(Static):
-    """Stage 1: Individual model responses in tabs."""
+class Stage1View(ScrollableContainer):
+    """Stage 1: Individual model responses."""
 
     def compose(self) -> ComposeResult:
         yield Static("Submit a query to see model responses.", id="stage1-placeholder")
 
     def update_responses(self, results: list) -> None:
         """Update with model responses."""
-        self.query_one("#stage1-placeholder").remove()
+        # Remove placeholder
+        try:
+            self.query_one("#stage1-placeholder").remove()
+        except Exception:
+            pass
 
-        # Create tabbed content for each model
-        tabbed = TabbedContent(id="stage1-tabs")
-        self.mount(tabbed)
-
-        for result in results:
-            model_name = result["model"].split("/")[-1]  # Short name
+        # Add each model's response as a panel
+        for i, result in enumerate(results):
+            model_name = result["model"]
             response = result["response"]
 
-            pane = TabPane(model_name, id=f"tab-{model_name}")
-            tabbed.add_pane(pane)
+            # Create a safe ID (no dots, slashes)
+            safe_id = f"response-{i}"
 
-            # Add markdown content to the pane
-            md = Markdown(response, id=f"response-{model_name}")
-            pane.mount(ScrollableContainer(md))
+            # Create a container for each response
+            container = Vertical(id=safe_id, classes="response-panel")
+            self.mount(container)
+
+            # Add header and content
+            header = Static(f"[bold cyan]━━━ {model_name} ━━━[/bold cyan]", classes="response-header")
+            content = Markdown(response, classes="response-content")
+            container.mount(header)
+            container.mount(content)
 
 
-class Stage2View(Static):
+class Stage2View(ScrollableContainer):
     """Stage 2: Rankings table and evaluations."""
 
     def compose(self) -> ComposeResult:
@@ -89,7 +96,10 @@ class Stage2View(Static):
 
     def update_rankings(self, results: list, label_to_model: dict, aggregate: list) -> None:
         """Update with ranking results."""
-        self.query_one("#stage2-placeholder").remove()
+        try:
+            self.query_one("#stage2-placeholder").remove()
+        except Exception:
+            pass
 
         # Create rankings table
         table = DataTable(id="rankings-table")
@@ -117,10 +127,10 @@ class Stage2View(Static):
             ])
             eval_text += f"**{model}:** {parsed_display}\n\n"
 
-        self.mount(ScrollableContainer(Markdown(eval_text, id="evaluations")))
+        self.mount(Markdown(eval_text, id="evaluations"))
 
 
-class Stage3View(Static):
+class Stage3View(ScrollableContainer):
     """Stage 3: Chairman's final synthesis."""
 
     def compose(self) -> ComposeResult:
@@ -128,12 +138,15 @@ class Stage3View(Static):
 
     def update_synthesis(self, result: dict) -> None:
         """Update with chairman's synthesis."""
-        self.query_one("#stage3-placeholder").remove()
+        try:
+            self.query_one("#stage3-placeholder").remove()
+        except Exception:
+            pass
 
         chairman = result["model"].split("/")[-1]
         content = f"## Final Answer\n*Chairman: {chairman}*\n\n---\n\n{result['response']}"
 
-        self.mount(ScrollableContainer(Markdown(content, id="synthesis")))
+        self.mount(Markdown(content, id="synthesis"))
 
 
 class StatusBar(Static):
@@ -150,52 +163,123 @@ class CouncilApp(App):
     """LLM Council TUI Application."""
 
     CSS = """
+    Screen {
+        background: #1a1a2e;
+    }
+
+    Header {
+        background: #16213e;
+    }
+
+    Footer {
+        background: #16213e;
+    }
+
     #input-area {
         height: 3;
         padding: 0 1;
-        background: $surface;
+        background: #16213e;
     }
 
     #query-input {
         width: 1fr;
+        border: tall #0f3460;
+        background: #1a1a2e;
+    }
+
+    #query-input:focus {
+        border: tall #e94560;
     }
 
     #submit-btn {
         width: 12;
         margin-left: 1;
+        background: #0f3460;
+    }
+
+    #submit-btn:hover {
+        background: #e94560;
     }
 
     #main-content {
         height: 1fr;
+        background: #1a1a2e;
     }
 
     #status-bar {
         height: 1;
-        background: $primary;
-        color: $text;
+        background: #0f3460;
+        color: #eee;
         padding: 0 1;
+    }
+
+    TabbedContent {
+        background: #1a1a2e;
+    }
+
+    TabPane {
+        background: #1a1a2e;
+        padding: 1;
+    }
+
+    Tabs {
+        background: #16213e;
+    }
+
+    Tab {
+        background: #16213e;
+        color: #aaa;
+    }
+
+    Tab.-active {
+        background: #0f3460;
+        color: #fff;
     }
 
     .stage-view {
         padding: 1;
+        height: 1fr;
+    }
+
+    .response-panel {
+        margin-bottom: 1;
+        padding: 1;
+        border: solid #0f3460;
+        background: #16213e;
+    }
+
+    .response-header {
+        margin-bottom: 1;
+        color: #e94560;
     }
 
     #rankings-table {
         height: auto;
-        max-height: 10;
+        max-height: 12;
         margin-bottom: 1;
     }
 
     DataTable {
         height: auto;
+        background: #16213e;
     }
 
-    ScrollableContainer {
+    DataTable > .datatable--header {
+        background: #0f3460;
+        color: #e94560;
+    }
+
+    Stage1View, Stage2View, Stage3View {
         height: 1fr;
+        background: #1a1a2e;
     }
 
-    LoadingIndicator {
-        height: 3;
+    Markdown {
+        background: transparent;
+    }
+
+    Static {
+        background: transparent;
     }
     """
 
@@ -214,15 +298,14 @@ class CouncilApp(App):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield QueryInput(id="query-section")
-        yield Container(
-            TabbedContent(
-                TabPane("Stage 1: Responses", Stage1View(classes="stage-view"), id="stage1"),
-                TabPane("Stage 2: Rankings", Stage2View(classes="stage-view"), id="stage2"),
-                TabPane("Stage 3: Final", Stage3View(classes="stage-view"), id="stage3"),
-                id="stages",
-            ),
-            id="main-content",
-        )
+        with Container(id="main-content"):
+            with TabbedContent(id="stages"):
+                with TabPane("Stage 1: Responses", id="stage1"):
+                    yield Stage1View(classes="stage-view")
+                with TabPane("Stage 2: Rankings", id="stage2"):
+                    yield Stage2View(classes="stage-view")
+                with TabPane("Stage 3: Final", id="stage3"):
+                    yield Stage3View(classes="stage-view")
         yield StatusBar(id="status-bar")
         yield Footer()
 
