@@ -122,9 +122,63 @@ cli/
 - `pyproject.toml` - Dependencies and packaging config
 
 ### Next Steps
-- [ ] Phase 2: Textual TUI with interactive interface
+- [x] Phase 2: Textual TUI with interactive interface
 - [ ] Add `--models` and `--chairman` flags for model selection
 - [ ] Add config file support (`~/.config/llm-council/config.yaml`)
+
+---
+
+## 2025-01-16: Phase 2 - Textual TUI Implementation
+
+### Session Goals
+- Implement interactive TUI with Textual
+- Add tabbed interface for stages
+- Enable keyboard navigation
+
+### What Was Done
+
+**1. Added Textual Dependency**
+- Added `textual>=0.50.0` to pyproject.toml
+
+**2. Created TUI Application (`cli/tui.py`)**
+- Full Textual app with header, footer, keybindings
+- Query input area with text field and submit button
+- Tabbed content for Stage 1, Stage 2, Stage 3
+
+**3. Stage Views**
+- **Stage 1:** Sub-tabs for each model's response with markdown rendering
+- **Stage 2:** DataTable for aggregate rankings + individual evaluations
+- **Stage 3:** Markdown panel with chairman's synthesis
+
+**4. Added `interactive` Command**
+- `uv run python -m cli interactive` - Launch TUI
+- `uv run python -m cli interactive "question"` - Launch with initial query
+
+### TUI Features
+
+| Feature | Keybinding |
+|---------|------------|
+| Switch to Stage 1 | `1` |
+| Switch to Stage 2 | `2` |
+| Switch to Stage 3 | `3` |
+| New query | `Ctrl+N` |
+| Quit | `Q` |
+
+### Files Changed
+- `pyproject.toml` - Added textual dependency
+- `cli/tui.py` - New TUI implementation (~250 lines)
+- `cli/main.py` - Added `interactive` command
+
+### Testing
+- [ ] TUI launches: `uv run python -m cli interactive`
+- [ ] Query submission works
+- [ ] Stage tabs switch correctly
+- [ ] Keyboard shortcuts work
+
+### Next Steps
+- [ ] Add `--models` and `--chairman` CLI flags
+- [ ] Add config file support
+- [ ] Polish TUI styling
 
 ---
 
