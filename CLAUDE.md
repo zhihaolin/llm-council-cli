@@ -19,11 +19,24 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 **`openrouter.py`**
 - `query_model()`: Single async model query
 - `query_models_parallel()`: Parallel queries using `asyncio.gather()`
+- `query_model_with_tools()`: Query with tool/function calling support
+  - Handles tool call loop: model requests tool → execute → return results → get final response
+  - `max_tool_calls` parameter prevents infinite loops (default: 3)
+  - Returns `tool_calls_made` list showing which tools were used
 - Returns dict with 'content' and optional 'reasoning_details'
 - Graceful degradation: returns None on failure, continues with successful responses
 
+**`search.py`** - Web Search Integration
+- `SEARCH_TOOL`: OpenAI-format tool definition for function calling
+- `search_web(query)`: Async function to query Tavily API
+- `format_search_results()`: Converts search results to LLM-readable text
+- Requires `TAVILY_API_KEY` in `.env` (optional - gracefully degrades if missing)
+
 **`council.py`** - The Core Logic
-- `stage1_collect_responses()`: Parallel queries to all council models
+- `execute_tool()`: Dispatches tool calls to appropriate handlers (currently only `search_web`)
+- `stage1_collect_responses()`: Parallel queries to all council models with tool support
+  - Models receive `SEARCH_TOOL` and can autonomously decide when to search
+  - Returns `tool_calls_made` for each model if any searches were performed
 - `stage2_collect_rankings()`:
   - Anonymizes responses as "Response A, B, C, etc."
   - Creates `label_to_model` mapping for de-anonymization
@@ -125,12 +138,40 @@ All ReactMarkdown components must be wrapped in `<div className="markdown-conten
 ### Model Configuration
 Models are hardcoded in `backend/config.py`. Chairman can be same or different from council members. The current default is Gemini as chairman per user preference.
 
+## Web Search / Tool Calling
+
+### How It Works
+Models in Stage 1 receive a `search_web` tool definition. They autonomously decide when to use it based on the query:
+- Questions about current events, prices, weather → model calls search
+- General knowledge questions → model answers directly
+
+### Tool Calling Flow
+```
+1. Send request to OpenRouter with tools=[SEARCH_TOOL]
+2. Model response may include:
+   - Normal content (no tool needed)
+   - tool_calls: [{"function": {"name": "search_web", "arguments": {"query": "..."}}}]
+3. If tool_calls:
+   a. Parse the arguments
+   b. Execute search_web(query) → Tavily API
+   c. Send tool result back to model
+   d. Get final response with search context
+4. Return final response
+```
+
+### Configuration
+- Requires `TAVILY_API_KEY` in `.env`
+- Free tier: 1000 searches/month at [tavily.com](https://tavily.com)
+- If key is missing, models gracefully acknowledge they can't search
+
 ## Common Gotchas
 
 1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
 2. **CORS Issues**: Frontend must match allowed origins in `main.py` CORS middleware
 3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
 4. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
+5. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
+6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3)
 
 ## Future Enhancement Ideas
 
@@ -150,7 +191,11 @@ Use `test_openrouter.py` to verify API connectivity and test different model ide
 ```
 User Query
     ↓
-Stage 1: Parallel queries → [individual responses]
+Stage 1: Parallel queries with tools=[SEARCH_TOOL]
+    ├── Model decides: needs current info → calls search_web → Tavily API
+    └── Model decides: knows answer → direct response
+    ↓
+[individual responses + tool_calls_made]
     ↓
 Stage 2: Anonymize → Parallel ranking queries → [evaluations + parsed rankings]
     ↓
@@ -160,7 +205,7 @@ Stage 3: Chairman synthesis with full context
     ↓
 Return: {stage1, stage2, stage3, metadata}
     ↓
-Frontend: Display with tabs + validation UI
+Frontend/CLI: Display with tabs + validation UI
 ```
 
 The entire flow is async/parallel where possible to minimize latency.

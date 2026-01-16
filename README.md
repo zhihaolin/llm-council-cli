@@ -24,6 +24,7 @@ Instead of asking a question to a single LLM, you can group multiple LLMs into a
 
 - **CLI interface** - Query the council from your terminal
 - **Rich output** - Progress indicators, formatted tables, markdown rendering
+- **Web search** - Models can autonomously search the web for current information
 - **Interactive TUI** - Terminal UI with Textual (optional)
 - **Simple mode** - Pipe-friendly output for scripting
 
@@ -46,15 +47,21 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-### 2. Configure API Key
+### 2. Configure API Keys
 
 Create a `.env` file in the project root:
 
 ```bash
+# Required: OpenRouter API key for LLM access
 echo "OPENROUTER_API_KEY=sk-or-v1-your-key-here" > .env
+
+# Optional: Tavily API key for web search (models decide when to search)
+echo "TAVILY_API_KEY=tvly-your-key-here" >> .env
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/).
+Get your API keys at:
+- [openrouter.ai](https://openrouter.ai/) - Required for LLM queries
+- [tavily.com](https://tavily.com/) - Optional, enables web search (free tier: 1000 searches/month)
 
 ### 3. Run the CLI
 
@@ -163,6 +170,7 @@ Then open http://localhost:5173 in your browser.
 - **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
 - **Frontend:** React + Vite, react-markdown for rendering
 - **CLI:** Typer, Textual, Rich
+- **Web Search:** Tavily API (optional, for real-time information)
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript
 
