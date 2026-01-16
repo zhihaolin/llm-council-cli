@@ -61,7 +61,7 @@ async def query_model_with_tools(
     tools: List[Dict[str, Any]],
     tool_executor: Callable[[str, Dict[str, Any]], Any],
     timeout: float = 120.0,
-    max_tool_calls: int = 5
+    max_tool_calls: int = 10
 ) -> Optional[Dict[str, Any]]:
     """
     Query a model with tool calling support.

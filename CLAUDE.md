@@ -171,7 +171,7 @@ Models in Stage 1 receive a `search_web` tool definition. They autonomously deci
 3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
 4. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
 5. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
-6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 5)
+6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 10)
 
 ## Future Enhancement Ideas
 
