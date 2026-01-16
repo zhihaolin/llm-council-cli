@@ -251,11 +251,11 @@ cli/
 | v1.0 | Basic CLI + TUI | ✓ Done |
 | v1.1 | Web Search Integration | ✓ Done |
 | v1.2 | Multi-Turn Debate Mode | Planned |
-| v1.3 | Presets & Profiles | Planned |
-| v1.4 | Conversation History | Planned |
-| v1.5 | Streaming Responses | Planned |
-| v1.6 | File/Document Upload | Planned |
-| v1.7 | Image Input | Planned |
+| v1.3 | File/Document Upload | Planned |
+| v1.4 | Image Input | Planned |
+| v1.5 | Presets & Profiles | Planned |
+| v1.6 | Conversation History | Planned |
+| v1.7 | Streaming Responses | Planned |
 | v1.8 | Extended Tooling | Planned |
 | v1.9 | Local Models (Ollama) | Planned |
 
@@ -346,7 +346,7 @@ Stage 2 & 3 (unchanged)
 ### Next Steps
 - [ ] Consider showing tool calls in CLI output
 - [ ] v1.2: Multi-Turn Debate Mode
-- [ ] v1.6: File/Document Upload (txt, pdf, docx, epub)
+- [ ] v1.3: File/Document Upload (txt, pdf, docx, epub)
 
 ---
 

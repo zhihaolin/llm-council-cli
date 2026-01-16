@@ -324,34 +324,7 @@ llm-council --debate "Is capitalism or socialism better for reducing poverty?"
 llm-council --debate --rounds 3 "Complex ethical question"
 ```
 
-### v1.3: Presets & Profiles
-
-Save and load council configurations:
-
-```bash
-# Save current config as a preset
-llm-council preset save "coding-council"
-
-# Use a preset
-llm-council --preset coding-council "How do I optimize this SQL?"
-
-# List presets
-llm-council preset list
-```
-
-### v1.4: Conversation History
-
-- Persist conversations locally (SQLite or JSON)
-- Continue previous conversations: `llm-council --continue`
-- Browse history in TUI
-
-### v1.5: Streaming Responses
-
-- Show tokens as they arrive (requires SSE support from OpenRouter)
-- Progressive rendering in TUI
-- Better perceived latency
-
-### v1.6: File/Document Upload
+### v1.3: File/Document Upload
 
 Enable attaching files to queries for the council to analyze.
 
@@ -379,11 +352,38 @@ uv run python -m cli query --file ./report.pdf "Summarize this"
 - Extract text using appropriate library
 - Prepend file contents to user query
 
-### v1.7: Image Input
+### v1.4: Image Input
 
 - Multimodal support for vision-capable models
 - Base64 encoding for images
 - Formats: `.png`, `.jpg`, `.gif`, `.webp`
+
+### v1.5: Presets & Profiles
+
+Save and load council configurations:
+
+```bash
+# Save current config as a preset
+llm-council preset save "coding-council"
+
+# Use a preset
+llm-council --preset coding-council "How do I optimize this SQL?"
+
+# List presets
+llm-council preset list
+```
+
+### v1.6: Conversation History
+
+- Persist conversations locally (SQLite or JSON)
+- Continue previous conversations: `llm-council --continue`
+- Browse history in TUI
+
+### v1.7: Streaming Responses
+
+- Show tokens as they arrive (requires SSE support from OpenRouter)
+- Progressive rendering in TUI
+- Better perceived latency
 
 ### v1.8: Extended Tooling
 
