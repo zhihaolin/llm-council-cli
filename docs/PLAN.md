@@ -294,7 +294,33 @@ uv run python -m cli query "What's the latest news on AI regulation?"
 TAVILY_API_KEY=tvly-your-key-here
 ```
 
-### v1.2: Multi-Turn Debate Mode
+### v1.2: Conversation History
+
+Enable multi-turn conversations in CLI, similar to the web UI experience.
+
+**CLI usage:**
+```bash
+# Start a new conversation
+uv run python -m cli chat
+
+# Continue the last conversation
+uv run python -m cli chat --continue
+
+# List past conversations
+uv run python -m cli history
+
+# Resume a specific conversation
+uv run python -m cli chat --id <conversation-id>
+```
+
+**Implementation:**
+- Reuse existing `backend/storage.py` for JSON persistence
+- Add `chat` command for interactive multi-turn mode
+- Add `history` command to list past conversations
+- Track conversation context between turns
+- Send full message history to council on each turn
+
+### v1.3: Multi-Turn Debate Mode
 
 Enable models to challenge and respond to each other for deeper analysis.
 
@@ -324,7 +350,7 @@ llm-council --debate "Is capitalism or socialism better for reducing poverty?"
 llm-council --debate --rounds 3 "Complex ethical question"
 ```
 
-### v1.3: File/Document Upload
+### v1.4: File/Document Upload
 
 Enable attaching files to queries for the council to analyze.
 
@@ -352,13 +378,13 @@ uv run python -m cli query --file ./report.pdf "Summarize this"
 - Extract text using appropriate library
 - Prepend file contents to user query
 
-### v1.4: Image Input
+### v1.5: Image Input
 
 - Multimodal support for vision-capable models
 - Base64 encoding for images
 - Formats: `.png`, `.jpg`, `.gif`, `.webp`
 
-### v1.5: Presets & Profiles
+### v1.6: Presets & Profiles
 
 Save and load council configurations:
 
@@ -372,12 +398,6 @@ llm-council --preset coding-council "How do I optimize this SQL?"
 # List presets
 llm-council preset list
 ```
-
-### v1.6: Conversation History
-
-- Persist conversations locally (SQLite or JSON)
-- Continue previous conversations: `llm-council --continue`
-- Browse history in TUI
 
 ### v1.7: Streaming Responses
 
