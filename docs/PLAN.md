@@ -300,25 +300,46 @@ Enable multi-turn conversations in CLI, similar to the web UI experience.
 
 **CLI usage:**
 ```bash
-# Start a new conversation
-uv run python -m cli chat
+# Normal query (stateless, current behavior)
+uv run python -m cli query "Question"
 
-# Continue the last conversation
-uv run python -m cli chat --continue
+# Continue last conversation
+uv run python -m cli query "Follow-up question" --continue
+
+# Resume specific conversation
+uv run python -m cli query "Question" --id <conversation-id>
 
 # List past conversations
 uv run python -m cli history
-
-# Resume a specific conversation
-uv run python -m cli chat --id <conversation-id>
 ```
 
+**Design Decisions:**
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Message format for context | Stage 3 only | All stages too verbose, confusing to models |
+| Storage location | Shared `data/conversations/` | Allows switching between CLI and web UI |
+| Display on `--continue` | Show last exchange | User needs context |
+| `--continue` with no history | Error with message | Explicit over implicit |
+| Track "last conversation" | Most recent modified file | No extra state file needed |
+| Truncation strategy | Keep last N exchanges (e.g., 10) | Simple, predictable |
+| Context limit | Conservative 8K tokens | Works for all models |
+| Conversation titles | Reuse `generate_conversation_title()` | Consistency with web UI |
+
 **Implementation:**
-- Reuse existing `backend/storage.py` for JSON persistence
-- Add `chat` command for interactive multi-turn mode
-- Add `history` command to list past conversations
-- Track conversation context between turns
-- Send full message history to council on each turn
+1. Add `--continue` flag to `query` command
+2. Add `--id` flag to resume specific conversation
+3. Add `history` command to list conversations
+4. Modify council flow to accept message history
+5. Send Stage 3 responses as assistant messages in context
+6. Basic truncation: first message + last N exchanges
+7. Warn user when truncation occurs
+8. Reuse `backend/storage.py` for persistence
+
+**Future enhancement (v1.2.x):**
+- Smart summarization/compaction instead of truncation
+- Token-aware truncation using tiktoken
+- Interactive `chat` command with REPL loop
 
 ### v1.3: Multi-Turn Debate Mode
 
