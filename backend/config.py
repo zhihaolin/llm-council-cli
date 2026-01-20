@@ -10,13 +10,13 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # Council members - list of OpenRouter model identifiers
 COUNCIL_MODELS = [
-    "openai/gpt-5.2",
-    "x-ai/grok-4.1-fast",
-    "deepseek/deepseek-r1-0528",
+    "openai/gpt-4o-mini",
+    "x-ai/grok-3",
+    "deepseek/deepseek-chat",
 ]
 
 # Chairman model - synthesizes final response
-CHAIRMAN_MODEL = "openai/gpt-5.2"
+CHAIRMAN_MODEL = "openai/gpt-4o-mini"
 
 # OpenRouter API endpoint
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"

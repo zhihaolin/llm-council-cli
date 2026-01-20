@@ -14,12 +14,14 @@ import uuid
 from typing import Optional
 
 import typer
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
 from rich.markdown import Markdown
 from rich.theme import Theme
+from rich.live import Live
+from rich.text import Text
 
 # Import council logic from backend
 sys.path.insert(0, str(__file__).rsplit("/", 2)[0])  # Add project root to path
@@ -29,6 +31,8 @@ from backend.council import (
     stage3_synthesize_final,
     calculate_aggregate_rankings,
     run_debate_council,
+    run_debate_council_streaming,
+    run_debate_token_streaming,
     generate_conversation_title,
 )
 from backend.config import COUNCIL_MODELS, CHAIRMAN_MODEL
@@ -71,6 +75,7 @@ def print_chat_banner(
     resumed: bool,
     debate_enabled: bool,
     debate_rounds: int,
+    stream_enabled: bool = False,
 ) -> None:
     """Show chat banner with conversation details."""
     short_id = conversation_id[:8]
@@ -79,7 +84,7 @@ def print_chat_banner(
         f"[chat.meta]{status} conversation[/chat.meta]\n"
         f"[chat.accent]{title}[/chat.accent]\n"
         f"[chat.meta]ID: {short_id}[/chat.meta]\n"
-        f"{format_chat_mode_line(debate_enabled, debate_rounds)}"
+        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled)}"
     )
     console.print()
     console.print(Panel(
@@ -88,7 +93,7 @@ def print_chat_banner(
         border_style=CHAT_BORDER_COLOR,
         padding=(1, 2),
     ))
-    console.print("[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /mode, /exit[/chat.meta]")
+    console.print("[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /stream, /mode, /exit[/chat.meta]")
     console.print()
 
 
@@ -101,6 +106,7 @@ def print_chat_help() -> None:
     console.print("[chat.command]/new[/chat.command]     Start a new conversation")
     console.print("[chat.command]/debate on|off[/chat.command] Toggle debate mode")
     console.print("[chat.command]/rounds N[/chat.command] Set debate rounds")
+    console.print("[chat.command]/stream on|off[/chat.command] Toggle streaming (debate only)")
     console.print("[chat.command]/mode[/chat.command]    Show current mode")
     console.print("[chat.command]/exit[/chat.command]    Exit chat")
     console.print()
@@ -287,8 +293,9 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
     conversation_id = None
     conversation = None
     resumed = False
-    debate_enabled = False
+    debate_enabled = True
     debate_rounds = DEFAULT_DEBATE_ROUNDS
+    stream_enabled = True
 
     if not start_new and conversations:
         conversation_id = conversations[0]["id"]
@@ -307,12 +314,13 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         resumed=resumed,
         debate_enabled=debate_enabled,
         debate_rounds=debate_rounds,
+        stream_enabled=stream_enabled,
     )
 
     while True:
         try:
             user_input = console.input(
-                build_chat_prompt(debate_enabled, debate_rounds)
+                build_chat_prompt(debate_enabled, debate_rounds, stream_enabled)
             ).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[chat.meta]Exiting chat.[/chat.meta]")
@@ -357,6 +365,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         resumed=True,
                         debate_enabled=debate_enabled,
                         debate_rounds=debate_rounds,
+                        stream_enabled=stream_enabled,
                     )
                 continue
             if command == "new":
@@ -369,6 +378,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     resumed=False,
                     debate_enabled=debate_enabled,
                     debate_rounds=debate_rounds,
+                    stream_enabled=stream_enabled,
                 )
                 continue
             if command == "debate":
@@ -376,7 +386,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Usage: /debate on|off[/chat.error]")
                     continue
                 debate_enabled = argument == "on"
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
                 continue
             if command == "rounds":
                 if not argument:
@@ -391,10 +401,19 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Rounds must be at least 2.[/chat.error]")
                     continue
                 debate_rounds = rounds_value
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
+                continue
+            if command == "stream":
+                if argument not in ("on", "off"):
+                    console.print("[chat.error]Usage: /stream on|off[/chat.error]")
+                    continue
+                stream_enabled = argument == "on"
+                if stream_enabled and not debate_enabled:
+                    console.print("[chat.meta]Note: Streaming only applies in debate mode.[/chat.meta]")
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
                 continue
             if command == "mode":
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
                 continue
 
             console.print("[chat.error]Unknown command. Type /help for options.[/chat.error]")
@@ -423,10 +442,18 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         console.print()
 
         if debate_enabled:
-            debate_rounds_data, synthesis = await run_debate_with_progress(
-                full_query,
-                debate_rounds,
-            )
+            if stream_enabled:
+                # Streaming mode - shows responses as they complete
+                debate_rounds_data, synthesis = await run_debate_streaming(
+                    full_query,
+                    debate_rounds,
+                )
+            else:
+                # Batch mode - shows progress spinners
+                debate_rounds_data, synthesis = await run_debate_with_progress(
+                    full_query,
+                    debate_rounds,
+                )
 
             if debate_rounds_data is None:
                 console.print("[chat.error]Error: Debate mode failed to produce responses.[/chat.error]")
@@ -438,9 +465,11 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 title = await title_task
                 storage.update_conversation_title(conversation_id, title)
 
-            for round_data in debate_rounds_data:
-                print_debate_round(round_data, round_data["round_number"])
-            print_debate_synthesis(synthesis)
+            if not stream_enabled:
+                # Only print rounds if not streaming (streaming already displayed them)
+                for round_data in debate_rounds_data:
+                    print_debate_round(round_data, round_data["round_number"])
+                print_debate_synthesis(synthesis)
         else:
             stage1, stage2, stage3, metadata = await run_council_with_progress(full_query)
 
@@ -635,6 +664,154 @@ async def run_debate_with_progress(query: str, max_rounds: int = 2) -> tuple:
     return rounds, synthesis
 
 
+async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
+    """
+    Run debate with token-by-token streaming.
+
+    Streams raw text while generating, then shows rendered markdown panel when complete.
+
+    Returns:
+        Tuple of (rounds list, synthesis dict)
+    """
+    import shutil
+
+    type_styles = {
+        "initial": ("cyan", "Initial Responses"),
+        "critique": ("yellow", "Critiques"),
+        "defense": ("magenta", "Defense & Revision"),
+    }
+
+    rounds_data = []
+    synthesis_data = None
+    current_content = ""
+    current_model = ""
+    line_count = 0
+    current_col = 0  # Track current column position for line wrap calculation
+    terminal_width = shutil.get_terminal_size().columns
+
+    def clear_streaming_output():
+        """Clear the streaming output lines to replace with panel."""
+        nonlocal line_count, current_col
+        if line_count > 0:
+            # Move cursor up and clear lines (write directly to bypass Rich escaping)
+            import sys
+            sys.stdout.write(f"\033[{line_count}A\033[J")
+            sys.stdout.flush()
+            line_count = 0
+            current_col = 0
+
+    def track_output(text: str):
+        """Track line count including terminal wrapping."""
+        nonlocal line_count, current_col
+        for char in text:
+            if char == "\n":
+                line_count += 1
+                current_col = 0
+            else:
+                current_col += 1
+                if current_col >= terminal_width:
+                    line_count += 1
+                    current_col = 0
+
+    def build_model_panel(model: str, content: str, color: str = "blue") -> Panel:
+        """Build a panel with rendered markdown."""
+        short_name = model.split("/")[-1]
+        return Panel(
+            Markdown(content) if content.strip() else Text("(empty)", style="dim"),
+            title=f"[bold {color}]{short_name}[/bold {color}]",
+            border_style=color,
+            padding=(1, 2),
+        )
+
+    async for event in run_debate_token_streaming(query, max_rounds):
+        event_type = event["type"]
+
+        if event_type == "round_start":
+            round_num = event["round_number"]
+            round_type = event["round_type"]
+            color, label = type_styles.get(round_type, ("white", round_type.title()))
+            console.print()
+            console.print(f"[bold {color}]━━━ ROUND {round_num}: {label} ━━━[/bold {color}]")
+            console.print()
+
+        elif event_type == "model_start":
+            current_model = event["model"]
+            current_content = ""
+            line_count = 0  # Reset - track_output will count actual lines
+            current_col = 0
+            # Print model header
+            short_name = current_model.split("/")[-1]
+            header = f"{short_name}: "
+            track_output(header)
+            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
+        elif event_type == "token":
+            current_content += event["content"]
+            # Print token, track lines including wrapping
+            token = event["content"]
+            track_output(token)
+            console.print(f"[grey62]{token}[/grey62]", end="")
+
+        elif event_type == "model_complete":
+            # Clear streaming output
+            console.print()  # End the streaming line
+            track_output("\n")
+            clear_streaming_output()
+            # Show rendered panel
+            console.print(build_model_panel(current_model, current_content))
+            console.print()
+
+        elif event_type == "model_error":
+            console.print()
+            clear_streaming_output()
+            console.print(Panel(
+                f"[bold red]Error: {event.get('error', 'Unknown')}[/bold red]",
+                title=f"[bold red]{current_model.split('/')[-1]}[/bold red]",
+                border_style="red",
+            ))
+            console.print()
+
+        elif event_type == "round_complete":
+            rounds_data.append({
+                "round_number": event["round_number"],
+                "round_type": event["round_type"],
+                "responses": event["responses"],
+            })
+
+        elif event_type == "synthesis_start":
+            console.print()
+            console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
+            console.print()
+            current_model = CHAIRMAN_MODEL
+            current_content = ""
+            line_count = 0  # Reset - track_output will count actual lines
+            current_col = 0
+            short_name = current_model.split("/")[-1]
+            header = f"{short_name}: "
+            track_output(header)
+            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
+        elif event_type == "synthesis_token":
+            current_content += event["content"]
+            token = event["content"]
+            track_output(token)
+            console.print(f"[grey62]{token}[/grey62]", end="")
+
+        elif event_type == "synthesis_complete":
+            synthesis_data = event["synthesis"]
+            console.print()
+            track_output("\n")
+            clear_streaming_output()
+            console.print(build_model_panel(current_model, current_content, "green"))
+            console.print()
+
+        elif event_type == "complete":
+            rounds_data = event["rounds"]
+            synthesis_data = event["synthesis"]
+
+    return rounds_data, synthesis_data
+
+
 @app.command()
 def chat(
     max_turns: int = typer.Option(
@@ -681,6 +858,11 @@ def query(
         "--rounds", "-r",
         help="Number of debate rounds (default: 2 = initial + critique + defense)",
     ),
+    stream: bool = typer.Option(
+        False,
+        "--stream",
+        help="Stream responses as they complete (debate mode only)",
+    ),
 ):
     """
     Query the LLM Council with a question.
@@ -691,6 +873,7 @@ def query(
         llm-council -f "Just give me the answer"
         llm-council --debate "Complex question"
         llm-council --debate --rounds 3 "Very complex question"
+        llm-council --debate --stream "Watch responses appear live"
     """
     if not question:
         question = typer.prompt("Enter your question")
@@ -705,17 +888,28 @@ def query(
     console.print(f"[dim]Council: {', '.join([m.split('/')[-1] for m in COUNCIL_MODELS])}[/dim]")
     console.print(f"[dim]Chairman: {CHAIRMAN_MODEL.split('/')[-1]}[/dim]")
     if debate:
-        console.print(f"[dim]Mode: Debate ({rounds} rounds)[/dim]")
+        mode_desc = f"Debate ({rounds} rounds)"
+        if stream:
+            mode_desc += " [streaming]"
+        console.print(f"[dim]Mode: {mode_desc}[/dim]")
     console.print()
 
     if debate:
         # Run debate mode
-        debate_rounds, synthesis = asyncio.run(run_debate_with_progress(question, rounds))
+        if stream:
+            # Streaming mode - shows responses as they complete
+            debate_rounds, synthesis = asyncio.run(run_debate_streaming(question, rounds))
+        else:
+            # Batch mode - shows progress spinners
+            debate_rounds, synthesis = asyncio.run(run_debate_with_progress(question, rounds))
 
         if debate_rounds is None:
             raise typer.Exit(1)
 
-        if simple:
+        if stream:
+            # Streaming mode already displayed everything via Live
+            pass
+        elif simple:
             # Just print the final answer as plain text
             console.print()
             console.print(Markdown(synthesis["response"]))

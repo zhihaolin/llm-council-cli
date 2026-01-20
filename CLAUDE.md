@@ -273,6 +273,75 @@ llm-council --debate --simple "Question"           # Just final answer
 - Critique parsing fails: use full response text
 - <2 models respond: abort debate, return error
 
+## Streaming Mode
+
+### Overview
+Streaming mode shows model responses as they're generated, with token-by-token streaming. Each model processes sequentially (not in parallel) to provide a readable streaming experience.
+
+**Default behavior:** Streaming is enabled by default in chat REPL with debate mode.
+
+### How It Works
+1. Models are processed one at a time (sequential, not parallel)
+2. Tokens are displayed in dimmed grey as they arrive
+3. When a model completes, the streaming text is cleared and replaced with a rendered markdown panel
+4. The clearing accounts for terminal line wrapping to ensure clean replacement
+
+### CLI Usage
+```bash
+llm-council query --stream "Question"          # Single query with streaming
+llm-council chat                               # REPL (streaming+debate on by default)
+```
+
+### Chat REPL Commands
+- `/stream on` - Enable streaming mode
+- `/stream off` - Disable streaming mode
+- `/mode` - Show current mode (streaming indicator shown if enabled)
+
+### Streaming Functions
+
+**`backend/openrouter.py`**
+- `query_model_streaming()`: Async generator that yields SSE tokens
+  - Yields `{'type': 'token', 'content': str}` for each token
+  - Yields `{'type': 'done', 'content': str}` when complete
+  - Yields `{'type': 'error', 'error': str}` on failure
+
+**`backend/council.py`**
+- `debate_round_streaming()`: Yields events as each model completes (parallel mode, not token streaming)
+- `run_debate_council_streaming()`: Full debate with model-completion events
+- `run_debate_token_streaming()`: Full debate with token-by-token streaming (sequential)
+
+**`cli/main.py`**
+- `run_debate_streaming()`: Renders streaming output with Rich
+  - Tracks terminal line wrapping for accurate clearing
+  - Uses ANSI escape codes for cursor movement
+  - Shows dimmed text while streaming, then replaces with markdown panel
+
+### Key Implementation Details
+
+**Line Wrapping Tracking:**
+```python
+def track_output(text: str):
+    """Track line count including terminal wrapping."""
+    nonlocal line_count, current_col
+    for char in text:
+        if char == "\n":
+            line_count += 1
+            current_col = 0
+        else:
+            current_col += 1
+            if current_col >= terminal_width:
+                line_count += 1
+                current_col = 0
+```
+
+**Clearing Streaming Output:**
+```python
+def clear_streaming_output():
+    if line_count > 0:
+        sys.stdout.write(f"\033[{line_count}A\033[J")
+        sys.stdout.flush()
+```
+
 ## Common Gotchas
 
 1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
@@ -285,7 +354,6 @@ llm-council --debate --simple "Question"           # Just final answer
 ## Future Enhancement Ideas
 
 - Configurable council/chairman via UI instead of config file
-- Streaming responses instead of batch loading
 - Export conversations to markdown/PDF
 - Model performance analytics over time
 - Custom ranking criteria (not just accuracy/insight)
@@ -293,14 +361,18 @@ llm-council --debate --simple "Question"           # Just final answer
 
 ## Testing
 
-### Test Suite (46 tests)
+### Test Suite (70 tests)
 ```
 tests/
-├── conftest.py              # Fixtures and mock API responses
-├── test_ranking_parser.py   # 14 tests - ranking extraction
-├── test_debate.py           # 15 tests - debate mode
-├── test_search.py           # 17 tests - web search & tool calling
-└── integration/             # CLI tests (planned)
+├── conftest.py                  # Fixtures and mock API responses
+├── test_chat_commands.py        # 10 tests - chat REPL command parsing
+├── test_cli_imports.py          # 1 test - CLI module imports
+├── test_conversation_context.py # 5 tests - conversation context handling
+├── test_debate.py               # 15 tests - debate mode
+├── test_ranking_parser.py       # 14 tests - ranking extraction
+├── test_search.py               # 17 tests - web search & tool calling
+├── test_streaming.py            # 8 tests - streaming mode
+└── integration/                 # CLI tests (planned)
 ```
 
 ### Running Tests

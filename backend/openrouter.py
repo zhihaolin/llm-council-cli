@@ -2,7 +2,7 @@
 
 import json
 import httpx
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, AsyncGenerator
 
 from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
 
@@ -53,6 +53,76 @@ async def query_model(
     except Exception as e:
         print(f"Error querying model {model}: {e}")
         return None
+
+
+async def query_model_streaming(
+    model: str,
+    messages: List[Dict[str, str]],
+    timeout: float = 120.0
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """
+    Query a model with streaming response.
+
+    Args:
+        model: OpenRouter model identifier
+        messages: List of message dicts with 'role' and 'content'
+        timeout: Request timeout in seconds
+
+    Yields:
+        {'type': 'token', 'content': str} - Content tokens as they arrive
+        {'type': 'done', 'content': str} - Final complete content
+        {'type': 'error', 'error': str} - If an error occurs
+    """
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+    }
+
+    full_content = ""
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            async with client.stream(
+                "POST",
+                OPENROUTER_API_URL,
+                headers=headers,
+                json=payload
+            ) as response:
+                response.raise_for_status()
+
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    if not line.startswith("data: "):
+                        continue
+
+                    data_str = line[6:]  # Remove "data: " prefix
+
+                    if data_str == "[DONE]":
+                        break
+
+                    try:
+                        data = json.loads(data_str)
+                        delta = data.get("choices", [{}])[0].get("delta", {})
+                        content = delta.get("content", "")
+
+                        if content:
+                            full_content += content
+                            yield {"type": "token", "content": content}
+
+                    except json.JSONDecodeError:
+                        continue
+
+        yield {"type": "done", "content": full_content}
+
+    except Exception as e:
+        yield {"type": "error", "error": str(e)}
 
 
 async def query_model_with_tools(

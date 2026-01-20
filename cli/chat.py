@@ -11,6 +11,7 @@ CHAT_COMMANDS = {
     "new": "Start a new conversation",
     "debate": "Toggle debate mode (on/off)",
     "rounds": "Set debate rounds",
+    "stream": "Toggle streaming mode (on/off)",
     "mode": "Show current mode",
     "exit": "Exit chat",
 }
@@ -52,26 +53,41 @@ def suggest_chat_commands(prefix: str) -> List[str]:
     return [command for command in CHAT_COMMANDS if command.startswith(prefix)]
 
 
-def format_chat_mode_line(debate_enabled: bool, debate_rounds: int) -> str:
+def format_chat_mode_line(
+    debate_enabled: bool,
+    debate_rounds: int,
+    stream_enabled: bool = False,
+) -> str:
     """Format the current chat mode line for display."""
     if debate_enabled:
+        mode_str = f"Debate ({debate_rounds} rounds)"
+        if stream_enabled:
+            mode_str += " [streaming]"
         return (
             "[chat.meta]Mode:[/chat.meta] "
-            f"[chat.accent]Debate ({debate_rounds} rounds)[/chat.accent]"
+            f"[chat.accent]{mode_str}[/chat.accent]"
         )
     return "[chat.meta]Mode:[/chat.meta] [chat.accent]Council (ranking)[/chat.accent]"
 
 
-def format_prompt_mode(debate_enabled: bool, debate_rounds: int) -> str:
+def format_prompt_mode(
+    debate_enabled: bool,
+    debate_rounds: int,
+    stream_enabled: bool = False,
+) -> str:
     """Format the prompt mode indicator."""
     if debate_enabled:
         return f"debate({debate_rounds})"
     return "rank"
 
 
-def build_chat_prompt(debate_enabled: bool, debate_rounds: int) -> str:
+def build_chat_prompt(
+    debate_enabled: bool,
+    debate_rounds: int,
+    stream_enabled: bool = False,
+) -> str:
     """Build the chat prompt string with mode indicator."""
-    mode = format_prompt_mode(debate_enabled, debate_rounds)
+    mode = format_prompt_mode(debate_enabled, debate_rounds, stream_enabled)
     return f"[chat.prompt]{mode}>[/chat.prompt] "
 
 
