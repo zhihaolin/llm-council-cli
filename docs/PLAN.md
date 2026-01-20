@@ -7,7 +7,7 @@
 | v1.0 | CLI + TUI + Web UI | ✅ Complete |
 | v1.1 | Web Search (Tool Calling) | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
-| v1.3 | Conversation History | 🔜 Next |
+| v1.3 | Conversation History | 🟡 In progress |
 | v1.4 | File/Document Upload | Planned |
 | v1.5 | Image Input (Multimodal) | Planned |
 
@@ -40,17 +40,16 @@
 
 Multi-turn conversations in CLI.
 
-```bash
-llm-council query "Question"                    # New conversation
-llm-council query "Follow-up" --continue        # Continue last
-llm-council query "Question" --id <id>          # Resume specific
-llm-council history                             # List conversations
-```
-
-**Key decisions:**
-- Context includes Stage 3 only (not all stages)
+**Implemented:**
+- `llm-council chat` interactive REPL with auto-resume
+- Slash commands: `/history`, `/use <id>`, `/new`, `/debate on|off`, `/rounds N`, `/mode`, `/exit`
+- Live slash-command autocomplete in chat
+- Context includes Stage 3 only (first message + last N exchanges)
 - Shared storage with web UI (`data/conversations/`)
-- Truncation: first message + last N exchanges
+
+**Optional follow-ups:**
+- One-shot commands: `query --continue`, `query --id <id>`
+- Top-level `llm-council history` command outside chat
 
 ### v1.4: File/Document Upload
 

@@ -4,6 +4,24 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.3: CLI Chat REPL
+*January 2026*
+
+### Overview
+Added a chat-oriented CLI workflow with conversation history, slash commands, and live autocomplete.
+
+### Implementation
+- `cli/main.py` adds `chat` command with auto-resume, debate toggles, and prompt-toolkit autocomplete
+- `cli/chat.py` centralizes context building, command parsing, and completion
+- Context uses Stage 3 only (first message + last N exchanges)
+- Shared storage remains `data/conversations/` to align with web UI
+
+### Configuration
+- Council model list trimmed to OpenAI, Grok, and DeepSeek
+- Chairman set to OpenAI (`openai/gpt-5.2`)
+
+---
+
 ## CI/CD Setup
 *January 2026*
 
