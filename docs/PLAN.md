@@ -206,14 +206,37 @@ uv run pytest tests/ --cov=backend --cov-report=term # With coverage
 2. **Async tests**: pytest-asyncio for debate rounds
 3. **Integration tests**: CLI commands (planned)
 
-### Engineering Practices (v1.3+)
+### Engineering Practices Roadmap
+
+#### Currently Implemented ✅
+
+| Practice | Details |
+|----------|---------|
+| **Async/Parallel Execution** | `asyncio.gather()` for concurrent API calls, non-blocking I/O |
+| **Graceful Degradation** | Council continues if individual models fail |
+| **Test Suite** | pytest + pytest-asyncio, 29 tests, mocked API responses |
+| **Type Hints** | Function signatures and return types throughout |
+| **Error Handling** | Try/catch with fallback behavior, None-safe returns |
+
+#### Planned for v1.3
 
 | Practice | Implementation |
 |----------|----------------|
-| **TDD** | Write tests first for new features starting v1.3 |
-| **SOLID** | Refactor toward single responsibility, dependency injection |
-| **Guardrails** | Input validation, cost estimation, rate limiting |
-| **CI** | GitHub Actions for automated testing (planned) |
+| **TDD** | Write tests first for conversation history feature |
+| **Pydantic Models** | `CouncilConfig`, `ModelResponse`, `DebateRound`, `RankingResult` |
+| **Config Extraction** | Move hardcoded values to `config.yaml` with Pydantic validation |
+| **Structured Logging** | JSON logs with log levels, correlation IDs for request tracing |
+
+#### Planned for v1.4+
+
+| Practice | Implementation |
+|----------|----------------|
+| **CI/CD** | GitHub Actions: run tests, lint, coverage on PR |
+| **Pre-commit Hooks** | ruff/black formatting, lint checks before commit |
+| **Custom Exceptions** | `CouncilError`, `ModelTimeoutError`, `RateLimitError` |
+| **Retry with Backoff** | Exponential backoff for transient API failures |
+| **SOLID Refactor** | Extract `RankingCouncil`, `DebateCouncil` classes; dependency injection |
+| **Rate Limiting** | Cost estimation before execution, configurable limits |
 
 ---
 

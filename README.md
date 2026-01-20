@@ -277,6 +277,23 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 
 ---
 
+## Engineering Practices
+
+| Practice | Status | Details |
+|----------|--------|---------|
+| **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
+| **Graceful Degradation** | ✅ | Continues if individual models fail |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 29 tests |
+| **Type Hints** | ✅ | Throughout codebase |
+| **CI/CD** | 🔜 | GitHub Actions (planned) |
+| **Pydantic Models** | 🔜 | Data validation (planned) |
+| **Structured Logging** | 🔜 | JSON logs with correlation IDs (planned) |
+| **Config Management** | 🔜 | YAML config with validation (planned) |
+
+See [docs/PLAN.md](docs/PLAN.md) for the full engineering roadmap.
+
+---
+
 ## Development
 
 ### Running Tests
