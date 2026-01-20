@@ -4,6 +4,48 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.4: Token Streaming
+*January 2026*
+
+### Overview
+Added token-by-token streaming for debate mode. Responses stream as they generate, then are replaced with rendered markdown panels.
+
+### Implementation
+
+**Backend (`backend/openrouter.py`):**
+- `query_model_streaming()` - Async generator yielding SSE tokens
+- Parses `data: ` lines from OpenRouter streaming response
+- Yields `{'type': 'token'}`, `{'type': 'done'}`, `{'type': 'error'}` events
+
+**Backend (`backend/council.py`):**
+- `debate_round_streaming()` - Model-completion streaming (parallel)
+- `run_debate_council_streaming()` - Full debate with completion events
+- `run_debate_token_streaming()` - Sequential token-by-token streaming
+
+**CLI (`cli/main.py`):**
+- `run_debate_streaming()` - Rich-based streaming display
+- `track_output()` - Tracks terminal line wrapping for accurate clearing
+- ANSI escape codes for cursor movement (`\033[{n}A\033[J`)
+
+**CLI (`cli/chat.py`):**
+- `/stream on|off` command
+- Streaming enabled by default with debate mode
+- Updated prompt to show streaming state
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Streaming type | Token-by-token | More engaging than model-completion |
+| Model order | Sequential | Parallel token streams would be chaotic |
+| Display | Stream dimmed → replace with panel | Readable while streaming, clean final output |
+| Line tracking | Count wraps | Terminal wrapping breaks naive newline counting |
+
+### Tests
+- `test_streaming.py` - 8 tests for streaming event order, model identity, error handling
+
+---
+
 ## v1.3: Interactive Chat with History
 *January 2026*
 
@@ -142,11 +184,15 @@ Set up pytest with async support and wrote tests for critical parsing logic.
 
 ```
 tests/
-├── conftest.py              # Fixtures, mock API responses
-├── test_ranking_parser.py   # 14 tests
-├── test_debate.py           # 15 tests
-├── test_search.py           # 17 tests
-└── integration/             # CLI tests (planned)
+├── conftest.py                  # Fixtures, mock API responses
+├── test_chat_commands.py        # 10 tests
+├── test_cli_imports.py          # 1 test
+├── test_conversation_context.py # 5 tests
+├── test_debate.py               # 15 tests
+├── test_ranking_parser.py       # 14 tests
+├── test_search.py               # 17 tests
+├── test_streaming.py            # 8 tests
+└── integration/                 # CLI tests (planned)
 ```
 
 **Dependencies added:**
@@ -161,8 +207,12 @@ tests/
 | Ranking parser | 14 | `parse_ranking_from_text`, `calculate_aggregate_rankings` |
 | Debate mode | 15 | Critique extraction, defense parsing, async rounds |
 | Web search | 17 | Tool calling, search_web, format_search_results |
+| Chat commands | 10 | Command parsing, aliases, mode formatting |
+| Conversation context | 5 | Pair extraction, context selection |
+| Streaming | 8 | Event order, model identity, error handling |
+| CLI imports | 1 | Module import verification |
 
-**Results:** 46 passed (focused on critical parsing and tool calling logic)
+**Results:** 70 passed (parsing, tool calling, streaming, and chat logic)
 
 ---
 

@@ -8,8 +8,9 @@
 | v1.1 | Web Search (Tool Calling) | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |
-| v1.4 | File/Document Upload | Planned |
-| v1.5 | Image Input (Multimodal) | Planned |
+| v1.4 | Token Streaming | ✅ Complete |
+| v1.5 | File/Document Upload | Planned |
+| v1.6 | Image Input (Multimodal) | Planned |
 
 ---
 
@@ -39,11 +40,18 @@
 - Shared storage with web UI (`data/conversations/`)
 - `--new` flag to start fresh, `--max-turns` to control context window
 
+### v1.4: Token Streaming
+- Token-by-token streaming in debate mode
+- `/stream on|off` command in chat REPL
+- Streaming enabled by default with debate mode
+- Dimmed text while streaming, replaced with rendered markdown panel on completion
+- Terminal line-wrap tracking for clean output clearing
+
 ---
 
 ## Next Up
 
-### v1.4: File/Document Upload
+### v1.5: File/Document Upload
 
 ```bash
 llm-council query --file ./code.py "Review this"
@@ -52,13 +60,12 @@ llm-council query --file ./report.pdf "Summarize"
 
 **Supported:** `.txt`, `.md`, `.py`, `.json`, `.pdf`, `.docx`
 
-### v1.5+: Future
+### v1.6+: Future
 
 | Version | Feature |
 |---------|---------|
-| v1.5 | Image input (multimodal) |
-| v1.6 | Presets & profiles |
-| v1.7 | Streaming responses |
+| v1.6 | Image input (multimodal) |
+| v1.7 | Presets & profiles |
 | v1.8 | Code execution tool |
 | v1.9 | Local models (Ollama) |
 | v2.0 | Docker packaging (for web UI) |
@@ -73,7 +80,7 @@ llm-council query --file ./report.pdf "Summarize"
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 46 tests |
+| Test Suite | pytest + pytest-asyncio, 70 tests |
 | Type Hints | Function signatures throughout |
 | CI/CD | GitHub Actions (tests on every push) |
 
@@ -135,11 +142,15 @@ uv run pytest tests/ --cov=backend         # With coverage
 
 ```
 tests/
-├── conftest.py              # Fixtures, mocks
-├── test_ranking_parser.py   # 14 tests
-├── test_debate.py           # 15 tests
-├── test_search.py           # 17 tests
-└── integration/             # CLI tests (planned)
+├── conftest.py                  # Fixtures, mocks
+├── test_chat_commands.py        # 10 tests
+├── test_cli_imports.py          # 1 test
+├── test_conversation_context.py # 5 tests
+├── test_debate.py               # 15 tests
+├── test_ranking_parser.py       # 14 tests
+├── test_search.py               # 17 tests
+├── test_streaming.py            # 8 tests
+└── integration/                 # CLI tests (planned)
 ```
 
 ---

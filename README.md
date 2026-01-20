@@ -93,6 +93,7 @@ Slash commands:
 - `/use <id>` — Switch to a conversation by ID prefix
 - `/new` — Start a new conversation
 - `/debate on|off` — Toggle debate mode
+- `/stream on|off` — Toggle streaming mode
 - `/rounds N` — Set debate rounds
 - `/mode` — Show current mode
 - `/exit` — Exit chat
@@ -117,8 +118,8 @@ Slash commands:
 ┌─────────────────────────────────────────────────────────────────┐
 │              Stage 1: Parallel Model Queries                     │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │
-│  │ GPT-5.2 │ │ Gemini  │ │ Claude  │ │  Grok   │ │DeepSeek │   │
-│  │         │ │  3 Pro  │ │Sonnet4.5│ │4.1 Fast │ │   R1    │   │
+│  │ Model A │ │ Model B │ │ Model C │ │ Model D │ │ Model E │   │
+│  │  (GPT)  │ │(Gemini) │ │(Claude) │ │ (Grok)  │ │(DeepSeek)   │
 │  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘   │
 │       │           │           │           │           │         │
 │       └───────────┴─────┬─────┴───────────┴───────────┘         │
@@ -288,18 +289,17 @@ Then open http://localhost:5173
 Edit `backend/config.py` to customize the council:
 
 ```python
+# Example configuration (use any OpenRouter-supported models)
 COUNCIL_MODELS = [
-    "openai/gpt-5.2",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4.1-fast",
-    "deepseek/deepseek-r1-0528",
+    "openai/gpt-4o-mini",      # Fast, cost-effective
+    "x-ai/grok-3",             # X.AI's latest
+    "deepseek/deepseek-chat",  # Strong reasoning
 ]
 
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+CHAIRMAN_MODEL = "openai/gpt-4o-mini"
 ```
 
-All models are accessed through [OpenRouter](https://openrouter.ai/), which provides a unified API for multiple providers.
+All models are accessed through [OpenRouter](https://openrouter.ai/), which provides a unified API for 200+ models from OpenAI, Anthropic, Google, Meta, and more. Choose models based on your budget and quality requirements.
 
 ---
 
@@ -323,7 +323,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 46 tests |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 70 tests |
 | **Type Hints** | ✅ | Throughout codebase |
 | **CI/CD** | ✅ | GitHub Actions (tests on every push) |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
@@ -353,11 +353,14 @@ uv run pytest tests/ --cov=backend --cov-report=term-missing
 
 ```
 tests/
-├── conftest.py              # Fixtures and mock API responses
-├── test_ranking_parser.py   # Ranking extraction tests (14 tests)
-├── test_debate.py           # Debate mode tests (15 tests)
-├── test_search.py           # Web search & tool calling tests (17 tests)
-└── integration/             # CLI integration tests (planned)
+├── conftest.py                  # Fixtures and mock API responses
+├── test_chat_commands.py        # Chat REPL command parsing (10 tests)
+├── test_conversation_context.py # Context extraction (5 tests)
+├── test_debate.py               # Debate mode (15 tests)
+├── test_ranking_parser.py       # Ranking extraction (14 tests)
+├── test_search.py               # Web search & tool calling (17 tests)
+├── test_streaming.py            # Token streaming (8 tests)
+└── integration/                 # CLI integration tests (planned)
 ```
 
 ---
@@ -370,8 +373,9 @@ tests/
 | v1.1 | Autonomous Web Search | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |
-| v1.4 | File/Document Upload | Planned |
-| v1.5 | Image Input (Multimodal) | Planned |
+| v1.4 | Token Streaming | ✅ Complete |
+| v1.5 | File/Document Upload | Planned |
+| v1.6 | Image Input (Multimodal) | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 
