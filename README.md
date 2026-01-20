@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/Tests-46%20passed-green.svg)](tests/)
+[![Tests](https://github.com/zhihaolin/llm-council-cli/actions/workflows/test.yml/badge.svg)](https://github.com/zhihaolin/llm-council-cli/actions/workflows/test.yml)
 
 **Multi-model deliberation for better answers.**
 
