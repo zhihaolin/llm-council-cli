@@ -4,6 +4,23 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## CI/CD Setup
+*January 2026*
+
+### Overview
+Added GitHub Actions for automated testing on every push.
+
+### Implementation
+- `.github/workflows/test.yml` runs pytest on push/PR to master
+- Dynamic badge in README shows real-time CI status
+- Uses `astral-sh/setup-uv` for fast dependency installation
+
+### Future
+- Contract tests (daily scheduled runs to detect API drift)
+- Pre-commit hooks for linting
+
+---
+
 ## v1.2: Multi-Turn Debate Mode
 *January 2026*
 

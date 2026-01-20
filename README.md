@@ -289,7 +289,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
 | **Test Suite** | ✅ | pytest + pytest-asyncio, 46 tests |
 | **Type Hints** | ✅ | Throughout codebase |
-| **CI/CD** | 🔜 | GitHub Actions (planned) |
+| **CI/CD** | ✅ | GitHub Actions (tests on every push) |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
 | **Structured Logging** | 🔜 | JSON logs with correlation IDs (planned) |
 | **Config Management** | 🔜 | YAML config with validation (planned) |

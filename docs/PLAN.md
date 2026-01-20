@@ -83,6 +83,7 @@ llm-council query --file ./report.pdf "Summarize"
 | Graceful Degradation | Continues if individual models fail |
 | Test Suite | pytest + pytest-asyncio, 46 tests |
 | Type Hints | Function signatures throughout |
+| CI/CD | GitHub Actions (tests on every push) |
 
 ### Planned for v1.3
 
@@ -97,7 +98,7 @@ llm-council query --file ./report.pdf "Summarize"
 
 | Practice | Details |
 |----------|---------|
-| CI/CD | GitHub Actions for tests + lint |
+| Contract Tests | Scheduled daily API schema validation |
 | Pre-commit Hooks | ruff/black formatting |
 | Custom Exceptions | `CouncilError`, `ModelTimeoutError` |
 | Retry with Backoff | Exponential backoff for API failures |
