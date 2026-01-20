@@ -4,9 +4,6 @@ Helpers for CLI chat mode and conversation context.
 
 from typing import Dict, List, Tuple, Any, Optional
 
-from prompt_toolkit.completion import Completer, Completion
-from prompt_toolkit.formatted_text import FormattedText, HTML
-
 CHAT_COMMANDS = {
     "help": "Show this help",
     "history": "List saved conversations",
@@ -55,32 +52,6 @@ def suggest_chat_commands(prefix: str) -> List[str]:
     return [command for command in CHAT_COMMANDS if command.startswith(prefix)]
 
 
-class ChatCommandCompleter(Completer):
-    """Completer for chat slash commands."""
-
-    def __init__(self, commands: Dict[str, str]) -> None:
-        self.commands = commands
-
-    def get_completions(self, document, complete_event):
-        text = document.text_before_cursor.lstrip()
-        if not text.startswith(("/", ":")):
-            return
-
-        body = text[1:]
-        if " " in body:
-            return
-
-        prefix = body.strip().lower()
-        for command in suggest_chat_commands(prefix):
-            description = self.commands.get(command, "")
-            yield Completion(
-                command,
-                start_position=-len(prefix),
-                display=f"/{command}",
-                display_meta=description,
-            )
-
-
 def format_chat_mode_line(debate_enabled: bool, debate_rounds: int) -> str:
     """Format the current chat mode line for display."""
     if debate_enabled:
@@ -98,10 +69,10 @@ def format_prompt_mode(debate_enabled: bool, debate_rounds: int) -> str:
     return "rank"
 
 
-def build_chat_prompt(debate_enabled: bool, debate_rounds: int) -> FormattedText:
-    """Build the chat prompt formatted text with mode indicator."""
+def build_chat_prompt(debate_enabled: bool, debate_rounds: int) -> str:
+    """Build the chat prompt string with mode indicator."""
     mode = format_prompt_mode(debate_enabled, debate_rounds)
-    return HTML(f"<style fg=\"#5B8DEF\">{mode}&gt; </style>")
+    return f"[chat.prompt]{mode}>[/chat.prompt] "
 
 
 def extract_assistant_reply(message: Dict[str, Any]) -> str:

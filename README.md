@@ -68,10 +68,40 @@ The CLI shows which models used search with a subtle `• searched` indicator.
 
 ![Models autonomously searching for current information](images/search.png)
 
+### Interactive Chat Mode
+
+Multi-turn conversations with persistent history. The chat REPL remembers context and lets you switch between ranking and debate modes on the fly.
+
+```bash
+uv run python -m cli chat
+```
+
+```
+┌─────────────── Council Chat ───────────────┐
+│ Resumed conversation                       │
+│ Previous Topic Title                       │
+│ ID: abc12345                               │
+│ Mode: Council (ranking)                    │
+└────────────────────────────────────────────┘
+Commands: /help, /history, /use <id>, /new, /debate, /rounds, /mode, /exit
+
+(ranking) > What is the capital of France?
+```
+
+Slash commands:
+- `/history` — List saved conversations
+- `/use <id>` — Switch to a conversation by ID prefix
+- `/new` — Start a new conversation
+- `/debate on|off` — Toggle debate mode
+- `/rounds N` — Set debate rounds
+- `/mode` — Show current mode
+- `/exit` — Exit chat
+
 ### Rich Terminal Interface
 
 - **CLI mode** — Full 3-stage output with progress indicators
 - **Simple mode** — Just the final answer, pipe-friendly
+- **Chat mode** — Interactive REPL with conversation history
 - **Interactive TUI** — Terminal UI with keyboard navigation
 
 ---
@@ -213,6 +243,10 @@ uv run python -m cli query --final-only "Question"
 # Show current council configuration
 uv run python -m cli models
 
+# Interactive chat with history
+uv run python -m cli chat
+uv run python -m cli chat --new  # Start fresh conversation
+
 # Interactive TUI
 uv run python -m cli interactive
 ```
@@ -225,6 +259,8 @@ uv run python -m cli interactive
 | `--final-only` | `-f` | Show only chairman's synthesis (with formatting) |
 | `--debate` | `-d` | Enable debate mode |
 | `--rounds N` | `-r N` | Number of debate rounds (default: 2) |
+| `--new` | | Start a new conversation (chat mode) |
+| `--max-turns N` | `-t N` | Context turns to include (chat mode, default: 6) |
 
 ---
 
@@ -333,7 +369,7 @@ tests/
 | v1.0 | CLI + TUI + Web UI | ✅ Complete |
 | v1.1 | Autonomous Web Search | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
-| v1.3 | Conversation History | Planned |
+| v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | File/Document Upload | Planned |
 | v1.5 | Image Input (Multimodal) | Planned |
 
@@ -347,6 +383,7 @@ This project builds upon the original [LLM Council](https://github.com/karpathy/
 
 This fork extends the original with:
 - Full CLI/TUI interface
+- Interactive chat with conversation history
 - Autonomous web search via tool calling
 - Multi-turn debate mode
 - Rich terminal output with progress indicators

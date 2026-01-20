@@ -2,13 +2,7 @@
 Tests for chat helpers.
 """
 
-from prompt_toolkit.completion import CompleteEvent
-from prompt_toolkit.document import Document
-from prompt_toolkit.formatted_text import to_formatted_text
-
 from cli.chat import (
-    CHAT_COMMANDS,
-    ChatCommandCompleter,
     build_chat_prompt,
     format_chat_mode_line,
     parse_chat_command,
@@ -63,26 +57,9 @@ def test_format_chat_mode_line_ranking():
 
 def test_build_chat_prompt_debate():
     prompt = build_chat_prompt(True, 3)
-    text = "".join(chunk[1] for chunk in to_formatted_text(prompt))
-    assert "debate(3)>" in text
+    assert "debate(3)>" in prompt
 
 
 def test_build_chat_prompt_ranking():
     prompt = build_chat_prompt(False, 2)
-    text = "".join(chunk[1] for chunk in to_formatted_text(prompt))
-    assert "rank>" in text
-
-
-def test_chat_command_completer_matches_prefix():
-    completer = ChatCommandCompleter(CHAT_COMMANDS)
-    document = Document(text="/d", cursor_position=2)
-    completions = list(completer.get_completions(document, CompleteEvent()))
-    texts = [item.text for item in completions]
-    assert "debate" in texts
-
-
-def test_chat_command_completer_requires_prefix():
-    completer = ChatCommandCompleter(CHAT_COMMANDS)
-    document = Document(text="hello", cursor_position=5)
-    completions = list(completer.get_completions(document, CompleteEvent()))
-    assert completions == []
+    assert "rank>" in prompt

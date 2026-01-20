@@ -7,7 +7,7 @@
 | v1.0 | CLI + TUI + Web UI | ✅ Complete |
 | v1.1 | Web Search (Tool Calling) | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
-| v1.3 | Conversation History | 🟡 In progress |
+| v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | File/Document Upload | Planned |
 | v1.5 | Image Input (Multimodal) | Planned |
 
@@ -32,24 +32,16 @@
 - `--rounds N` for extended debates
 - Chairman synthesizes full debate transcript
 
+### v1.3: Interactive Chat with History
+- `llm-council chat` interactive REPL with auto-resume
+- Slash commands: `/history`, `/use <id>`, `/new`, `/debate on|off`, `/rounds N`, `/mode`, `/exit`
+- Context includes Stage 3 only (first message + last N exchanges)
+- Shared storage with web UI (`data/conversations/`)
+- `--new` flag to start fresh, `--max-turns` to control context window
+
 ---
 
 ## Next Up
-
-### v1.3: Conversation History
-
-Multi-turn conversations in CLI.
-
-**Implemented:**
-- `llm-council chat` interactive REPL with auto-resume
-- Slash commands: `/history`, `/use <id>`, `/new`, `/debate on|off`, `/rounds N`, `/mode`, `/exit`
-- Live slash-command autocomplete in chat
-- Context includes Stage 3 only (first message + last N exchanges)
-- Shared storage with web UI (`data/conversations/`)
-
-**Optional follow-ups:**
-- One-shot commands: `query --continue`, `query --id <id>`
-- Top-level `llm-council history` command outside chat
 
 ### v1.4: File/Document Upload
 
@@ -85,19 +77,13 @@ llm-council query --file ./report.pdf "Summarize"
 | Type Hints | Function signatures throughout |
 | CI/CD | GitHub Actions (tests on every push) |
 
-### Planned for v1.3
+### Planned
 
 | Practice | Details |
 |----------|---------|
-| TDD | Tests first for new features |
 | Pydantic Models | `CouncilConfig`, `ModelResponse`, `DebateRound` |
 | Config Extraction | YAML config with validation |
 | Structured Logging | JSON logs with correlation IDs |
-
-### Planned for v1.4+
-
-| Practice | Details |
-|----------|---------|
 | Contract Tests | Scheduled daily API schema validation |
 | Pre-commit Hooks | Ruff lint/format |
 | Type Checking | Pyright (basic) |
@@ -158,6 +144,6 @@ tests/
 
 ---
 
-*Last updated: 2026-01-20*
+*Last updated: 2026-01-21*
 
 For implementation details and session notes, see [DEVLOG.md](DEVLOG.md).

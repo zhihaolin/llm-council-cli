@@ -4,17 +4,45 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
-## v1.3: CLI Chat REPL
+## v1.3: Interactive Chat with History
 *January 2026*
 
 ### Overview
-Added a chat-oriented CLI workflow with conversation history, slash commands, and live autocomplete.
+Added a chat-oriented CLI workflow with conversation history and slash commands.
 
 ### Implementation
-- `cli/main.py` adds `chat` command with auto-resume, debate toggles, and prompt-toolkit autocomplete
-- `cli/chat.py` centralizes context building, command parsing, and completion
-- Context uses Stage 3 only (first message + last N exchanges)
-- Shared storage remains `data/conversations/` to align with web UI
+
+**New file `cli/chat.py`:**
+- `CHAT_COMMANDS` dictionary with `/help`, `/history`, `/use`, `/new`, `/debate`, `/rounds`, `/mode`, `/exit`
+- `parse_chat_command()` - Parse slash commands with alias support (`/q` → `/exit`)
+- `extract_conversation_pairs()` - Extract (user, assistant) pairs from stored messages
+- `select_context_pairs()` - Select first + last N exchanges for context window
+- `build_context_prompt()` - Format context for LLM queries
+
+**Modified `cli/main.py`:**
+- `chat` command with `--new` and `--max-turns` flags
+- `run_chat_session()` - Interactive REPL loop
+- Rich-themed output with custom color scheme
+- Auto-resume most recent conversation on startup
+
+### Tests
+
+```
+tests/
+├── test_chat_commands.py         # 10 tests - command parsing, formatting
+└── test_conversation_context.py  # 5 tests - context extraction, formatting
+```
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `test_chat_commands.py` | 10 | Command parsing, aliases, mode formatting |
+| `test_conversation_context.py` | 5 | Pair extraction, context selection, prompt building |
+
+### Features
+- Auto-resume latest conversation or start fresh with `--new`
+- Switch between ranking and debate modes mid-conversation
+- Context window: first exchange + last N exchanges (default: 6)
+- Shared storage with web UI (`data/conversations/`)
 
 ### Configuration
 - Council model list trimmed to OpenAI, Grok, and DeepSeek

@@ -14,10 +14,6 @@ import uuid
 from typing import Optional
 
 import typer
-from prompt_toolkit import PromptSession
-from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.shortcuts import CompleteStyle
-from prompt_toolkit.styles import Style as PromptStyle
 from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -40,7 +36,6 @@ from backend import storage
 
 from cli.chat import (
     CHAT_COMMANDS,
-    ChatCommandCompleter,
     build_context_prompt,
     build_chat_prompt,
     format_chat_mode_line,
@@ -55,20 +50,6 @@ CHAT_THEME = Theme({
     "chat.command": "#E0B15A",
     "chat.success": "green",
     "chat.error": "bold red",
-})
-
-CHAT_PROMPT_STYLE = PromptStyle.from_dict({
-    "prompt": "#5B8DEF",
-    "completion-menu": "bg:default fg:default",
-    "completion-menu.completion": "bg:default fg:default",
-    "completion-menu.completion.current": "bg:default fg:default underline",
-    "completion-menu.meta": "bg:default fg:default dim",
-    "completion-menu.meta.current": "bg:default fg:default underline",
-    "completion-menu.meta.completion": "bg:default fg:default dim",
-    "completion-menu.meta.completion.current": "bg:default fg:default underline",
-    "completion-menu.multi-column-meta": "bg:default fg:default dim",
-    "scrollbar.background": "bg:default",
-    "scrollbar.button": "bg:default",
 })
 
 app = typer.Typer(
@@ -308,12 +289,6 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
     resumed = False
     debate_enabled = False
     debate_rounds = DEFAULT_DEBATE_ROUNDS
-    session = PromptSession(
-        completer=ChatCommandCompleter(CHAT_COMMANDS),
-        complete_style=CompleteStyle.COLUMN,
-        auto_suggest=AutoSuggestFromHistory(),
-        style=CHAT_PROMPT_STYLE,
-    )
 
     if not start_new and conversations:
         conversation_id = conversations[0]["id"]
@@ -336,11 +311,9 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
 
     while True:
         try:
-            user_input = await session.prompt_async(
-                build_chat_prompt(debate_enabled, debate_rounds),
-                complete_while_typing=True,
-            )
-            user_input = user_input.strip()
+            user_input = console.input(
+                build_chat_prompt(debate_enabled, debate_rounds)
+            ).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[chat.meta]Exiting chat.[/chat.meta]")
             break
