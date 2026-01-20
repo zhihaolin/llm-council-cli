@@ -1,34 +1,146 @@
-# LLM Council CLI
+# LLM Council
 
-> **Fork of [Andrej Karpathy's LLM Council](https://github.com/karpathy/llm-council)** - Extended with a terminal-based interface.
+**Multi-model deliberation for better answers.**
 
-![llmcouncil](header.jpg)
+A system where AI models debate, critique, and synthesize answers together.
 
-## Credits
+Instead of asking one LLM and hoping for the best, LLM Council orchestrates multiple frontier models through structured deliberation—producing more accurate, nuanced, and well-reasoned answers.
 
-This project is based on the original [LLM Council](https://github.com/karpathy/llm-council) created by **[Andrej Karpathy](https://github.com/karpathy)**. All credit for the core concept and implementation goes to him. This fork adds a CLI/TUI interface for terminal users.
+![Chairman synthesis after multi-round debate](images/hero.png)
+
+## Why This Exists
+
+Single-model responses have blind spots. LLM Council fixes this by:
+
+1. **Consulting multiple models** — GPT, Claude, Gemini, Grok, and DeepSeek all weigh in
+2. **Anonymous peer review** — Models rank each other's responses without knowing who wrote what (prevents favoritism)
+3. **Structured debate** — Models critique and defend positions across multiple rounds
+4. **Chairman synthesis** — A designated model synthesizes the collective wisdom into one answer
+
+The result? Answers that capture the best insights from each model while filtering out individual weaknesses.
 
 ---
 
-## What is LLM Council?
+## Features
 
-Instead of asking a question to a single LLM, you can group multiple LLMs into a "Council". This project sends your query to multiple LLMs, has them review and rank each other's work anonymously, and then a Chairman LLM produces the final response.
+### Multi-Model Deliberation
 
-**The 3-Stage Process:**
+Query 5 frontier models in parallel. Each provides an independent response, then anonymously evaluates the others. A chairman model synthesizes the final answer based on the full deliberation.
 
-1. **Stage 1: First opinions** - The query is sent to all LLMs individually, responses collected
-2. **Stage 2: Review** - Each LLM ranks the anonymized responses of others
-3. **Stage 3: Final response** - The Chairman synthesizes everything into a final answer
+```
+Stage 1: Independent Responses    →  5 models answer your question
+Stage 2: Anonymous Peer Review    →  Each model ranks the others (blind)
+Stage 3: Chairman Synthesis       →  Best insights combined into final answer
+```
 
-## What This Fork Adds
+### Debate Mode
 
-- **CLI interface** - Query the council from your terminal
-- **Rich output** - Progress indicators, formatted tables, markdown rendering
-- **Web search** - Models can autonomously search the web for current information
-- **Interactive TUI** - Terminal UI with Textual (optional)
-- **Simple mode** - Pipe-friendly output for scripting
+For complex or controversial questions, enable multi-round debate where models critique each other's reasoning and defend their positions.
 
-See [docs/PLAN.md](docs/PLAN.md) for the full implementation roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development progress.
+```bash
+llm-council --debate "Is capitalism or socialism better for reducing poverty?"
+llm-council --debate --rounds 3 "Should AI development be paused?"
+```
+
+```
+Round 1: Initial Responses    →  Each model presents their position
+Round 2: Critiques            →  Models challenge each other's arguments
+Round 3: Defense & Revision   →  Models defend valid points, concede weaknesses
+Final:   Chairman Synthesis   →  Synthesizes the evolved positions
+```
+
+![Models critiquing each other in debate mode](images/debate.png)
+
+### Autonomous Web Search
+
+Models decide when they need current information. No manual flags—they call the search tool when the question requires it.
+
+```bash
+llm-council "What is the current price of Bitcoin?"
+# Models automatically search for real-time data
+```
+
+The CLI shows which models used search with a subtle `• searched` indicator.
+
+![Models autonomously searching for current information](images/search.png)
+
+### Rich Terminal Interface
+
+- **CLI mode** — Full 3-stage output with progress indicators
+- **Simple mode** — Just the final answer, pipe-friendly
+- **Interactive TUI** — Terminal UI with keyboard navigation
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         User Query                               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Stage 1: Parallel Model Queries                     │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │
+│  │ GPT-5.2 │ │ Gemini  │ │ Claude  │ │  Grok   │ │DeepSeek │   │
+│  │         │ │  3 Pro  │ │Sonnet4.5│ │4.1 Fast │ │   R1    │   │
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘   │
+│       │           │           │           │           │         │
+│       └───────────┴─────┬─────┴───────────┴───────────┘         │
+│                         │                                        │
+│              ┌──────────▼──────────┐                            │
+│              │   Web Search Tool   │  (Tavily API)              │
+│              │  Models call when   │                            │
+│              │  they need current  │                            │
+│              │    information      │                            │
+│              └─────────────────────┘                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Stage 2: Anonymous Peer Review                      │
+│                                                                  │
+│   Responses anonymized as "Response A, B, C, D, E"              │
+│   Each model ranks all responses (can't identify authors)        │
+│   Aggregate rankings computed from all evaluations               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│              Stage 3: Chairman Synthesis                         │
+│                                                                  │
+│   Chairman model receives:                                       │
+│   - All original responses                                       │
+│   - All peer evaluations                                         │
+│   - Aggregate rankings                                           │
+│                                                                  │
+│   Produces: Single comprehensive answer                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Debate Mode Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  Round 1: Initial        Round 2: Critique       Round 3: Defend │
+│  ┌─────┐ ┌─────┐        ┌─────┐ ┌─────┐        ┌─────┐ ┌─────┐  │
+│  │Model│ │Model│   →    │  A  │→│  B  │   →    │Revise│ │Revise│ │
+│  │  A  │ │  B  │        │critiques B,C,D│        │  A   │ │  B   │ │
+│  └─────┘ └─────┘        └─────┘ └─────┘        └─────┘ └─────┘  │
+│  ┌─────┐ ┌─────┐        ┌─────┐ ┌─────┐        ┌─────┐ ┌─────┐  │
+│  │Model│ │Model│   →    │  C  │→│  D  │   →    │Revise│ │Revise│ │
+│  │  C  │ │  D  │        │critiques A,B,D│        │  C   │ │  D   │ │
+│  └─────┘ └─────┘        └─────┘ └─────┘        └─────┘ └─────┘  │
+└──────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │    Chairman     │
+                    │   Synthesizes   │
+                    │  Full Debate    │
+                    └─────────────────┘
+```
 
 ---
 
@@ -49,80 +161,89 @@ uv sync
 
 ### 2. Configure API Keys
 
-Create a `.env` file in the project root:
-
 ```bash
-# Required: OpenRouter API key for LLM access
+# Required: OpenRouter API key (access to all models via one API)
 echo "OPENROUTER_API_KEY=sk-or-v1-your-key-here" > .env
 
-# Optional: Tavily API key for web search (models decide when to search)
+# Optional: Tavily API key for web search
 echo "TAVILY_API_KEY=tvly-your-key-here" >> .env
 ```
 
-Get your API keys at:
-- [openrouter.ai](https://openrouter.ai/) - Required for LLM queries
-- [tavily.com](https://tavily.com/) - Optional, enables web search (free tier: 1000 searches/month)
+Get your API keys:
+- [openrouter.ai](https://openrouter.ai/) — Required, provides access to GPT, Claude, Gemini, etc.
+- [tavily.com](https://tavily.com/) — Optional, enables web search (free tier: 1000 searches/month)
 
-### 3. Run the CLI
+### 3. Query the Council
 
 ```bash
-# Query the council
+# Standard deliberation (all 3 stages)
 uv run python -m cli query "What is the best programming language for beginners?"
 
-# Show current council configuration
-uv run python -m cli models
+# Debate mode (models critique each other)
+uv run python -m cli query --debate "Should AI be regulated?"
+
+# Simple output (just the final answer)
+uv run python -m cli query --simple "What is 2+2?"
 ```
 
 ---
 
 ## CLI Usage
 
-### Basic Query
+### Commands
 
 ```bash
-uv run python -m cli query "Your question here"
-```
+# Query with full deliberation output
+uv run python -m cli query "Your question"
 
-This shows all 3 stages: individual responses, rankings, and final synthesis.
+# Query with debate mode
+uv run python -m cli query --debate "Complex question"
+uv run python -m cli query --debate --rounds 3 "Very complex question"
 
-### Output Options
+# Simple output (final answer only, no stages)
+uv run python -m cli query --simple "Quick question"
 
-```bash
-# Simple output - just the final answer (no formatting)
-uv run python -m cli query -s "Quick question"
+# Final answer with formatting (skip stages 1 & 2)
+uv run python -m cli query --final-only "Question"
 
-# Final only - skip stages 1 & 2, show only chairman's synthesis
-uv run python -m cli query -f "Just give me the answer"
-```
-
-### Show Models
-
-```bash
+# Show current council configuration
 uv run python -m cli models
-```
 
-### Interactive TUI (Experimental)
-
-```bash
+# Interactive TUI
 uv run python -m cli interactive
 ```
 
+### Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--simple` | `-s` | Output only the final answer (no formatting) |
+| `--final-only` | `-f` | Show only chairman's synthesis (with formatting) |
+| `--debate` | `-d` | Enable debate mode |
+| `--rounds N` | `-r N` | Number of debate rounds (default: 2) |
+
 ---
 
-## Running in a New Terminal Session
+## Web UI
 
-If you open a new terminal, navigate to the project and run:
+A React-based web interface is also available:
 
 ```bash
-cd /path/to/llm-council-cli
-uv run python -m cli query "Your question"
+# Start both backend and frontend
+./start.sh
+
+# Or manually:
+# Terminal 1: uv run python -m backend.main
+# Terminal 2: cd frontend && npm run dev
 ```
 
-The `uv run` command automatically uses the project's virtual environment.
+Then open http://localhost:5173
 
 ---
 
-## Configure Models
+## Configuration
+
+### Models
 
 Edit `backend/config.py` to customize the council:
 
@@ -138,44 +259,78 @@ COUNCIL_MODELS = [
 CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
 ```
 
----
-
-## Web UI (Original)
-
-The original web interface is still available:
-
-**Option 1: Use the start script**
-```bash
-./start.sh
-```
-
-**Option 2: Run manually**
-
-Terminal 1 (Backend):
-```bash
-uv run python -m backend.main
-```
-
-Terminal 2 (Frontend):
-```bash
-cd frontend
-npm install  # first time only
-npm run dev
-```
-
-Then open http://localhost:5173 in your browser.
+All models are accessed through [OpenRouter](https://openrouter.ai/), which provides a unified API for multiple providers.
 
 ---
 
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
-- **Frontend:** React + Vite, react-markdown for rendering
-- **CLI:** Typer, Textual, Rich
-- **Web Search:** Tavily API (optional, for real-time information)
-- **Storage:** JSON files in `data/conversations/`
-- **Package Management:** uv for Python, npm for JavaScript
+| Component | Technology |
+|-----------|------------|
+| Backend | Python 3.10+, FastAPI, async httpx |
+| CLI | Typer, Rich, Textual |
+| Frontend | React, Vite, react-markdown |
+| LLM Access | OpenRouter API (unified access to GPT, Claude, Gemini, etc.) |
+| Web Search | Tavily API (LLM-optimized search) |
+| Testing | pytest, pytest-asyncio, pytest-cov |
+| Storage | JSON files |
+
+---
+
+## Development
+
+### Running Tests
+
+```bash
+# Install dev dependencies
+uv sync --extra dev
+
+# Run all tests
+uv run pytest tests/ -v
+
+# Run with coverage report
+uv run pytest tests/ --cov=backend --cov-report=term-missing
+```
+
+### Test Structure
+
+```
+tests/
+├── conftest.py              # Fixtures and mock API responses
+├── test_ranking_parser.py   # Ranking extraction tests
+├── test_debate.py           # Debate mode tests
+└── integration/             # CLI integration tests
+```
+
+---
+
+## Roadmap
+
+| Version | Feature | Status |
+|---------|---------|--------|
+| v1.0 | CLI + TUI + Web UI | ✅ Complete |
+| v1.1 | Autonomous Web Search | ✅ Complete |
+| v1.2 | Multi-Turn Debate Mode | ✅ Complete |
+| v1.3 | Conversation History | Planned |
+| v1.4 | File/Document Upload | Planned |
+| v1.5 | Image Input (Multimodal) | Planned |
+
+See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
+
+---
+
+## Credits
+
+This project builds upon the original [LLM Council](https://github.com/karpathy/llm-council) concept by **[Andrej Karpathy](https://github.com/karpathy)**. The core idea of using multiple LLMs with peer review comes from his work.
+
+This fork extends the original with:
+- Full CLI/TUI interface
+- Autonomous web search via tool calling
+- Multi-turn debate mode
+- Rich terminal output with progress indicators
+
+---
 
 ## License
 
-This project inherits from the original [LLM Council](https://github.com/karpathy/llm-council) by Andrej Karpathy.
+MIT

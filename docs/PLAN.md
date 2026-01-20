@@ -185,9 +185,35 @@ llm-council = "cli.main:app"
 
 ## Testing Strategy
 
-1. **Unit tests**: Mock OpenRouter API responses
-2. **Integration test**: Run with real API (manual)
-3. **TUI test**: Textual's built-in snapshot testing
+### Current Implementation ✅
+
+```
+tests/
+├── conftest.py              # Fixtures, mock API responses
+├── test_ranking_parser.py   # 14 tests for ranking extraction
+├── test_debate.py           # 15 tests for debate mode
+└── integration/             # CLI integration tests (planned)
+```
+
+**Commands:**
+```bash
+uv run pytest tests/ -v                              # Run all tests
+uv run pytest tests/ --cov=backend --cov-report=term # With coverage
+```
+
+**Test Categories:**
+1. **Unit tests**: Mock OpenRouter API responses, test parsing logic
+2. **Async tests**: pytest-asyncio for debate rounds
+3. **Integration tests**: CLI commands (planned)
+
+### Engineering Practices (v1.3+)
+
+| Practice | Implementation |
+|----------|----------------|
+| **TDD** | Write tests first for new features starting v1.3 |
+| **SOLID** | Refactor toward single responsibility, dependency injection |
+| **Guardrails** | Input validation, cost estimation, rate limiting |
+| **CI** | GitHub Actions for automated testing (planned) |
 
 ---
 
@@ -294,7 +320,7 @@ uv run python -m cli query "What's the latest news on AI regulation?"
 TAVILY_API_KEY=tvly-your-key-here
 ```
 
-### v1.2: Multi-Turn Debate Mode
+### v1.2: Multi-Turn Debate Mode ✅ COMPLETE
 
 Enable models to challenge and respond to each other for deeper analysis.
 
@@ -312,17 +338,37 @@ Round N: Continue until consensus or max rounds
 Final: Chairman synthesizes with full debate context
 ```
 
-**Implementation:**
-- Add `--debate` flag to enable debate mode
-- Add `--rounds N` to set max debate rounds (default: 2)
-- Track position changes across rounds
-- Chairman considers debate quality, not just final positions
+**Implementation (Completed):**
+- `--debate` / `-d` flag enables debate mode
+- `--rounds N` / `-r N` sets debate rounds (default: 2)
+- Models use named attribution (not anonymous) to track positions across rounds
+- Each model critiques all others, then defends/revises based on critiques received
+- Chairman synthesizes full debate transcript
+
+**Files Added/Modified:**
+- `backend/council.py` - Added 6 debate functions:
+  - `debate_round_critique()` - Models critique each other
+  - `extract_critiques_for_model()` - Parse critiques directed at specific model
+  - `debate_round_defense()` - Models defend and revise
+  - `parse_revised_answer()` - Extract revised response section
+  - `synthesize_debate()` - Chairman synthesizes debate
+  - `run_debate_council()` - Orchestrate full debate flow
+- `cli/main.py` - Added flags, display functions, progress indicators
+- `backend/storage.py` - Added `add_debate_message()` for persistence
 
 **Usage:**
 ```bash
 llm-council --debate "Is capitalism or socialism better for reducing poverty?"
 llm-council --debate --rounds 3 "Complex ethical question"
+llm-council --debate --simple "Just the final answer"
 ```
+
+**API Costs (5 models):**
+| Mode | API Calls |
+|------|-----------|
+| Standard (ranking) | 11 calls |
+| Debate (2 rounds) | 16 calls |
+| Debate (3 rounds) | 21 calls |
 
 ### v1.3: Conversation History
 
@@ -448,4 +494,4 @@ llm-council preset list
 
 *Plan created: 2025-01-16*
 *Last updated: 2026-01-20*
-*Status: v1.1 complete, v1.2 (Debate Mode) next*
+*Status: v1.2 complete, v1.3 (Conversation History) next*

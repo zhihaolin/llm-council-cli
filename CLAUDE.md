@@ -164,6 +164,114 @@ Models in Stage 1 receive a `search_web` tool definition. They autonomously deci
 - Free tier: 1000 searches/month at [tavily.com](https://tavily.com)
 - If key is missing, models gracefully acknowledge they can't search
 
+## Debate Mode
+
+### Overview
+Debate mode replaces the standard ranking flow with multi-round deliberation where models critique and defend positions.
+
+**Standard flow:** Stage 1 (answers) → Stage 2 (rank) → Stage 3 (synthesize)
+
+**Debate flow:** Round 1 (answers) → Round 2 (critique all) → Round 3 (defend/revise) → Chairman synthesis
+
+### CLI Usage
+```bash
+llm-council --debate "Question"                    # 2 rounds (default)
+llm-council --debate --rounds 3 "Complex question" # 3 rounds
+llm-council --debate --simple "Question"           # Just final answer
+```
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Attribution | Named (not anonymous) | Need to track who said what across rounds |
+| Critique scope | All-to-all | Each model critiques all others |
+| Defense format | Structured sections | Easy to parse revised answers |
+| Default rounds | 2 | Sufficient for most questions |
+
+### Debate Functions in `council.py`
+
+**`debate_round_critique(query, initial_responses)`**
+- Each model receives all responses and critiques the others
+- Models are told their own model name so they skip self-critique
+- Prompt requests structured format: `## Critique of [Model Name]`
+
+**`extract_critiques_for_model(target_model, critique_responses)`**
+- Parses all critique responses to find sections about a specific model
+- Uses regex to match `## Critique of [model_name]` headers
+- Returns concatenated critiques with attribution
+
+**`debate_round_defense(query, initial_responses, critique_responses)`**
+- Each model receives their original response + all critiques of them
+- Prompt requests: "Addressing Critiques" + "Revised Response" sections
+- Returns both full response and parsed `revised_answer`
+
+**`parse_revised_answer(defense_response)`**
+- Extracts content after `## Revised Response` header
+- Falls back to full response if section not found
+
+**`synthesize_debate(query, rounds, num_rounds)`**
+- Chairman receives full debate transcript
+- Considers evolution of arguments, valid critiques, consensus points
+- Produces final synthesized answer
+
+**`run_debate_council(query, max_rounds)`**
+- Orchestrates complete debate flow
+- `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
+- Additional rounds alternate between critique and defense
+
+### Debate Data Structure
+
+```python
+# Round data format
+{
+    "round_number": 1,
+    "round_type": "initial",  # or "critique" or "defense"
+    "responses": [
+        {
+            "model": "openai/gpt-5.2",
+            "response": "...",
+            "revised_answer": "..."  # Only for defense rounds
+        }
+    ]
+}
+
+# Storage format (backend/storage.py)
+{
+    "role": "assistant",
+    "mode": "debate",
+    "rounds": [...],
+    "synthesis": {"model": "...", "response": "..."}
+}
+```
+
+### CLI Display Functions in `main.py`
+
+**`print_debate_round(round_data, round_num)`**
+- Color-coded by round type (cyan=initial, yellow=critique, magenta=defense)
+- Shows each model's response in a Rich panel
+- Includes `• searched` indicator if model used web search
+
+**`print_debate_synthesis(synthesis)`**
+- Green-styled panel for final answer
+- Same format as Stage 3 synthesis
+
+**`run_debate_with_progress(query, max_rounds)`**
+- Progress spinners for each round
+- Reports completion status after each round
+
+### API Costs
+| Mode | API Calls (5 models) |
+|------|---------------------|
+| Standard (ranking) | 11 calls |
+| Debate (2 rounds) | 16 calls |
+| Debate (3 rounds) | 21 calls |
+
+### Error Handling
+- Model fails during round: continue with remaining models
+- Critique parsing fails: use full response text
+- <2 models respond: abort debate, return error
+
 ## Common Gotchas
 
 1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
@@ -188,6 +296,7 @@ Use `test_openrouter.py` to verify API connectivity and test different model ide
 
 ## Data Flow Summary
 
+### Standard Mode (Ranking)
 ```
 User Query
     ↓
@@ -206,6 +315,33 @@ Stage 3: Chairman synthesis with full context
 Return: {stage1, stage2, stage3, metadata}
     ↓
 Frontend/CLI: Display with tabs + validation UI
+```
+
+### Debate Mode
+```
+User Query (--debate flag)
+    ↓
+Round 1: Parallel queries with tools=[SEARCH_TOOL]
+    ↓
+[initial responses + tool_calls_made]
+    ↓
+Round 2: Each model critiques all others (parallel)
+    ↓
+[critique responses with ## Critique of [Model] sections]
+    ↓
+Round 3: Each model defends/revises (parallel)
+    ├── Receives: own original response + critiques of self
+    └── Outputs: ## Addressing Critiques + ## Revised Response
+    ↓
+[defense responses with revised_answer extracted]
+    ↓
+(Optional: additional critique/defense rounds if --rounds > 2)
+    ↓
+Chairman synthesis with full debate transcript
+    ↓
+Return: {rounds: [...], synthesis: {...}}
+    ↓
+CLI: Display rounds with color-coded headers + synthesis
 ```
 
 The entire flow is async/parallel where possible to minimize latency.

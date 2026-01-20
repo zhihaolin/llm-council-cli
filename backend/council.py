@@ -372,3 +372,387 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     }
 
     return stage1_results, stage2_results, stage3_result, metadata
+
+
+# ============================================================================
+# DEBATE MODE FUNCTIONS
+# ============================================================================
+
+
+async def debate_round_critique(
+    user_query: str,
+    initial_responses: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Debate Round 2: Each model critiques all other models' responses.
+
+    Args:
+        user_query: The original user query
+        initial_responses: Results from round 1 (initial answers)
+
+    Returns:
+        List of dicts with 'model' and 'response' containing critiques
+    """
+    # Build the list of all responses for critique
+    responses_text = "\n\n".join([
+        f"**{result['model']}:**\n{result['response']}"
+        for result in initial_responses
+    ])
+
+    async def get_critique(model: str, own_response: str) -> Tuple[str, Dict]:
+        """Get critique from a single model."""
+        critique_prompt = f"""You are participating in a multi-model debate on the following question:
+
+**Question:** {user_query}
+
+Here are the initial responses from all participating models:
+
+{responses_text}
+
+Your task is to critically evaluate the OTHER models' responses (not your own). For each model except yourself, provide a thorough critique that:
+- Identifies strengths and what they got right
+- Points out weaknesses, errors, or gaps in reasoning
+- Challenges any questionable assumptions
+- Notes missing information or perspectives
+
+Your own response is from **{model}** - do NOT critique yourself.
+
+Format your response as follows:
+
+## Critique of [Model Name]
+[Your critique]
+
+## Critique of [Model Name]
+[Your critique]
+
+(Continue for each model except yourself)"""
+
+        messages = [{"role": "user", "content": critique_prompt}]
+        response = await query_model(model, messages)
+        return model, response
+
+    # Query all models in parallel
+    tasks = [
+        get_critique(result['model'], result['response'])
+        for result in initial_responses
+    ]
+    results = await asyncio.gather(*tasks)
+
+    # Format results
+    critique_results = []
+    for model, response in results:
+        if response is not None:
+            critique_results.append({
+                "model": model,
+                "response": response.get('content', '')
+            })
+
+    return critique_results
+
+
+def extract_critiques_for_model(
+    target_model: str,
+    critique_responses: List[Dict[str, Any]]
+) -> str:
+    """
+    Extract all critiques directed at a specific model.
+
+    Args:
+        target_model: The model whose critiques we want to extract
+        critique_responses: All critique responses from round 2
+
+    Returns:
+        Concatenated string of all critiques for the target model
+    """
+    import re
+
+    critiques = []
+    # Get just the model name without provider prefix for matching
+    target_name = target_model.split('/')[-1].lower()
+
+    for response in critique_responses:
+        critic_model = response['model']
+        # Skip self-critiques (shouldn't exist, but just in case)
+        if critic_model == target_model:
+            continue
+
+        content = response['response']
+
+        # Try to extract the section about this model
+        # Look for "## Critique of [model]" pattern
+        pattern = rf"##\s*Critique of\s*[^\n]*{re.escape(target_name)}[^\n]*\n(.*?)(?=##\s*Critique of|\Z)"
+        matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
+
+        if matches:
+            critique_text = matches[0].strip()
+            critiques.append(f"**From {critic_model}:**\n{critique_text}")
+        else:
+            # Fallback: try matching just the model name in header
+            pattern_simple = rf"##[^\n]*{re.escape(target_name)}[^\n]*\n(.*?)(?=##|\Z)"
+            matches_simple = re.findall(pattern_simple, content, re.IGNORECASE | re.DOTALL)
+            if matches_simple:
+                critique_text = matches_simple[0].strip()
+                critiques.append(f"**From {critic_model}:**\n{critique_text}")
+
+    if not critiques:
+        return "(No specific critiques were extracted for this model)"
+
+    return "\n\n".join(critiques)
+
+
+async def debate_round_defense(
+    user_query: str,
+    initial_responses: List[Dict[str, Any]],
+    critique_responses: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Debate Round 3+: Each model defends/revises based on critiques received.
+
+    Args:
+        user_query: The original user query
+        initial_responses: Results from round 1
+        critique_responses: Critiques from round 2
+
+    Returns:
+        List of dicts with 'model', 'response', and 'revised_answer' keys
+    """
+    async def get_defense(model: str, original_response: str) -> Tuple[str, Dict]:
+        """Get defense/revision from a single model."""
+        # Extract critiques specifically directed at this model
+        critiques_for_me = extract_critiques_for_model(model, critique_responses)
+
+        defense_prompt = f"""You are participating in a multi-model debate on the following question:
+
+**Question:** {user_query}
+
+**Your original response:**
+{original_response}
+
+**Critiques of your response from other models:**
+{critiques_for_me}
+
+Your task is to:
+1. Address the specific criticisms raised against your response
+2. Defend points where you believe you were correct
+3. Acknowledge valid criticisms and incorporate them
+4. Provide a REVISED response that improves upon your original
+
+Format your response as follows:
+
+## Addressing Critiques
+[Address each major criticism, explaining where you stand firm and where you concede]
+
+## Revised Response
+[Your updated, improved answer to the original question]"""
+
+        messages = [{"role": "user", "content": defense_prompt}]
+        response = await query_model(model, messages)
+        return model, response
+
+    # Get the original response for each model
+    model_to_response = {r['model']: r['response'] for r in initial_responses}
+
+    # Query all models in parallel
+    tasks = [
+        get_defense(result['model'], model_to_response[result['model']])
+        for result in initial_responses
+        if result['model'] in model_to_response
+    ]
+    results = await asyncio.gather(*tasks)
+
+    # Format results
+    defense_results = []
+    for model, response in results:
+        if response is not None:
+            content = response.get('content', '')
+            defense_results.append({
+                "model": model,
+                "response": content,
+                "revised_answer": parse_revised_answer(content)
+            })
+
+    return defense_results
+
+
+def parse_revised_answer(defense_response: str) -> str:
+    """
+    Extract the 'Revised Response' section from a defense response.
+
+    Args:
+        defense_response: Full defense text
+
+    Returns:
+        The revised answer text, or full response if section not found
+    """
+    import re
+
+    # Look for "## Revised Response" section
+    pattern = r"##\s*Revised Response\s*\n(.*)"
+    match = re.search(pattern, defense_response, re.IGNORECASE | re.DOTALL)
+
+    if match:
+        return match.group(1).strip()
+
+    # Fallback: return the full response
+    return defense_response
+
+
+async def synthesize_debate(
+    user_query: str,
+    rounds: List[Dict[str, Any]],
+    num_rounds: int
+) -> Dict[str, Any]:
+    """
+    Chairman synthesizes based on the full debate transcript.
+
+    Args:
+        user_query: The original user query
+        rounds: List of round data dicts
+        num_rounds: Number of debate rounds completed
+
+    Returns:
+        Dict with 'model' and 'response' keys
+    """
+    # Build the debate transcript
+    transcript_parts = []
+
+    for round_data in rounds:
+        round_num = round_data['round_number']
+        round_type = round_data['round_type']
+
+        transcript_parts.append(f"\n{'='*60}")
+        transcript_parts.append(f"ROUND {round_num}: {round_type.upper()}")
+        transcript_parts.append('='*60)
+
+        for response in round_data['responses']:
+            model = response['model']
+            content = response['response']
+            transcript_parts.append(f"\n**{model}:**\n{content}")
+
+    debate_transcript = "\n".join(transcript_parts)
+
+    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have participated in a structured debate to answer a user's question. The debate consisted of {num_rounds} rounds:
+
+1. **Initial Responses**: Each model provided their initial answer
+2. **Critiques**: Each model critically evaluated the other models' responses
+3. **Defense/Revision**: Each model addressed critiques and revised their answer
+
+**Original Question:** {user_query}
+
+**DEBATE TRANSCRIPT:**
+{debate_transcript}
+
+Your task as Chairman is to synthesize all of this debate into a single, comprehensive, accurate answer. Consider:
+- The evolution of arguments across rounds
+- Which critiques were most valid and well-addressed
+- Points of consensus among the models
+- The strongest revised arguments
+- Any remaining disagreements and how to resolve them
+
+Provide a clear, well-reasoned final answer that represents the council's collective wisdom after deliberation:"""
+
+    messages = [{"role": "user", "content": chairman_prompt}]
+
+    # Query the chairman model
+    response = await query_model(CHAIRMAN_MODEL, messages)
+
+    if response is None:
+        return {
+            "model": CHAIRMAN_MODEL,
+            "response": "Error: Unable to generate debate synthesis."
+        }
+
+    return {
+        "model": CHAIRMAN_MODEL,
+        "response": response.get('content', '')
+    }
+
+
+async def run_debate_council(
+    user_query: str,
+    max_rounds: int = 2
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Orchestrate the complete debate flow.
+
+    Args:
+        user_query: The user's question
+        max_rounds: Number of debate rounds (2 = initial + critique + defense)
+
+    Returns:
+        Tuple of (rounds list, synthesis result)
+        Each round is: {round_number, round_type, responses}
+    """
+    rounds = []
+
+    # Round 1: Initial responses (reuse stage1 function)
+    initial_responses = await stage1_collect_responses(user_query)
+
+    if len(initial_responses) < 2:
+        # Not enough models to have a debate
+        return [], {
+            "model": "error",
+            "response": "Not enough models responded to conduct a debate. Need at least 2 models."
+        }
+
+    rounds.append({
+        "round_number": 1,
+        "round_type": "initial",
+        "responses": initial_responses
+    })
+
+    # Round 2: Critiques
+    critique_responses = await debate_round_critique(user_query, initial_responses)
+
+    if len(critique_responses) < 2:
+        # Continue with partial results
+        pass
+
+    rounds.append({
+        "round_number": 2,
+        "round_type": "critique",
+        "responses": critique_responses
+    })
+
+    # Round 3: Defense/Revision
+    defense_responses = await debate_round_defense(
+        user_query,
+        initial_responses,
+        critique_responses
+    )
+
+    rounds.append({
+        "round_number": 3,
+        "round_type": "defense",
+        "responses": defense_responses
+    })
+
+    # Additional rounds if requested (alternating critique/defense)
+    current_responses = defense_responses
+    for round_num in range(4, max_rounds + 2):  # +2 because max_rounds=2 means 3 actual rounds
+        if round_num % 2 == 0:
+            # Even rounds: critique
+            critique_responses = await debate_round_critique(user_query, current_responses)
+            rounds.append({
+                "round_number": round_num,
+                "round_type": "critique",
+                "responses": critique_responses
+            })
+        else:
+            # Odd rounds: defense
+            defense_responses = await debate_round_defense(
+                user_query,
+                current_responses,
+                critique_responses
+            )
+            rounds.append({
+                "round_number": round_num,
+                "round_type": "defense",
+                "responses": defense_responses
+            })
+            current_responses = defense_responses
+
+    # Chairman synthesis
+    synthesis = await synthesize_debate(user_query, rounds, len(rounds))
+
+    return rounds, synthesis

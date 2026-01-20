@@ -351,6 +351,174 @@ Stage 2 & 3 (unchanged)
 
 ---
 
+## 2026-01-20: Test Infrastructure Setup
+
+### Session Goals
+- Set up pytest with async support
+- Write tests for critical parsing and debate logic
+- Establish testing patterns for future TDD
+
+### What Was Done
+
+**1. Added Test Dependencies**
+- Added `pytest>=8.0.0`, `pytest-asyncio>=0.23.0`, `pytest-cov>=4.1.0` to dev dependencies
+- Configured pytest in `pyproject.toml` with async mode and coverage settings
+
+**2. Created Test Structure**
+```
+tests/
+├── __init__.py
+├── conftest.py           # Fixtures and mock responses
+├── test_ranking_parser.py # 14 tests for ranking extraction
+├── test_debate.py         # 15 tests for debate mode
+└── integration/
+    └── __init__.py
+```
+
+**3. Test Coverage**
+
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| Ranking parser | 14 | `parse_ranking_from_text`, `calculate_aggregate_rankings` |
+| Debate mode | 15 | `extract_critiques_for_model`, `parse_revised_answer`, async rounds |
+
+**4. Key Test Categories**
+
+- **Ranking Parser Tests**: Standard format, edge cases (no header, extra whitespace, bullet format), fallback behavior
+- **Critique Extraction Tests**: Model name matching, self-critique exclusion, case insensitivity
+- **Defense Parsing Tests**: Section extraction, missing sections, header variations
+- **Async Round Tests**: Mocked API calls, failure handling, prompt verification
+
+### Testing Commands
+
+```bash
+# Run all tests
+uv run pytest tests/ -v
+
+# Run with coverage
+uv run pytest tests/ --cov=backend --cov-report=term-missing
+
+# Run specific test file
+uv run pytest tests/test_debate.py -v
+```
+
+### Results
+
+```
+29 passed in 0.14s
+Coverage: 28% (focused on critical parsing logic)
+```
+
+### Next Steps
+- [ ] TDD for v1.3 Conversation History
+- [ ] Add integration tests for CLI commands
+- [ ] Increase coverage as features are added
+
+---
+
+## 2026-01-20: v1.2 Multi-Turn Debate Mode
+
+### Session Goals
+- Implement debate mode where models critique and defend positions
+- Add `--debate` and `--rounds` CLI flags
+- Update storage format for debate conversations
+
+### What Was Done
+
+**1. Backend Debate Functions (`backend/council.py`)**
+
+Added 6 new functions for debate orchestration:
+
+| Function | Purpose |
+|----------|---------|
+| `debate_round_critique()` | Round 2: Each model critiques all others |
+| `extract_critiques_for_model()` | Parse critiques directed at a specific model |
+| `debate_round_defense()` | Round 3+: Models defend and revise |
+| `parse_revised_answer()` | Extract "Revised Response" section |
+| `synthesize_debate()` | Chairman synthesizes full debate |
+| `run_debate_council()` | Orchestrate complete debate flow |
+
+**2. CLI Integration (`cli/main.py`)**
+
+- Added `--debate` / `-d` flag to enable debate mode
+- Added `--rounds` / `-r` flag (default: 2)
+- Added `print_debate_round()` with color-coded round types
+- Added `print_debate_synthesis()` for chairman output
+- Added `run_debate_with_progress()` with round-by-round spinners
+- Added `• searched` indicator when models use web search
+
+**3. Storage Extension (`backend/storage.py`)**
+
+Added `add_debate_message()` for debate-format conversations:
+```python
+{
+    "role": "assistant",
+    "mode": "debate",
+    "rounds": [
+        {"round_number": 1, "round_type": "initial", "responses": [...]},
+        {"round_number": 2, "round_type": "critique", "responses": [...]},
+        {"round_number": 3, "round_type": "defense", "responses": [...]}
+    ],
+    "synthesis": {"model": "...", "response": "..."}
+}
+```
+
+### Architecture
+
+```
+Round 1 (Initial)     Round 2 (Critique)     Round 3 (Defense)
+┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+│ Model A answers │   │ A critiques B,C │   │ A defends/revises│
+│ Model B answers │ → │ B critiques A,C │ → │ B defends/revises│
+│ Model C answers │   │ C critiques A,B │   │ C defends/revises│
+└─────────────────┘   └─────────────────┘   └─────────────────┘
+                                                    │
+                                                    ▼
+                                          ┌─────────────────┐
+                                          │    Chairman     │
+                                          │   Synthesizes   │
+                                          └─────────────────┘
+```
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Attribution | Named (not anonymous) | Need to track who said what across rounds |
+| Critique scope | All-to-all | Each model critiques all others |
+| Defense format | Structured sections | "Addressing Critiques" + "Revised Response" |
+| Default rounds | 2 | Sufficient for most questions (initial + critique + defense) |
+| Replaces Stage 2? | Yes for debate mode | Debate is deeper than ranking |
+
+### Testing
+
+| Test | Command | Result |
+|------|---------|--------|
+| Basic debate | `--debate "What is 2+2?"` | ✓ 3 rounds + synthesis |
+| Extended debate | `--debate --rounds 3 "Complex Q"` | ✓ 4 rounds + synthesis |
+| Simple output | `--debate --simple "Q"` | ✓ Just final answer |
+| Web search indicator | `--debate "Bitcoin price?"` | ✓ Shows `• searched` |
+
+### API Cost Analysis
+
+| Mode | API Calls (5 models) |
+|------|---------------------|
+| Standard (ranking) | 11 calls |
+| Debate (2 rounds) | 16 calls |
+| Debate (3 rounds) | 21 calls |
+
+### Files Changed
+- `backend/council.py` - Added debate functions (~300 lines)
+- `cli/main.py` - Added flags and display functions (~150 lines)
+- `backend/storage.py` - Added `add_debate_message()`
+
+### Next Steps
+- [ ] v1.3: Conversation History (`--continue` flag)
+- [ ] v1.4: File/Document Upload (`--file` flag)
+- [ ] Consider debate mode for TUI
+
+---
+
 *Template for future entries:*
 
 ```markdown

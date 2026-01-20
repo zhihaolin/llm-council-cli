@@ -15,6 +15,13 @@ dependencies = [
     "textual>=0.50.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+]
+
 [project.scripts]
 llm-council = "cli.main:app"
 
@@ -23,3 +30,12 @@ package = true
 
 [tool.setuptools.packages.find]
 include = ["cli*", "backend*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["backend", "cli"]
+omit = ["*/tests/*"]

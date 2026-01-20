@@ -156,6 +156,36 @@ def add_assistant_message(
     save_conversation(conversation)
 
 
+def add_debate_message(
+    conversation_id: str,
+    rounds: List[Dict[str, Any]],
+    synthesis: Dict[str, Any]
+):
+    """
+    Add a debate-mode assistant message to a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        rounds: List of debate rounds, each with:
+            - round_number: int
+            - round_type: "initial" | "critique" | "defense"
+            - responses: List of model responses
+        synthesis: Final synthesized response from chairman
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["messages"].append({
+        "role": "assistant",
+        "mode": "debate",
+        "rounds": rounds,
+        "synthesis": synthesis
+    })
+
+    save_conversation(conversation)
+
+
 def update_conversation_title(conversation_id: str, title: str):
     """
     Update the title of a conversation.
