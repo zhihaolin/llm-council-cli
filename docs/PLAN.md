@@ -294,7 +294,37 @@ uv run python -m cli query "What's the latest news on AI regulation?"
 TAVILY_API_KEY=tvly-your-key-here
 ```
 
-### v1.2: Conversation History
+### v1.2: Multi-Turn Debate Mode
+
+Enable models to challenge and respond to each other for deeper analysis.
+
+**Current flow (ranking only):**
+```
+Stage 1: Independent answers → Stage 2: Rank → Stage 3: Synthesize
+```
+
+**Debate flow:**
+```
+Round 1: Independent answers
+Round 2: Each model critiques others' answers
+Round 3: Models defend/revise their positions
+Round N: Continue until consensus or max rounds
+Final: Chairman synthesizes with full debate context
+```
+
+**Implementation:**
+- Add `--debate` flag to enable debate mode
+- Add `--rounds N` to set max debate rounds (default: 2)
+- Track position changes across rounds
+- Chairman considers debate quality, not just final positions
+
+**Usage:**
+```bash
+llm-council --debate "Is capitalism or socialism better for reducing poverty?"
+llm-council --debate --rounds 3 "Complex ethical question"
+```
+
+### v1.3: Conversation History
 
 Enable multi-turn conversations in CLI, similar to the web UI experience.
 
@@ -336,40 +366,10 @@ uv run python -m cli history
 7. Warn user when truncation occurs
 8. Reuse `backend/storage.py` for persistence
 
-**Future enhancement (v1.2.x):**
+**Future enhancement (v1.3.x):**
 - Smart summarization/compaction instead of truncation
 - Token-aware truncation using tiktoken
 - Interactive `chat` command with REPL loop
-
-### v1.3: Multi-Turn Debate Mode
-
-Enable models to challenge and respond to each other for deeper analysis.
-
-**Current flow (ranking only):**
-```
-Stage 1: Independent answers → Stage 2: Rank → Stage 3: Synthesize
-```
-
-**Debate flow:**
-```
-Round 1: Independent answers
-Round 2: Each model critiques others' answers
-Round 3: Models defend/revise their positions
-Round N: Continue until consensus or max rounds
-Final: Chairman synthesizes with full debate context
-```
-
-**Implementation:**
-- Add `--debate` flag to enable debate mode
-- Add `--rounds N` to set max debate rounds (default: 2)
-- Track position changes across rounds
-- Chairman considers debate quality, not just final positions
-
-**Usage:**
-```bash
-llm-council --debate "Is capitalism or socialism better for reducing poverty?"
-llm-council --debate --rounds 3 "Complex ethical question"
-```
 
 ### v1.4: File/Document Upload
 
@@ -447,5 +447,5 @@ llm-council preset list
 ---
 
 *Plan created: 2025-01-16*
-*Last updated: 2026-01-17*
-*Status: v1.1 complete, v1.2+ in roadmap*
+*Last updated: 2026-01-20*
+*Status: v1.1 complete, v1.2 (Debate Mode) next*
