@@ -82,6 +82,7 @@ tests/
 ├── conftest.py              # Fixtures, mock API responses
 ├── test_ranking_parser.py   # 14 tests
 ├── test_debate.py           # 15 tests
+├── test_search.py           # 17 tests
 └── integration/             # CLI tests (planned)
 ```
 
@@ -96,8 +97,9 @@ tests/
 |----------|-------|----------|
 | Ranking parser | 14 | `parse_ranking_from_text`, `calculate_aggregate_rankings` |
 | Debate mode | 15 | Critique extraction, defense parsing, async rounds |
+| Web search | 17 | Tool calling, search_web, format_search_results |
 
-**Results:** 29 passed, 28% coverage (focused on critical parsing logic)
+**Results:** 46 passed (focused on critical parsing and tool calling logic)
 
 ---
 

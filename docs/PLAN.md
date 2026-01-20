@@ -81,7 +81,7 @@ llm-council query --file ./report.pdf "Summarize"
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 29 tests |
+| Test Suite | pytest + pytest-asyncio, 46 tests |
 | Type Hints | Function signatures throughout |
 
 ### Planned for v1.3
@@ -149,6 +149,7 @@ tests/
 ├── conftest.py              # Fixtures, mocks
 ├── test_ranking_parser.py   # 14 tests
 ├── test_debate.py           # 15 tests
+├── test_search.py           # 17 tests
 └── integration/             # CLI tests (planned)
 ```
 

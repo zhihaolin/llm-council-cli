@@ -1,10 +1,16 @@
 """3-stage LLM Council orchestration."""
 
 import asyncio
+from datetime import datetime
 from typing import List, Dict, Any, Tuple
 from .openrouter import query_models_parallel, query_model, query_model_with_tools
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 from .search import SEARCH_TOOL, search_web, format_search_results
+
+
+def get_date_context() -> str:
+    """Return current date context to prepend to queries."""
+    return f"Today's date is {datetime.now().strftime('%B %d, %Y')}.\n\n"
 
 
 async def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
@@ -38,7 +44,8 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     Returns:
         List of dicts with 'model', 'response', and optionally 'tool_calls_made' keys
     """
-    messages = [{"role": "user", "content": user_query}]
+    query_with_date = get_date_context() + user_query
+    messages = [{"role": "user", "content": query_with_date}]
     tools = [SEARCH_TOOL]
 
     # Query all models in parallel with tool support
@@ -178,7 +185,7 @@ async def stage3_synthesize_final(
         for result in stage2_results
     ])
 
-    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
+    chairman_prompt = f"""{get_date_context()}You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
 
 Original Question: {user_query}
 
@@ -401,7 +408,7 @@ async def debate_round_critique(
 
     async def get_critique(model: str, own_response: str) -> Tuple[str, Dict]:
         """Get critique from a single model."""
-        critique_prompt = f"""You are participating in a multi-model debate on the following question:
+        critique_prompt = f"""{get_date_context()}You are participating in a multi-model debate on the following question:
 
 **Question:** {user_query}
 
@@ -521,7 +528,7 @@ async def debate_round_defense(
         # Extract critiques specifically directed at this model
         critiques_for_me = extract_critiques_for_model(model, critique_responses)
 
-        defense_prompt = f"""You are participating in a multi-model debate on the following question:
+        defense_prompt = f"""{get_date_context()}You are participating in a multi-model debate on the following question:
 
 **Question:** {user_query}
 
@@ -631,7 +638,7 @@ async def synthesize_debate(
 
     debate_transcript = "\n".join(transcript_parts)
 
-    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have participated in a structured debate to answer a user's question. The debate consisted of {num_rounds} rounds:
+    chairman_prompt = f"""{get_date_context()}You are the Chairman of an LLM Council. Multiple AI models have participated in a structured debate to answer a user's question. The debate consisted of {num_rounds} rounds:
 
 1. **Initial Responses**: Each model provided their initial answer
 2. **Critiques**: Each model critically evaluated the other models' responses

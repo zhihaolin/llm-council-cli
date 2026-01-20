@@ -2,7 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/Tests-29%20passed-green.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-46%20passed-green.svg)](tests/)
 
 **Multi-model deliberation for better answers.**
 
@@ -287,7 +287,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 29 tests |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 46 tests |
 | **Type Hints** | ✅ | Throughout codebase |
 | **CI/CD** | 🔜 | GitHub Actions (planned) |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
@@ -318,9 +318,10 @@ uv run pytest tests/ --cov=backend --cov-report=term-missing
 ```
 tests/
 ├── conftest.py              # Fixtures and mock API responses
-├── test_ranking_parser.py   # Ranking extraction tests
-├── test_debate.py           # Debate mode tests
-└── integration/             # CLI integration tests
+├── test_ranking_parser.py   # Ranking extraction tests (14 tests)
+├── test_debate.py           # Debate mode tests (15 tests)
+├── test_search.py           # Web search & tool calling tests (17 tests)
+└── integration/             # CLI integration tests (planned)
 ```
 
 ---
