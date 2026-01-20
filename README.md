@@ -1,5 +1,9 @@
 # LLM Council
 
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Tests](https://img.shields.io/badge/Tests-29%20passed-green.svg)](tests/)
+
 **Multi-model deliberation for better answers.**
 
 A system where AI models debate, critique, and synthesize answers together.
