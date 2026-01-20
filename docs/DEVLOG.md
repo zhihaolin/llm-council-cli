@@ -1,470 +1,40 @@
 # Development Log
 
-This document tracks the development progress of the LLM Council CLI project.
+Technical decisions and implementation notes for LLM Council.
 
 ---
 
-## 2025-01-16: Project Setup & Planning
+## v1.2: Multi-Turn Debate Mode
+*January 2026*
 
-### Session Goals
-- Fork Karpathy's LLM Council and set up for CLI development
-- Create implementation plan
-- Establish development workflow
+### Overview
+Implemented debate mode where models critique each other's positions and revise their answers before chairman synthesis.
 
-### What Was Done
+### Implementation
 
-**1. Environment Setup**
-- Installed `uv` package manager (Python)
-- Installed frontend dependencies (`npm install`)
-- Created `.env` with OpenRouter API key
-- Verified web version runs correctly (backend :8001, frontend :5173)
-
-**2. Repository Setup**
-- Cloned from `karpathy/llm-council`
-- Forked to `zhihaolin/llm-council-cli`
-- Configured git remotes:
-  - `origin` → zhihaolin/llm-council-cli (our fork)
-  - `upstream` → karpathy/llm-council (original)
-
-**3. Documentation**
-- Created `docs/PLAN.md` - Full implementation roadmap
-- Updated `README.md` - Added credits to Karpathy, documented CLI features
-- Created `docs/DEVLOG.md` - This file
-
-### Decisions Made
-
-| Decision | Reasoning |
-|----------|-----------|
-| Fork instead of new repo | Maintains attribution, can sync upstream changes |
-| Use Textual for TUI | Modern, async-native, good for complex terminal UIs |
-| Use typer for CLI | Clean API, built on click, good help generation |
-| Layered config (CLI > file > default) | Flexibility without complexity |
-| Docs in `docs/` folder | Keep documentation organized |
-
-### Files Changed
-- `README.md` - Updated with credits and CLI preview
-- `docs/PLAN.md` - Implementation roadmap (moved from root)
-- `docs/DEVLOG.md` - This development log
-
-### Next Steps
-- [ ] Phase 1: Basic CLI with typer/rich
-  - Create `cli/` package structure
-  - Add dependencies to `pyproject.toml`
-  - Implement basic `query` command
-  - Test with real API call
-
-### Notes
-- Web version confirmed working at http://localhost:5173
-- Backend and frontend servers running in background
-
----
-
-## 2025-01-16: Phase 1 - Basic CLI Implementation
-
-### Session Goals
-- Implement basic CLI with typer and rich
-- Test with real API calls
-- Establish test → commit → push workflow
-
-### What Was Done
-
-**1. Created CLI Package Structure**
-```
-cli/
-├── __init__.py      # Package init with version
-├── __main__.py      # Enables `python -m cli`
-└── main.py          # Typer CLI with commands
-```
-
-**2. Updated pyproject.toml**
-- Added dependencies: `typer>=0.9.0`, `rich>=13.0.0`
-- Added entry point: `llm-council = "cli.main:app"`
-- Added `[tool.uv]` and `[tool.setuptools]` config for packaging
-
-**3. Implemented CLI Commands**
-- `query <question>` - Query the council with progress indicators
-- `models` - Show current council configuration
-- Flags: `--simple` (plain output), `--final-only` (skip stages 1 & 2)
-
-**4. Rich Terminal Output**
-- Progress spinners during API calls
-- Panels for each model's response
-- Tables for aggregate rankings
-- Markdown rendering for responses
-
-### Testing
-
-| Test | Command | Result |
-|------|---------|--------|
-| Help | `uv run python -m cli --help` | ✓ Works |
-| Models | `uv run python -m cli models` | ✓ Shows config table |
-| Query | `uv run python -m cli query "What is 2+2?"` | ✓ Full 3-stage output |
-
-### Issues Encountered
-
-| Issue | Resolution |
-|-------|------------|
-| `uv sync` failed with multiple top-level packages | Added `[tool.setuptools.packages.find]` to include only `cli*` and `backend*` |
-| Entry point script `llm-council` not finding module | Use `uv run python -m cli` instead; added `__main__.py` |
-
-### Decisions Made
-
-| Decision | Reasoning |
-|----------|-----------|
-| Use `python -m cli` over entry point | More reliable with uv's editable installs |
-| Show all stages by default | Transparency - users can see full deliberation |
-| Condensed Stage 2 output | Full evaluations too verbose; show rankings + parsed order |
-
-### Files Changed
-- `cli/__init__.py` - Package init
-- `cli/__main__.py` - Module runner
-- `cli/main.py` - Main CLI implementation
-- `pyproject.toml` - Dependencies and packaging config
-
-### Next Steps
-- [x] Phase 2: Textual TUI with interactive interface
-- [ ] Add `--models` and `--chairman` flags for model selection
-- [ ] Add config file support (`~/.config/llm-council/config.yaml`)
-
----
-
-## 2025-01-16: Phase 2 - Textual TUI Implementation
-
-### Session Goals
-- Implement interactive TUI with Textual
-- Add tabbed interface for stages
-- Enable keyboard navigation
-
-### What Was Done
-
-**1. Added Textual Dependency**
-- Added `textual>=0.50.0` to pyproject.toml
-
-**2. Created TUI Application (`cli/tui.py`)**
-- Full Textual app with header, footer, keybindings
-- Query input area with text field and submit button
-- Tabbed content for Stage 1, Stage 2, Stage 3
-
-**3. Stage Views**
-- **Stage 1:** Sub-tabs for each model's response with markdown rendering
-- **Stage 2:** DataTable for aggregate rankings + individual evaluations
-- **Stage 3:** Markdown panel with chairman's synthesis
-
-**4. Added `interactive` Command**
-- `uv run python -m cli interactive` - Launch TUI
-- `uv run python -m cli interactive "question"` - Launch with initial query
-
-### TUI Features
-
-| Feature | Keybinding |
-|---------|------------|
-| Switch to Stage 1 | `1` |
-| Switch to Stage 2 | `2` |
-| Switch to Stage 3 | `3` |
-| New query | `Ctrl+N` |
-| Quit | `Q` |
-
-### Files Changed
-- `pyproject.toml` - Added textual dependency
-- `cli/tui.py` - New TUI implementation (~250 lines)
-- `cli/main.py` - Added `interactive` command
-
-### Testing
-- [ ] TUI launches: `uv run python -m cli interactive`
-- [ ] Query submission works
-- [ ] Stage tabs switch correctly
-- [ ] Keyboard shortcuts work
-
-### Next Steps
-- [ ] Add `--models` and `--chairman` CLI flags
-- [ ] Add config file support
-- [ ] Polish TUI styling
-
----
-
-## 2025-01-16: TUI Fixes, Model Updates & Roadmap
-
-### Session Goals
-- Fix TUI bugs and test
-- Update council models
-- Review and update roadmap
-- Improve documentation
-
-### What Was Done
-
-**1. Fixed TUI Bugs**
-- Fixed `BadIdentifier` error - dots in widget IDs not allowed (e.g., `gpt-5.1`)
-- Changed to simple numeric IDs (`response-0`, `response-1`, etc.)
-- Updated Textual API usage for v7.x compatibility (context manager syntax)
-- Changed Stage views to `ScrollableContainer` for proper scrolling
-
-**2. Updated Color Scheme**
-- New dark navy/blue theme for TUI
-- Colors: `#1a1a2e` (background), `#16213e` (surface), `#0f3460` (primary), `#e94560` (accent)
-
-**3. Model Configuration**
-- Removed Grok from council (cost efficiency)
-- Updated GPT-5.1 → GPT-5.2
-
-**4. Roadmap Updates**
-- Added **v1.2: Multi-Turn Debate Mode** - Models will critique and respond to each other
-- Renumbered subsequent versions (v1.3-v1.7)
-
-**5. Documentation**
-- Rewrote README with Quick Start section
-- Added CLI usage instructions
-- Added "Running in New Terminal" section
-- Updated model examples to current config
-
-### Decisions Made
-
-| Decision | Reasoning |
-|----------|-----------|
-| Prefer simple CLI over TUI | User preference; TUI needs more polish |
-| Add Debate Mode to roadmap | More valuable than simple ranking; produces better answers |
-| Defer TUI styling | Functionality first, polish later |
-| Defer config file system | Already in plan, not blocking |
-
-### Issues Encountered
-
-| Issue | Resolution |
-|-------|------------|
-| TUI crash: BadIdentifier with dots | Use numeric IDs instead of model names |
-| TUI crash: TabbedContent API change | Use context manager syntax for Textual 7.x |
-| TUI color scheme "horrible" | Applied dark navy theme (still needs work) |
-
-### Files Changed
-- `cli/tui.py` - Fixed bugs, updated colors
-- `backend/config.py` - GPT-5.2, removed Grok
-- `docs/PLAN.md` - Added Debate Mode (v1.2)
-- `README.md` - Complete rewrite with Quick Start
-
-### Commits
-- `646fc23` - Implement Phase 2: Textual TUI
-- `d258d0f` - Fix TUI bugs and update to GPT-5.2
-- `5e13a43` - Update README and add Debate Mode to roadmap
-
-### Current Roadmap
-
-| Version | Feature | Status |
-|---------|---------|--------|
-| v1.0 | Basic CLI + TUI | ✓ Done |
-| v1.1 | Web Search Integration | ✓ Done |
-| v1.2 | Multi-Turn Debate Mode | Next |
-| v1.3 | Conversation History | Planned |
-| v1.4 | File/Document Upload | Planned |
-| v1.5 | Image Input | Planned |
-| v1.6 | Presets & Profiles | Planned |
-| v1.7 | Streaming Responses | Planned |
-| v1.8 | Extended Tooling | Planned |
-| v1.9 | Local Models (Ollama) | Planned |
-
-### Next Steps
-- [ ] Implement config file support
-- [ ] Add `--models` and `--chairman` CLI flags
-- [x] v1.1: Web Search Integration
-
----
-
-## 2026-01-17: v1.1 Web Search Integration
-
-### Session Goals
-- Implement web search capability for council models
-- Use Tavily API with tool calling so models decide when to search
-
-### What Was Done
-
-**1. Created `backend/search.py`**
-- Tavily API wrapper with `search_web()` async function
-- `SEARCH_TOOL` definition for OpenAI-style function calling
-- `format_search_results()` to convert search results to LLM-readable text
-
-**2. Updated `backend/openrouter.py`**
-- Added `query_model_with_tools()` function
-- Handles tool calling loop: model requests tool → execute → return results → get final response
-- Supports `max_tool_calls` parameter to prevent infinite loops
-- Returns `tool_calls_made` list in response for transparency
-
-**3. Updated `backend/council.py`**
-- Added `execute_tool()` function to dispatch tool calls to appropriate handlers
-- Modified `stage1_collect_responses()` to use `query_model_with_tools()`
-- Models now have access to `search_web` tool during Stage 1
-- Tool calls are tracked in stage1_results for each model
-
-**4. Updated `docs/PLAN.md`**
-- Documented the full v1.1 implementation plan before coding
-- Included tool definition format and calling flow
-
-### Architecture
-
-```
-User Query
-    │
-    ▼
-Stage 1: Query models WITH tools=[SEARCH_TOOL]
-    │
-    ├── Model decides: "I need current info"
-    │       ↓
-    │   Tool call: search_web(query)
-    │       ↓
-    │   Tavily API → Search results
-    │       ↓
-    │   Results sent back to model
-    │       ↓
-    │   Model generates final response
-    │
-    └── Model decides: "I know this" → Direct response
-    │
-    ▼
-Stage 2 & 3 (unchanged)
-```
-
-### Testing
-
-| Test | Command | Result |
-|------|---------|--------|
-| Weather query | `uv run python -m cli query "What is the current weather?"` | ✓ Models attempt to use search tool |
-| AI regulation | `uv run python -m cli query "AI regulation in 2026"` | ✓ Full 3-stage response |
-
-**Note:** Tool calling works correctly - models receive the tool definition and attempt to use it. To enable actual web searches, add `TAVILY_API_KEY=tvly-xxx` to `.env`.
-
-### Files Changed
-- `backend/search.py` - New file: Tavily wrapper and tool definition
-- `backend/openrouter.py` - Added `query_model_with_tools()`
-- `backend/council.py` - Integrated search tool into Stage 1
-- `docs/PLAN.md` - Documented v1.1 implementation plan
-
-### Post-Implementation Tuning
-- Increased `max_tool_calls` from 3 → 5 → 10 after testing showed models hitting the limit on complex queries
-
-### Council Member Updates
-- Added `x-ai/grok-4.1-fast` (free on OpenRouter)
-- Added `deepseek/deepseek-r1-0528` (free, strong reasoning from China)
-- Tested `qwen/qwen3-32b` but removed - not competitive enough
-- Final 5-member council: GPT-5.2, Gemini 3 Pro, Claude Sonnet 4.5, Grok 4.1 Fast, DeepSeek R1
-
-### Next Steps
-- [ ] Consider showing tool calls in CLI output
-- [ ] v1.2: Multi-Turn Debate Mode
-- [ ] v1.3: Conversation History (multi-turn conversations in CLI)
-- [ ] v1.4: File/Document Upload (txt, pdf, docx, epub)
-
----
-
-## 2026-01-20: Test Infrastructure Setup
-
-### Session Goals
-- Set up pytest with async support
-- Write tests for critical parsing and debate logic
-- Establish testing patterns for future TDD
-
-### What Was Done
-
-**1. Added Test Dependencies**
-- Added `pytest>=8.0.0`, `pytest-asyncio>=0.23.0`, `pytest-cov>=4.1.0` to dev dependencies
-- Configured pytest in `pyproject.toml` with async mode and coverage settings
-
-**2. Created Test Structure**
-```
-tests/
-├── __init__.py
-├── conftest.py           # Fixtures and mock responses
-├── test_ranking_parser.py # 14 tests for ranking extraction
-├── test_debate.py         # 15 tests for debate mode
-└── integration/
-    └── __init__.py
-```
-
-**3. Test Coverage**
-
-| Module | Tests | Coverage |
-|--------|-------|----------|
-| Ranking parser | 14 | `parse_ranking_from_text`, `calculate_aggregate_rankings` |
-| Debate mode | 15 | `extract_critiques_for_model`, `parse_revised_answer`, async rounds |
-
-**4. Key Test Categories**
-
-- **Ranking Parser Tests**: Standard format, edge cases (no header, extra whitespace, bullet format), fallback behavior
-- **Critique Extraction Tests**: Model name matching, self-critique exclusion, case insensitivity
-- **Defense Parsing Tests**: Section extraction, missing sections, header variations
-- **Async Round Tests**: Mocked API calls, failure handling, prompt verification
-
-### Testing Commands
-
-```bash
-# Run all tests
-uv run pytest tests/ -v
-
-# Run with coverage
-uv run pytest tests/ --cov=backend --cov-report=term-missing
-
-# Run specific test file
-uv run pytest tests/test_debate.py -v
-```
-
-### Results
-
-```
-29 passed in 0.14s
-Coverage: 28% (focused on critical parsing logic)
-```
-
-### Next Steps
-- [ ] TDD for v1.3 Conversation History
-- [ ] Add integration tests for CLI commands
-- [ ] Increase coverage as features are added
-
----
-
-## 2026-01-20: v1.2 Multi-Turn Debate Mode
-
-### Session Goals
-- Implement debate mode where models critique and defend positions
-- Add `--debate` and `--rounds` CLI flags
-- Update storage format for debate conversations
-
-### What Was Done
-
-**1. Backend Debate Functions (`backend/council.py`)**
-
-Added 6 new functions for debate orchestration:
+**Backend (`backend/council.py`)** - Added 6 functions:
 
 | Function | Purpose |
 |----------|---------|
-| `debate_round_critique()` | Round 2: Each model critiques all others |
-| `extract_critiques_for_model()` | Parse critiques directed at a specific model |
-| `debate_round_defense()` | Round 3+: Models defend and revise |
+| `debate_round_critique()` | Each model critiques all others |
+| `extract_critiques_for_model()` | Parse critiques for a specific model |
+| `debate_round_defense()` | Models defend and revise positions |
 | `parse_revised_answer()` | Extract "Revised Response" section |
 | `synthesize_debate()` | Chairman synthesizes full debate |
-| `run_debate_council()` | Orchestrate complete debate flow |
+| `run_debate_council()` | Orchestrate complete flow |
 
-**2. CLI Integration (`cli/main.py`)**
+**CLI (`cli/main.py`)** - Added flags and display:
+- `--debate` / `-d` flag
+- `--rounds N` / `-r N` flag (default: 2)
+- Color-coded round display (cyan/yellow/magenta)
+- `• searched` indicator for web search
 
-- Added `--debate` / `-d` flag to enable debate mode
-- Added `--rounds` / `-r` flag (default: 2)
-- Added `print_debate_round()` with color-coded round types
-- Added `print_debate_synthesis()` for chairman output
-- Added `run_debate_with_progress()` with round-by-round spinners
-- Added `• searched` indicator when models use web search
-
-**3. Storage Extension (`backend/storage.py`)**
-
-Added `add_debate_message()` for debate-format conversations:
+**Storage (`backend/storage.py`)** - New debate format:
 ```python
-{
-    "role": "assistant",
-    "mode": "debate",
-    "rounds": [
-        {"round_number": 1, "round_type": "initial", "responses": [...]},
-        {"round_number": 2, "round_type": "critique", "responses": [...]},
-        {"round_number": 3, "round_type": "defense", "responses": [...]}
-    ],
-    "synthesis": {"model": "...", "response": "..."}
-}
+{"mode": "debate", "rounds": [...], "synthesis": {...}}
 ```
 
 ### Architecture
-
 ```
 Round 1 (Initial)     Round 2 (Critique)     Round 3 (Defense)
 ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
@@ -484,73 +54,133 @@ Round 1 (Initial)     Round 2 (Critique)     Round 3 (Defense)
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Attribution | Named (not anonymous) | Need to track who said what across rounds |
+| Attribution | Named (not anonymous) | Track positions across rounds |
 | Critique scope | All-to-all | Each model critiques all others |
-| Defense format | Structured sections | "Addressing Critiques" + "Revised Response" |
-| Default rounds | 2 | Sufficient for most questions (initial + critique + defense) |
-| Replaces Stage 2? | Yes for debate mode | Debate is deeper than ranking |
+| Defense format | Structured sections | Easy to parse revised answers |
+| Default rounds | 2 | Sufficient for most questions |
 
-### Testing
-
-| Test | Command | Result |
-|------|---------|--------|
-| Basic debate | `--debate "What is 2+2?"` | ✓ 3 rounds + synthesis |
-| Extended debate | `--debate --rounds 3 "Complex Q"` | ✓ 4 rounds + synthesis |
-| Simple output | `--debate --simple "Q"` | ✓ Just final answer |
-| Web search indicator | `--debate "Bitcoin price?"` | ✓ Shows `• searched` |
-
-### API Cost Analysis
+### API Costs
 
 | Mode | API Calls (5 models) |
 |------|---------------------|
-| Standard (ranking) | 11 calls |
+| Standard | 11 calls |
 | Debate (2 rounds) | 16 calls |
 | Debate (3 rounds) | 21 calls |
 
-### Files Changed
-- `backend/council.py` - Added debate functions (~300 lines)
-- `cli/main.py` - Added flags and display functions (~150 lines)
-- `backend/storage.py` - Added `add_debate_message()`
+---
 
-### Next Steps
-- [ ] v1.3: Conversation History (`--continue` flag)
-- [ ] v1.4: File/Document Upload (`--file` flag)
-- [ ] Consider debate mode for TUI
+## Test Infrastructure
+*January 2026*
+
+### Overview
+Set up pytest with async support and wrote tests for critical parsing logic.
+
+### Implementation
+
+```
+tests/
+├── conftest.py              # Fixtures, mock API responses
+├── test_ranking_parser.py   # 14 tests
+├── test_debate.py           # 15 tests
+└── integration/             # CLI tests (planned)
+```
+
+**Dependencies added:**
+- `pytest>=8.0.0`
+- `pytest-asyncio>=0.23.0`
+- `pytest-cov>=4.1.0`
+
+### Test Categories
+
+| Category | Tests | Coverage |
+|----------|-------|----------|
+| Ranking parser | 14 | `parse_ranking_from_text`, `calculate_aggregate_rankings` |
+| Debate mode | 15 | Critique extraction, defense parsing, async rounds |
+
+**Results:** 29 passed, 28% coverage (focused on critical parsing logic)
 
 ---
 
-*Template for future entries:*
+## v1.1: Web Search Integration
+*January 2026*
 
-```markdown
-## YYYY-MM-DD: Session Title
+### Overview
+Integrated Tavily API with OpenAI-style tool calling. Models autonomously decide when to search.
 
-### Session Goals
-- Goal 1
-- Goal 2
+### Implementation
 
-### What Was Done
-1. ...
-2. ...
+**New file `backend/search.py`:**
+- `SEARCH_TOOL` - Function calling definition
+- `search_web()` - Async Tavily API wrapper
+- `format_search_results()` - Format for LLM context
 
-### Decisions Made
-| Decision | Reasoning |
-|----------|-----------|
+**Modified `backend/openrouter.py`:**
+- `query_model_with_tools()` - Handle tool call loop
+- `max_tool_calls` parameter to prevent infinite loops
 
-### Testing
-- [ ] Test 1: Result
-- [ ] Test 2: Result
+**Modified `backend/council.py`:**
+- `execute_tool()` - Dispatch tool calls
+- Stage 1 now passes `tools=[SEARCH_TOOL]` to models
 
-### Issues Encountered
-- Issue: ...
-- Resolution: ...
-
-### Files Changed
-- `file1.py` - Description
-- `file2.py` - Description
-
-### Next Steps
-- [ ] ...
-
-### Commits
-- `abc1234` - Commit message
+### Architecture
 ```
+User Query
+    ↓
+Stage 1: Query with tools=[SEARCH_TOOL]
+    ├── Model needs current info → calls search_web → Tavily API
+    └── Model knows answer → direct response
+    ↓
+Stage 2 & 3 (unchanged)
+```
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Search API | Tavily | Built for LLM use, free tier available |
+| Trigger | Model decides | More natural than `--web-search` flag |
+| Max tool calls | 10 | Prevents infinite loops |
+
+---
+
+## v1.0: Core Platform
+*January 2025*
+
+### Overview
+Built CLI and TUI interfaces on top of Karpathy's LLM Council concept.
+
+### Implementation
+
+**CLI (`cli/main.py`):**
+- `query` command with Rich progress indicators
+- `models` command to show configuration
+- `--simple` and `--final-only` output modes
+- Markdown rendering for responses
+
+**TUI (`cli/tui.py`):**
+- Textual app with tabbed interface
+- Stage 1/2/3 views with keyboard navigation
+- Keybindings: `1/2/3` for stages, `Q` to quit
+
+**Backend:**
+- 3-stage deliberation: responses → anonymous ranking → synthesis
+- Async parallel queries with `asyncio.gather()`
+- Graceful degradation if models fail
+
+### Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| CLI framework | Typer + Rich | Clean API, good help generation |
+| TUI framework | Textual | Modern, async-native |
+| Anonymous ranking | Labels (A, B, C) | Prevents model favoritism |
+| Default output | Show all stages | Transparency in deliberation |
+
+### Council Configuration
+- 5 models: GPT-5.2, Gemini 3 Pro, Claude Sonnet 4.5, Grok 4.1, DeepSeek R1
+- Chairman: Gemini 3 Pro
+- All via OpenRouter API
+
+---
+
+*For roadmap and planned features, see [PLAN.md](PLAN.md).*
