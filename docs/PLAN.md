@@ -70,6 +70,7 @@ llm-council query --file ./report.pdf "Summarize"
 | v1.7 | Streaming responses |
 | v1.8 | Code execution tool |
 | v1.9 | Local models (Ollama) |
+| v2.0 | Docker packaging (for web UI) |
 
 ---
 
