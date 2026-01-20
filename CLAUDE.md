@@ -33,6 +33,7 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - Requires `TAVILY_API_KEY` in `.env` (optional - gracefully degrades if missing)
 
 **`council.py`** - The Core Logic
+- `get_date_context()`: Returns current date string to prepend to prompts (models know today's date)
 - `execute_tool()`: Dispatches tool calls to appropriate handlers (currently only `search_web`)
 - `stage1_collect_responses()`: Parallel queries to all council models with tool support
   - Models receive `SEARCH_TOOL` and can autonomously decide when to search
@@ -290,9 +291,31 @@ llm-council --debate --simple "Question"           # Just final answer
 - Custom ranking criteria (not just accuracy/insight)
 - Support for reasoning models (o1, etc.) with special handling
 
-## Testing Notes
+## Testing
 
-Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council. The script tests both streaming and non-streaming modes.
+### Test Suite (46 tests)
+```
+tests/
+├── conftest.py              # Fixtures and mock API responses
+├── test_ranking_parser.py   # 14 tests - ranking extraction
+├── test_debate.py           # 15 tests - debate mode
+├── test_search.py           # 17 tests - web search & tool calling
+└── integration/             # CLI tests (planned)
+```
+
+### Running Tests
+```bash
+uv run pytest tests/ -v              # Run all tests
+uv run pytest tests/ --cov=backend   # With coverage
+```
+
+### CI/CD
+- GitHub Actions runs tests on every push to master
+- Workflow: `.github/workflows/test.yml`
+- Badge in README shows real-time CI status
+
+### Manual API Testing
+Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council.
 
 ## Data Flow Summary
 
