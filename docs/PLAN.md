@@ -1,520 +1,159 @@
-# LLM Council CLI - Implementation Plan
+# LLM Council - Roadmap
 
-## Overview
+## Current Status
 
-Extend Karpathy's LLM Council with a terminal-based interface using Python's Textual library for a rich TUI experience. The CLI will provide the same 3-stage council deliberation workflow without requiring a web browser.
+| Version | Feature | Status |
+|---------|---------|--------|
+| v1.0 | CLI + TUI + Web UI | ✅ Complete |
+| v1.1 | Web Search (Tool Calling) | ✅ Complete |
+| v1.2 | Multi-Turn Debate Mode | ✅ Complete |
+| v1.3 | Conversation History | 🔜 Next |
+| v1.4 | File/Document Upload | Planned |
+| v1.5 | Image Input (Multimodal) | Planned |
 
-## Goals
+---
 
-1. **Standalone CLI tool** - Single command to query the council
-2. **Rich TUI** - Interactive terminal UI with panels, tabs, and progress indicators
-3. **Simple mode** - Pipe-friendly output for scripting
-4. **Reuse existing logic** - Leverage `backend/council.py` and `backend/openrouter.py`
-5. **Configurable models** - Select council members and chairman via CLI or config
+## Completed Features
+
+### v1.0: Core Platform
+- CLI with Typer + Rich (progress indicators, formatted output)
+- Interactive TUI with Textual
+- React web interface
+- 3-stage deliberation: responses → anonymous ranking → synthesis
+
+### v1.1: Web Search
+- Tavily API integration via OpenAI-style tool calling
+- Models autonomously decide when to search
+- `• searched` indicator in CLI output
+
+### v1.2: Debate Mode
+- `--debate` flag for multi-round deliberation
+- Round 1: Initial responses → Round 2: Critiques → Round 3: Defense/Revision
+- `--rounds N` for extended debates
+- Chairman synthesizes full debate transcript
+
+---
+
+## Next Up
+
+### v1.3: Conversation History
+
+Multi-turn conversations in CLI.
+
+```bash
+llm-council query "Question"                    # New conversation
+llm-council query "Follow-up" --continue        # Continue last
+llm-council query "Question" --id <id>          # Resume specific
+llm-council history                             # List conversations
+```
+
+**Key decisions:**
+- Context includes Stage 3 only (not all stages)
+- Shared storage with web UI (`data/conversations/`)
+- Truncation: first message + last N exchanges
+
+### v1.4: File/Document Upload
+
+```bash
+llm-council query --file ./code.py "Review this"
+llm-council query --file ./report.pdf "Summarize"
+```
+
+**Supported:** `.txt`, `.md`, `.py`, `.json`, `.pdf`, `.docx`
+
+### v1.5+: Future
+
+| Version | Feature |
+|---------|---------|
+| v1.5 | Image input (multimodal) |
+| v1.6 | Presets & profiles |
+| v1.7 | Streaming responses |
+| v1.8 | Code execution tool |
+| v1.9 | Local models (Ollama) |
+
+---
+
+## Engineering Practices
+
+### Implemented ✅
+
+| Practice | Details |
+|----------|---------|
+| Async/Parallel | `asyncio.gather()` for concurrent API calls |
+| Graceful Degradation | Continues if individual models fail |
+| Test Suite | pytest + pytest-asyncio, 29 tests |
+| Type Hints | Function signatures throughout |
+
+### Planned for v1.3
+
+| Practice | Details |
+|----------|---------|
+| TDD | Tests first for new features |
+| Pydantic Models | `CouncilConfig`, `ModelResponse`, `DebateRound` |
+| Config Extraction | YAML config with validation |
+| Structured Logging | JSON logs with correlation IDs |
+
+### Planned for v1.4+
+
+| Practice | Details |
+|----------|---------|
+| CI/CD | GitHub Actions for tests + lint |
+| Pre-commit Hooks | ruff/black formatting |
+| Custom Exceptions | `CouncilError`, `ModelTimeoutError` |
+| Retry with Backoff | Exponential backoff for API failures |
+| SOLID Refactor | Extract classes, dependency injection |
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                      cli.py                             │
-│  (typer CLI entry point - handles args, launches TUI)   │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│                      tui.py                             │
-│  (Textual App - interactive terminal interface)         │
-│                                                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
-│  │  Stage 1    │  │  Stage 2    │  │  Stage 3    │     │
-│  │  Responses  │  │  Rankings   │  │  Synthesis  │     │
-│  │  (Tabs)     │  │  (Table)    │  │  (Panel)    │     │
-│  └─────────────┘  └─────────────┘  └─────────────┘     │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│              backend/council.py (existing)              │
-│  stage1_collect_responses()                             │
-│  stage2_collect_rankings()                              │
-│  stage3_synthesize_final()                              │
-└─────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│             backend/openrouter.py (existing)            │
-│  query_model() / query_models_parallel()                │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                        User Query                            │
+└─────────────────────────────────────────────────────────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+┌──────────────────────┐      ┌──────────────────────┐
+│    Standard Mode     │      │     Debate Mode      │
+│                      │      │                      │
+│  Stage 1: Responses  │      │  Round 1: Initial    │
+│  Stage 2: Rankings   │      │  Round 2: Critique   │
+│  Stage 3: Synthesis  │      │  Round 3: Defense    │
+│                      │      │  Synthesis           │
+└──────────────────────┘      └──────────────────────┘
+              │                             │
+              └──────────────┬──────────────┘
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   OpenRouter API                             │
+│         (GPT, Claude, Gemini, Grok, DeepSeek)               │
+│                                                              │
+│    ┌─────────────────────────────────────────────────┐      │
+│    │  Tool Calling: search_web() → Tavily API        │      │
+│    └─────────────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Features
+---
 
-### Core Features
+## Testing
 
-| Feature | Description |
-|---------|-------------|
-| Query command | `llm-council "question"` - run full council |
-| Interactive mode | `llm-council -i` - TUI with input prompt |
-| Simple mode | `llm-council -s "question"` - just final answer |
-| Show models | `llm-council models` - display current config |
-| Model selection | `llm-council --models gpt-5,claude-4 "question"` |
-| Chairman selection | `llm-council --chairman gemini-3 "question"` |
-
-### Model Configuration
-
-Models can be configured in three ways (in order of precedence):
-
-1. **CLI flags** (highest priority)
-   ```bash
-   llm-council --models "openai/gpt-5.2,anthropic/claude-sonnet-4.5" \
-               --chairman "google/gemini-3-pro-preview" \
-               "Your question"
-   ```
-
-2. **Config file** (`~/.config/llm-council/config.yaml`)
-   ```yaml
-   council_models:
-     - openai/gpt-5.2
-     - google/gemini-3-pro-preview
-     - anthropic/claude-sonnet-4.5
-     - x-ai/grok-4.1-fast
-     - deepseek/deepseek-r1-0528
-   chairman_model: google/gemini-3-pro-preview
-   ```
-
-3. **Default** (falls back to `backend/config.py`)
-
-### TUI Features
-
-| Feature | Description |
-|---------|-------------|
-| Stage tabs | Switch between Stage 1, 2, 3 views |
-| Model tabs | Within Stage 1, tab through each model's response |
-| Progress spinner | Show which stage/model is currently processing |
-| Rankings table | Aggregate rankings with avg position |
-| Markdown rendering | Proper formatting of model responses |
-| Keyboard navigation | `1/2/3` for stages, `Tab` for models, `q` to quit |
-
-## File Structure
-
+```bash
+uv run pytest tests/ -v                    # Run all tests
+uv run pytest tests/ --cov=backend         # With coverage
 ```
-llm-council-cli/
-├── backend/
-│   ├── council.py     # 3-stage council orchestration
-│   ├── openrouter.py  # OpenRouter API client + tool calling
-│   ├── search.py      # Tavily web search integration
-│   └── config.py      # Model configuration
-├── cli/
-│   ├── __init__.py
-│   ├── main.py        # Typer CLI entry point
-│   └── tui.py         # Textual TUI application
-├── docs/
-│   ├── PLAN.md        # This file
-│   └── DEVLOG.md      # Development log
-├── pyproject.toml
-└── README.md
-```
-
-## Dependencies to Add
-
-```toml
-[project.dependencies]
-# ... existing deps ...
-typer = ">=0.9.0"
-textual = ">=0.50.0"
-rich = ">=13.0.0"
-pyyaml = ">=6.0"  # For config file
-
-[project.scripts]
-llm-council = "cli.main:app"
-```
-
-## Implementation Steps
-
-### Phase 1: Basic CLI (no TUI)
-
-1. Create `cli/` package structure
-2. Add dependencies to `pyproject.toml`
-3. Implement `cli/config.py` - layered config loading
-4. Implement `cli/main.py` with typer:
-   - `query` command with progress spinner (rich)
-   - `models` command to show config
-   - `-s/--simple` flag for minimal output
-   - `--models` and `--chairman` flags
-5. Test: `uv run llm-council "test question"`
-
-### Phase 2: Textual TUI
-
-1. Create `cli/tui.py` with Textual App
-2. Layout: Header, TabPane for stages, Footer with keybindings
-3. Stage 1 view: TabbedContent for each model's response
-4. Stage 2 view: DataTable for rankings + expandable evaluations
-5. Stage 3 view: Markdown panel with chairman's synthesis
-6. Input widget for new queries within TUI
-
-### Phase 3: Polish
-
-1. Add keyboard shortcuts (1/2/3 for stages, q to quit)
-2. Style with `styles.tcss` (colors, borders, spacing)
-3. Add loading states and progress indicators
-4. Error handling and graceful degradation
-5. Update README with CLI usage
-
-## UI Mockup
-
-```
-┌─ LLM Council ─────────────────────────────────────────────────────┐
-│ Query: What is the best programming language for beginners?       │
-├───────────────────────────────────────────────────────────────────┤
-│ [Stage 1: Responses] [Stage 2: Rankings] [Stage 3: Final]        │
-├───────────────────────────────────────────────────────────────────┤
-│ ┌─ gpt-5.1 ─┬─ gemini-3 ─┬─ claude-4.5 ─┬─ grok-4 ─┐             │
-│ │                                                    │             │
-│ │ Python is widely recommended for beginners due to │             │
-│ │ its clean syntax and readability. Here's why:     │             │
-│ │                                                    │             │
-│ │ 1. **Simple syntax** - reads like English         │             │
-│ │ 2. **Rich ecosystem** - libraries for everything  │             │
-│ │ 3. **Strong community** - help is always available│             │
-│ │ ...                                                │             │
-│ └────────────────────────────────────────────────────┘             │
-├───────────────────────────────────────────────────────────────────┤
-│ [1] Stage 1  [2] Stage 2  [3] Stage 3  [q] Quit  [?] Help        │
-└───────────────────────────────────────────────────────────────────┘
-```
-
-## Testing Strategy
-
-### Current Implementation ✅
 
 ```
 tests/
-├── conftest.py              # Fixtures, mock API responses
-├── test_ranking_parser.py   # 14 tests for ranking extraction
-├── test_debate.py           # 15 tests for debate mode
-└── integration/             # CLI integration tests (planned)
+├── conftest.py              # Fixtures, mocks
+├── test_ranking_parser.py   # 14 tests
+├── test_debate.py           # 15 tests
+└── integration/             # CLI tests (planned)
 ```
-
-**Commands:**
-```bash
-uv run pytest tests/ -v                              # Run all tests
-uv run pytest tests/ --cov=backend --cov-report=term # With coverage
-```
-
-**Test Categories:**
-1. **Unit tests**: Mock OpenRouter API responses, test parsing logic
-2. **Async tests**: pytest-asyncio for debate rounds
-3. **Integration tests**: CLI commands (planned)
-
-### Engineering Practices Roadmap
-
-#### Currently Implemented ✅
-
-| Practice | Details |
-|----------|---------|
-| **Async/Parallel Execution** | `asyncio.gather()` for concurrent API calls, non-blocking I/O |
-| **Graceful Degradation** | Council continues if individual models fail |
-| **Test Suite** | pytest + pytest-asyncio, 29 tests, mocked API responses |
-| **Type Hints** | Function signatures and return types throughout |
-| **Error Handling** | Try/catch with fallback behavior, None-safe returns |
-
-#### Planned for v1.3
-
-| Practice | Implementation |
-|----------|----------------|
-| **TDD** | Write tests first for conversation history feature |
-| **Pydantic Models** | `CouncilConfig`, `ModelResponse`, `DebateRound`, `RankingResult` |
-| **Config Extraction** | Move hardcoded values to `config.yaml` with Pydantic validation |
-| **Structured Logging** | JSON logs with log levels, correlation IDs for request tracing |
-
-#### Planned for v1.4+
-
-| Practice | Implementation |
-|----------|----------------|
-| **CI/CD** | GitHub Actions: run tests, lint, coverage on PR |
-| **Pre-commit Hooks** | ruff/black formatting, lint checks before commit |
-| **Custom Exceptions** | `CouncilError`, `ModelTimeoutError`, `RateLimitError` |
-| **Retry with Backoff** | Exponential backoff for transient API failures |
-| **SOLID Refactor** | Extract `RankingCouncil`, `DebateCouncil` classes; dependency injection |
-| **Rate Limiting** | Cost estimation before execution, configurable limits |
 
 ---
 
-## Future Roadmap
-
-### v1.1: Web Search Integration ✅ COMPLETE
-
-Enable council members to search the web when they need current information. Models decide when to search using tool calling.
-
-**Decision: Tavily API + Tool Calling**
-
-- **Tavily**: Free tier 1,000 searches/month, built for LLM use
-- **Tool Calling**: Models decide when to search (not user-driven `--web-search` flag)
-
-**Architecture:**
-
-```
-User Query
-    │
-    ▼
-┌─────────────────────────────────────────────────────────┐
-│  Stage 1: Query models WITH search tool available       │
-│                                                         │
-│  Model sees: "What's the latest on X?"                  │
-│  Model decides: "I need current info" → calls search    │
-│  Your code: Executes Tavily search, returns results     │
-│  Model: Uses results to form response                   │
-└─────────────────────────────────────────────────────────┘
-    │
-    ▼
-  Stage 2 & 3 (normal flow)
-```
-
-**Files to create/modify:**
-
-1. **`backend/search.py`** (new)
-   - `SEARCH_TOOL` - Tool definition for function calling
-   - `search_web(query)` - Async function to call Tavily API
-   - `format_search_results()` - Format results for LLM context
-
-2. **`backend/openrouter.py`** (modify)
-   - Update `query_model()` to accept `tools` parameter
-   - Handle tool call responses (when model wants to use a tool)
-   - Execute tool, send results back, get final response
-
-3. **`backend/council.py`** (modify)
-   - Pass `SEARCH_TOOL` to models in Stage 1
-   - Handle the tool calling loop
-
-4. **`.env`** (update)
-   - Add `TAVILY_API_KEY=tvly-xxx`
-
-**Tool Definition:**
-
-```python
-SEARCH_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "search_web",
-        "description": "Search the web for current information. Use this when you need up-to-date information, recent events, current statistics, or facts you're unsure about.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query"
-                }
-            },
-            "required": ["query"]
-        }
-    }
-}
-```
-
-**Tool Calling Flow:**
-
-```
-1. Send request to OpenRouter with tools=[SEARCH_TOOL]
-2. Model response may include:
-   - Normal content (no tool needed)
-   - tool_calls: [{"function": {"name": "search_web", "arguments": {"query": "..."}}}]
-3. If tool_calls:
-   a. Parse the arguments
-   b. Execute search_web(query) → Tavily API
-   c. Send tool result back to model
-   d. Get final response with search context
-4. Return final response
-```
-
-**CLI Usage:**
-
-```bash
-# Web search is automatic - models decide when to use it
-uv run python -m cli query "What's the latest news on AI regulation?"
-
-# Model will automatically search if it needs current info
-# No --web-search flag needed
-```
-
-**Environment Setup:**
-
-```bash
-# Add to .env
-TAVILY_API_KEY=tvly-your-key-here
-```
-
-### v1.2: Multi-Turn Debate Mode ✅ COMPLETE
-
-Enable models to challenge and respond to each other for deeper analysis.
-
-**Current flow (ranking only):**
-```
-Stage 1: Independent answers → Stage 2: Rank → Stage 3: Synthesize
-```
-
-**Debate flow:**
-```
-Round 1: Independent answers
-Round 2: Each model critiques others' answers
-Round 3: Models defend/revise their positions
-Round N: Continue until consensus or max rounds
-Final: Chairman synthesizes with full debate context
-```
-
-**Implementation (Completed):**
-- `--debate` / `-d` flag enables debate mode
-- `--rounds N` / `-r N` sets debate rounds (default: 2)
-- Models use named attribution (not anonymous) to track positions across rounds
-- Each model critiques all others, then defends/revises based on critiques received
-- Chairman synthesizes full debate transcript
-
-**Files Added/Modified:**
-- `backend/council.py` - Added 6 debate functions:
-  - `debate_round_critique()` - Models critique each other
-  - `extract_critiques_for_model()` - Parse critiques directed at specific model
-  - `debate_round_defense()` - Models defend and revise
-  - `parse_revised_answer()` - Extract revised response section
-  - `synthesize_debate()` - Chairman synthesizes debate
-  - `run_debate_council()` - Orchestrate full debate flow
-- `cli/main.py` - Added flags, display functions, progress indicators
-- `backend/storage.py` - Added `add_debate_message()` for persistence
-
-**Usage:**
-```bash
-llm-council --debate "Is capitalism or socialism better for reducing poverty?"
-llm-council --debate --rounds 3 "Complex ethical question"
-llm-council --debate --simple "Just the final answer"
-```
-
-**API Costs (5 models):**
-| Mode | API Calls |
-|------|-----------|
-| Standard (ranking) | 11 calls |
-| Debate (2 rounds) | 16 calls |
-| Debate (3 rounds) | 21 calls |
-
-### v1.3: Conversation History
-
-Enable multi-turn conversations in CLI, similar to the web UI experience.
-
-**CLI usage:**
-```bash
-# Normal query (stateless, current behavior)
-uv run python -m cli query "Question"
-
-# Continue last conversation
-uv run python -m cli query "Follow-up question" --continue
-
-# Resume specific conversation
-uv run python -m cli query "Question" --id <conversation-id>
-
-# List past conversations
-uv run python -m cli history
-```
-
-**Design Decisions:**
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Message format for context | Stage 3 only | All stages too verbose, confusing to models |
-| Storage location | Shared `data/conversations/` | Allows switching between CLI and web UI |
-| Display on `--continue` | Show last exchange | User needs context |
-| `--continue` with no history | Error with message | Explicit over implicit |
-| Track "last conversation" | Most recent modified file | No extra state file needed |
-| Truncation strategy | Keep last N exchanges (e.g., 10) | Simple, predictable |
-| Context limit | Conservative 8K tokens | Works for all models |
-| Conversation titles | Reuse `generate_conversation_title()` | Consistency with web UI |
-
-**Implementation:**
-1. Add `--continue` flag to `query` command
-2. Add `--id` flag to resume specific conversation
-3. Add `history` command to list conversations
-4. Modify council flow to accept message history
-5. Send Stage 3 responses as assistant messages in context
-6. Basic truncation: first message + last N exchanges
-7. Warn user when truncation occurs
-8. Reuse `backend/storage.py` for persistence
-
-**Future enhancement (v1.3.x):**
-- Smart summarization/compaction instead of truncation
-- Token-aware truncation using tiktoken
-- Interactive `chat` command with REPL loop
-
-### v1.4: File/Document Upload
-
-Enable attaching files to queries for the council to analyze.
-
-**Supported formats:**
-- Plain text: `.txt`, `.md`, `.py`, `.js`, `.json`, `.yaml`, `.csv`, code files
-- PDF: `.pdf` (using `pypdf`)
-- Word: `.docx` (using `python-docx`)
-- Ebook: `.epub` (using `ebooklib`)
-
-**CLI usage:**
-```bash
-# Single file
-uv run python -m cli query --file ./code.py "Review this"
-
-# Multiple files
-uv run python -m cli query --file ./a.py --file ./b.py "Compare these"
-
-# PDF/documents
-uv run python -m cli query --file ./report.pdf "Summarize this"
-```
-
-**Implementation:**
-- Add `--file` flag (repeatable) to CLI
-- Detect file type by extension
-- Extract text using appropriate library
-- Prepend file contents to user query
-
-### v1.5: Image Input
-
-- Multimodal support for vision-capable models
-- Base64 encoding for images
-- Formats: `.png`, `.jpg`, `.gif`, `.webp`
-
-### v1.6: Presets & Profiles
-
-Save and load council configurations:
-
-```bash
-# Save current config as a preset
-llm-council preset save "coding-council"
-
-# Use a preset
-llm-council --preset coding-council "How do I optimize this SQL?"
-
-# List presets
-llm-council preset list
-```
-
-### v1.7: Streaming Responses
-
-- Show tokens as they arrive (requires SSE support from OpenRouter)
-- Progressive rendering in TUI
-- Better perceived latency
-
-### v1.8: Extended Tooling
-
-- **Code execution**: Let models run code to verify solutions
-
-### v1.9: Local Models
-
-- Support Ollama as a backend
-- Mix cloud + local models in same council
-- Fallback to local when API unavailable
-
-### Future Ideas (Unscheduled)
-
-- [ ] Web UI that calls the same CLI backend (hybrid mode)
-- [ ] Export to markdown/PDF
-- [ ] Model performance analytics (track which models rank highest over time)
-- [ ] Custom ranking criteria (security, performance, readability, etc.)
-- [ ] Voice input/output
-
----
-
-*Plan created: 2025-01-16*
 *Last updated: 2026-01-20*
-*Status: v1.2 complete, v1.3 (Conversation History) next*
+
+For implementation details and session notes, see [DEVLOG.md](DEVLOG.md).
