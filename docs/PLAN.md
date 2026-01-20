@@ -100,7 +100,9 @@ llm-council query --file ./report.pdf "Summarize"
 | Practice | Details |
 |----------|---------|
 | Contract Tests | Scheduled daily API schema validation |
-| Pre-commit Hooks | ruff/black formatting |
+| Pre-commit Hooks | Ruff lint/format |
+| Type Checking | Pyright (basic) |
+| Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked |
 | Custom Exceptions | `CouncilError`, `ModelTimeoutError` |
 | Retry with Backoff | Exponential backoff for API failures |
 | SOLID Refactor | Extract classes, dependency injection |
