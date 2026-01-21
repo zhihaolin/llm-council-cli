@@ -2,6 +2,37 @@
 
 This file contains technical details, architectural decisions, and important implementation notes for future development sessions.
 
+## Core Engineering Principles (SACROSANCT)
+
+These three principles are non-negotiable for this project:
+
+### 1. SOLID
+- **S**ingle Responsibility: Each module/class has one reason to change
+- **O**pen/Closed: Extend behavior without modifying existing code
+- **L**iskov Substitution: Subtypes must be substitutable for base types
+- **I**nterface Segregation: Small, focused interfaces over large ones
+- **D**ependency Inversion: Depend on abstractions, not concretions
+
+### 2. TDD (Test-Driven Development)
+- Write tests BEFORE implementation
+- Red → Green → Refactor cycle
+- Tests document expected behavior
+- No production code without a failing test first
+
+### 3. TBD (Trunk-Based Development)
+- Small, frequent commits to master/trunk
+- Each commit must pass all tests
+- Each commit should be independently deployable
+- No long-lived feature branches
+- For refactors: use Branch by Abstraction
+  1. Add new structure alongside old
+  2. Migrate incrementally (each commit passes tests)
+  3. Remove old code only after full migration
+
+**When refactoring**: Never make large, sweeping changes in a single commit. Break into small, safe steps.
+
+---
+
 ## Project Overview
 
 LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively answer user questions. The key innovation is anonymized peer review in Stage 2, preventing models from playing favorites.
