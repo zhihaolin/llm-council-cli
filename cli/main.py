@@ -77,6 +77,7 @@ def print_chat_banner(
     debate_rounds: int,
     stream_enabled: bool = False,
     parallel_enabled: bool = False,
+    react_enabled: bool = True,
 ) -> None:
     """Show chat banner with conversation details."""
     short_id = conversation_id[:8]
@@ -85,7 +86,7 @@ def print_chat_banner(
         f"[chat.meta]{status} conversation[/chat.meta]\n"
         f"[chat.accent]{title}[/chat.accent]\n"
         f"[chat.meta]ID: {short_id}[/chat.meta]\n"
-        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled)}"
+        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled)}"
     )
     console.print()
     console.print(Panel(
@@ -279,13 +280,110 @@ def print_debate_round(round_data: dict, round_num: int) -> None:
 
 def print_debate_synthesis(synthesis: dict) -> None:
     """Display chairman's debate synthesis."""
-    console.print("\n[bold cyan]━━━ CHAIRMAN'S DEBATE SYNTHESIS ━━━[/bold cyan]\n")
+    console.print("\n[bold cyan]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold cyan]\n")
     console.print(Panel(
         Markdown(synthesis["response"]),
         title=f"[bold green]Final Answer • {synthesis['model']}[/bold green]",
         border_style="green",
         padding=(1, 2),
     ))
+
+
+async def run_react_synthesis(
+    user_query: str,
+    context: str,
+    header: str = "CHAIRMAN'S REASONING"
+) -> dict:
+    """
+    Run ReAct synthesis with streaming display.
+
+    Displays the reasoning trace as it streams, then shows the final synthesis.
+
+    Args:
+        user_query: Original user question
+        context: Formatted context from ranking or debate mode
+        header: Header text to display
+
+    Returns:
+        Dict with 'model' and 'response' keys
+    """
+    from backend.council import synthesize_with_react
+
+    console.print(f"\n[bold cyan]━━━ {header} ━━━[/bold cyan]\n")
+
+    synthesis_result = None
+    current_text = ""
+    terminal_width = console.width or 80
+
+    # Track lines for clearing streaming output
+    line_count = 0
+    current_col = 0
+
+    def track_output(text: str):
+        """Track line count including terminal wrapping."""
+        nonlocal line_count, current_col
+        for char in text:
+            if char == "\n":
+                line_count += 1
+                current_col = 0
+            else:
+                current_col += 1
+                if current_col >= terminal_width:
+                    line_count += 1
+                    current_col = 0
+
+    def clear_streaming():
+        """Clear the streamed text."""
+        nonlocal line_count, current_col
+        if line_count > 0:
+            sys.stdout.write(f"\033[{line_count}A\033[J")
+            sys.stdout.flush()
+        line_count = 0
+        current_col = 0
+
+    async for event in synthesize_with_react(user_query, context):
+        event_type = event["type"]
+
+        if event_type == "token":
+            # Stream tokens in dim text
+            token = event["content"]
+            sys.stdout.write(f"\033[2m{token}\033[0m")
+            sys.stdout.flush()
+            track_output(token)
+            current_text += token
+
+        elif event_type == "thought":
+            # After streaming completes, show formatted thought
+            clear_streaming()
+            thought = event["content"]
+            console.print(f"[cyan]Thought:[/cyan] {thought}\n")
+            current_text = ""
+
+        elif event_type == "action":
+            tool = event["tool"]
+            args = event.get("args")
+            if tool == "search_web":
+                console.print(f"[yellow]Action:[/yellow] search_web(\"{args}\")\n")
+            elif tool == "synthesize":
+                console.print(f"[yellow]Action:[/yellow] synthesize()\n")
+
+        elif event_type == "observation":
+            # Show observation in dim text
+            observation = event["content"]
+            # Truncate long observations
+            if len(observation) > 500:
+                observation = observation[:500] + "..."
+            console.print(f"[dim]Observation: {observation}[/dim]\n")
+
+        elif event_type == "synthesis":
+            # Clear any remaining streaming text
+            clear_streaming()
+            synthesis_result = {
+                "model": event["model"],
+                "response": event["response"]
+            }
+
+    return synthesis_result
 
 
 async def run_chat_session(max_turns: int, start_new: bool) -> None:
@@ -298,6 +396,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
     debate_rounds = DEFAULT_DEBATE_ROUNDS
     parallel_enabled = True
     stream_enabled = False
+    react_enabled = True
 
     if not start_new and conversations:
         conversation_id = conversations[0]["id"]
@@ -318,6 +417,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         debate_rounds=debate_rounds,
         stream_enabled=stream_enabled,
         parallel_enabled=parallel_enabled,
+        react_enabled=react_enabled,
     )
 
     while True:
@@ -370,6 +470,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_rounds=debate_rounds,
                         stream_enabled=stream_enabled,
                         parallel_enabled=parallel_enabled,
+                        react_enabled=react_enabled,
                     )
                 continue
             if command == "new":
@@ -384,6 +485,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     debate_rounds=debate_rounds,
                     stream_enabled=stream_enabled,
                     parallel_enabled=parallel_enabled,
+                    react_enabled=react_enabled,
                 )
                 continue
             if command == "debate":
@@ -391,7 +493,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Usage: /debate on|off[/chat.error]")
                     continue
                 debate_enabled = argument == "on"
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
                 continue
             if command == "rounds":
                 if not argument:
@@ -406,7 +508,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Rounds must be at least 2.[/chat.error]")
                     continue
                 debate_rounds = rounds_value
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
                 continue
             if command == "parallel":
                 if argument not in ("on", "off"):
@@ -417,7 +519,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     stream_enabled = False  # Parallel and stream are mutually exclusive
                 if parallel_enabled and not debate_enabled:
                     console.print("[chat.meta]Note: Parallel only applies in debate mode.[/chat.meta]")
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
                 continue
             if command == "stream":
                 if argument not in ("on", "off"):
@@ -428,10 +530,17 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     parallel_enabled = False  # Stream and parallel are mutually exclusive
                 if stream_enabled and not debate_enabled:
                     console.print("[chat.meta]Note: Streaming only applies in debate mode.[/chat.meta]")
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                continue
+            if command == "react":
+                if argument not in ("on", "off"):
+                    console.print("[chat.error]Usage: /react on|off[/chat.error]")
+                    continue
+                react_enabled = argument == "on"
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
                 continue
             if command == "mode":
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
                 continue
 
             console.print("[chat.error]Unknown command. Type /help for options.[/chat.error]")
@@ -460,6 +569,9 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         console.print()
 
         if debate_enabled:
+            # Determine if we should use ReAct (only for batch mode currently)
+            use_react_here = react_enabled and not parallel_enabled and not stream_enabled
+
             if parallel_enabled:
                 # Parallel mode - runs models in parallel with progress spinners
                 debate_rounds_data, synthesis = await run_debate_parallel(
@@ -477,11 +589,23 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 debate_rounds_data, synthesis = await run_debate_with_progress(
                     full_query,
                     debate_rounds,
+                    skip_synthesis=use_react_here,
                 )
 
             if debate_rounds_data is None:
                 console.print("[chat.error]Error: Debate mode failed to produce responses.[/chat.error]")
                 continue
+
+            # If using ReAct, run synthesis separately
+            if use_react_here:
+                from backend.council import build_react_context_debate
+                # Show rounds first
+                for round_data in debate_rounds_data:
+                    print_debate_round(round_data, round_data["round_number"])
+                # Run ReAct synthesis
+                context = build_react_context_debate(full_query, debate_rounds_data, len(debate_rounds_data))
+                synthesis = await run_react_synthesis(full_query, context)
+                print_debate_synthesis(synthesis)
 
             storage.add_debate_message(conversation_id, debate_rounds_data, synthesis)
 
@@ -489,17 +613,32 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 title = await title_task
                 storage.update_conversation_title(conversation_id, title)
 
-            if not stream_enabled and not parallel_enabled:
-                # Only print rounds if not streaming/parallel (they already displayed them)
+            if not stream_enabled and not parallel_enabled and not use_react_here:
+                # Only print rounds if not streaming/parallel/react (they already displayed them)
                 for round_data in debate_rounds_data:
                     print_debate_round(round_data, round_data["round_number"])
                 print_debate_synthesis(synthesis)
         else:
-            stage1, stage2, stage3, metadata = await run_council_with_progress(full_query)
+            # Standard ranking mode
+            use_react_here = react_enabled
+            stage1, stage2, stage3, metadata = await run_council_with_progress(
+                full_query, skip_synthesis=use_react_here
+            )
 
             if stage1 is None:
                 console.print("[chat.error]Error: All models failed to respond.[/chat.error]")
                 continue
+
+            # If using ReAct, run synthesis separately
+            if use_react_here:
+                from backend.council import build_react_context_ranking
+                # Show Stage 1 and 2 first
+                print_stage1(stage1)
+                print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
+                # Run ReAct synthesis
+                context = build_react_context_ranking(full_query, stage1, stage2)
+                stage3 = await run_react_synthesis(full_query, context)
+                print_stage3(stage3)
 
             storage.add_assistant_message(conversation_id, stage1, stage2, stage3)
 
@@ -507,13 +646,23 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 title = await title_task
                 storage.update_conversation_title(conversation_id, title)
 
-            print_stage1(stage1)
-            print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
-            print_stage3(stage3)
+            if not use_react_here:
+                print_stage1(stage1)
+                print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
+                print_stage3(stage3)
 
 
-async def run_council_with_progress(query: str) -> tuple:
-    """Run the council with progress indicators."""
+async def run_council_with_progress(query: str, skip_synthesis: bool = False) -> tuple:
+    """Run the council with progress indicators.
+
+    Args:
+        query: The user's question
+        skip_synthesis: If True, skip Stage 3 synthesis (for ReAct mode)
+
+    Returns:
+        Tuple of (stage1_results, stage2_results, stage3_result, metadata)
+        If skip_synthesis=True, stage3_result will be None
+    """
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -545,15 +694,17 @@ async def run_council_with_progress(query: str) -> tuple:
 
         console.print(f"[green]✓[/green] Stage 2 complete: {len(stage2_results)} rankings")
 
-        # Stage 3
-        task3 = progress.add_task(
-            f"[cyan]Stage 3: Chairman synthesizing...",
-            total=None
-        )
-        stage3_result = await stage3_synthesize_final(query, stage1_results, stage2_results)
-        progress.remove_task(task3)
+        # Stage 3 (optional)
+        stage3_result = None
+        if not skip_synthesis:
+            task3 = progress.add_task(
+                f"[cyan]Stage 3: Chairman synthesizing...",
+                total=None
+            )
+            stage3_result = await stage3_synthesize_final(query, stage1_results, stage2_results)
+            progress.remove_task(task3)
 
-        console.print(f"[green]✓[/green] Stage 3 complete: Final answer ready")
+            console.print(f"[green]✓[/green] Stage 3 complete: Final answer ready")
 
     return stage1_results, stage2_results, stage3_result, {
         "label_to_model": label_to_model,
@@ -561,7 +712,7 @@ async def run_council_with_progress(query: str) -> tuple:
     }
 
 
-async def run_debate_with_progress(query: str, max_rounds: int = 2) -> tuple:
+async def run_debate_with_progress(query: str, max_rounds: int = 2, skip_synthesis: bool = False) -> tuple:
     """Run the debate council with progress indicators."""
     from backend.council import (
         stage1_collect_responses,
@@ -675,15 +826,17 @@ async def run_debate_with_progress(query: str, max_rounds: int = 2) -> tuple:
                 })
                 current_responses = defense_responses
 
-        # Chairman synthesis
-        task = progress.add_task(
-            "[green]Chairman synthesizing debate...",
-            total=None
-        )
-        synthesis = await synthesize_debate(query, rounds, len(rounds))
-        progress.remove_task(task)
+        # Chairman synthesis (optional)
+        synthesis = None
+        if not skip_synthesis:
+            task = progress.add_task(
+                "[green]Chairman synthesizing debate...",
+                total=None
+            )
+            synthesis = await synthesize_debate(query, rounds, len(rounds))
+            progress.remove_task(task)
 
-        console.print(f"[green]✓[/green] Chairman synthesis complete")
+            console.print(f"[green]✓[/green] Chairman synthesis complete")
 
     return rounds, synthesis
 
@@ -1080,9 +1233,17 @@ def query(
         "--parallel", "-p",
         help="Run models in parallel with progress spinners (debate mode only)",
     ),
+    no_react: bool = typer.Option(
+        False,
+        "--no-react",
+        help="Disable ReAct reasoning for chairman (skips reasoning trace)",
+    ),
 ):
     """
     Query the LLM Council with a question.
+
+    By default, the chairman uses ReAct reasoning to verify facts before synthesis.
+    Use --no-react to disable this behavior.
 
     Examples:
         llm-council "What is the best programming language?"
@@ -1090,6 +1251,7 @@ def query(
         llm-council -f "Just give me the answer"
         llm-council --debate "Complex question"
         llm-council --debate --rounds 3 "Very complex question"
+        llm-council --no-react "Skip reasoning trace"
         llm-council --debate --stream "Watch responses stream token-by-token"
         llm-council --debate --parallel "Watch models query in parallel"
     """
@@ -1105,31 +1267,60 @@ def query(
     console.print()
     console.print(f"[dim]Council: {', '.join([m.split('/')[-1] for m in COUNCIL_MODELS])}[/dim]")
     console.print(f"[dim]Chairman: {CHAIRMAN_MODEL.split('/')[-1]}[/dim]")
+    mode_parts = []
     if debate:
-        mode_desc = f"Debate ({rounds} rounds)"
+        mode_parts.append(f"Debate ({rounds} rounds)")
         if stream:
-            mode_desc += " [streaming]"
+            mode_parts.append("[streaming]")
         elif parallel:
-            mode_desc += " [parallel]"
-        console.print(f"[dim]Mode: {mode_desc}[/dim]")
+            mode_parts.append("[parallel]")
+    else:
+        mode_parts.append("Ranking")
+    if not no_react:
+        mode_parts.append("[react]")
+    console.print(f"[dim]Mode: {' '.join(mode_parts)}[/dim]")
     console.print()
 
     if debate:
         # Run debate mode
+        use_react = not no_react
+
         if stream:
             # Streaming mode - shows responses token-by-token (sequential)
+            # TODO: Add ReAct support for streaming mode
             debate_rounds, synthesis = asyncio.run(run_debate_streaming(question, rounds))
         elif parallel:
             # Parallel mode - runs models in parallel with progress spinners
+            # TODO: Add ReAct support for parallel mode
             debate_rounds, synthesis = asyncio.run(run_debate_parallel(question, rounds))
         else:
             # Batch mode - shows single progress spinner per round
-            debate_rounds, synthesis = asyncio.run(run_debate_with_progress(question, rounds))
+            debate_rounds, synthesis = asyncio.run(
+                run_debate_with_progress(question, rounds, skip_synthesis=use_react)
+            )
 
         if debate_rounds is None:
             raise typer.Exit(1)
 
-        if stream or parallel:
+        # If ReAct enabled, run ReAct synthesis separately
+        if use_react and not stream and not parallel:
+            from backend.council import build_react_context_debate
+            context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
+
+            if not simple and not final_only:
+                # Show all debate rounds first
+                for round_data in debate_rounds:
+                    print_debate_round(round_data, round_data["round_number"])
+
+            # Run ReAct synthesis
+            synthesis = asyncio.run(run_react_synthesis(question, context))
+
+            if simple:
+                console.print()
+                console.print(Markdown(synthesis["response"]))
+            else:
+                print_debate_synthesis(synthesis)
+        elif stream or parallel:
             # Streaming/parallel mode already displayed everything via Live
             pass
         elif simple:
@@ -1145,12 +1336,33 @@ def query(
             print_debate_synthesis(synthesis)
     else:
         # Run standard council mode
-        stage1, stage2, stage3, metadata = asyncio.run(run_council_with_progress(question))
+        use_react = not no_react
+        stage1, stage2, stage3, metadata = asyncio.run(
+            run_council_with_progress(question, skip_synthesis=use_react)
+        )
 
         if stage1 is None:
             raise typer.Exit(1)
 
-        if simple:
+        # If ReAct enabled, run ReAct synthesis separately
+        if use_react:
+            from backend.council import build_react_context_ranking
+            context = build_react_context_ranking(question, stage1, stage2)
+
+            if not simple and not final_only:
+                # Show Stage 1 and 2 first
+                print_stage1(stage1)
+                print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
+
+            # Run ReAct synthesis
+            stage3 = asyncio.run(run_react_synthesis(question, context))
+
+            if simple:
+                console.print()
+                console.print(Markdown(stage3["response"]))
+            else:
+                print_stage3(stage3)
+        elif simple:
             # Just print the final answer as plain text
             console.print()
             console.print(Markdown(stage3["response"]))

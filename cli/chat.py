@@ -13,6 +13,7 @@ CHAT_COMMANDS = {
     "rounds": "Set debate rounds",
     "parallel": "Toggle parallel mode (on/off)",
     "stream": "Toggle streaming mode (on/off)",
+    "react": "Toggle ReAct reasoning (on/off)",
     "mode": "Show current mode",
     "exit": "Exit chat",
 }
@@ -59,6 +60,7 @@ def format_chat_mode_line(
     debate_rounds: int,
     stream_enabled: bool = False,
     parallel_enabled: bool = False,
+    react_enabled: bool = True,
 ) -> str:
     """Format the current chat mode line for display."""
     if debate_enabled:
@@ -67,11 +69,16 @@ def format_chat_mode_line(
             mode_str += " [parallel]"
         elif stream_enabled:
             mode_str += " [streaming]"
-        return (
-            "[chat.meta]Mode:[/chat.meta] "
-            f"[chat.accent]{mode_str}[/chat.accent]"
-        )
-    return "[chat.meta]Mode:[/chat.meta] [chat.accent]Council (ranking)[/chat.accent]"
+    else:
+        mode_str = "Council (ranking)"
+
+    if react_enabled:
+        mode_str += " [react]"
+
+    return (
+        "[chat.meta]Mode:[/chat.meta] "
+        f"[chat.accent]{mode_str}[/chat.accent]"
+    )
 
 
 def format_prompt_mode(

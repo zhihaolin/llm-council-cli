@@ -74,24 +74,37 @@
 Chairman uses ReAct pattern: Reason → Act → Observe → Repeat.
 
 **Features:**
-- Chairman can call tools (search, re-query specific models)
+- Chairman can call `search_web` tool to verify facts
 - Reasoning loop: "Do I have enough info? No → search → synthesize"
 - Max iterations limit (default: 3)
-- Thought/Action/Observation trace visible in output
+- Thought/Action/Observation trace streams token-by-token
+- Enabled by default for both ranking and debate modes
+- `--no-react` flag to disable
 
 **Example output:**
 ```
+━━━ CHAIRMAN'S REASONING ━━━
+
 Thought: The responses disagree on the 2024 election date. I should verify.
+
 Action: search_web("2024 US presidential election date")
+
 Observation: November 5, 2024
+
 Thought: Now I can synthesize with the correct date.
+
 Action: synthesize
+
+━━━ CHAIRMAN'S SYNTHESIS ━━━
 ```
 
 **Implementation:**
-- `synthesize_with_react()` replaces `stage3_synthesize_final()` when enabled
+- `synthesize_with_react()` async generator yields trace events
 - Chairman prompt includes ReAct format instructions
-- `--react` flag to enable (off by default for cost)
+- Streaming display with color-coded trace (Thought=cyan, Action=yellow, Observation=dim)
+
+**Future enhancement:**
+- `ask_model(model, question)` tool to re-query specific council models for clarification
 
 ### v1.7: Self-Reflection Round
 
