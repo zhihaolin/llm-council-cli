@@ -4,6 +4,64 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.6.1: SOLID Refactoring
+*January 2026*
+
+### Overview
+Major refactoring to apply SOLID principles and remove the unused Web UI. Split monolithic files into focused modules.
+
+### What Was Removed
+- `frontend/` - Entire React app (unused, CLI-only project)
+- `backend/main.py` - FastAPI server (not needed for CLI)
+- `start.sh` - Launch script for frontend+backend
+
+### Backend Refactoring
+
+Split `backend/council.py` (1,722 lines) into focused modules:
+
+```
+backend/council/
+├── __init__.py       # Public API exports (backward compatible)
+├── aggregation.py    # Ranking calculations (~55 lines)
+├── debate.py         # Debate orchestration (~210 lines)
+├── orchestrator.py   # Stage 1-2-3 flow (~175 lines)
+├── parsers.py        # Regex/text parsing (~155 lines)
+├── prompts.py        # All prompt templates (~290 lines)
+├── react.py          # ReAct chairman logic (~105 lines)
+└── streaming.py      # Event generators (~530 lines)
+```
+
+### CLI Refactoring
+
+Split `cli/main.py` (1,407 lines) into focused modules:
+
+```
+cli/
+├── main.py           # Command routing only (~270 lines)
+├── presenters.py     # All print_* functions (~250 lines)
+├── orchestrators.py  # run_* execution functions (~450 lines)
+├── chat_session.py   # Chat REPL logic (~280 lines)
+├── chat.py           # Command parsing (unchanged)
+└── utils.py          # Constants (~10 lines)
+```
+
+### SOLID Principles Applied
+
+| Principle | Change |
+|-----------|--------|
+| **Single Responsibility** | Each module has one reason to change |
+| **Interface Segregation** | `__init__.py` exports only public API |
+
+### Documentation
+- Added `docs/REFACTORING.md` - Educational guide with bad→good examples for each SOLID principle
+
+### Results
+- All 84 tests pass
+- Net reduction: ~4,500 lines (deleted unused Web UI)
+- CLI commands unchanged (backward compatible)
+
+---
+
 ## v1.5: Parallel Execution with Progress
 *January 2026*
 

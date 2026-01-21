@@ -257,6 +257,7 @@ Minimum security layer to claim "end-to-end secure."
 | Test Suite | pytest + pytest-asyncio, 84 tests |
 | Type Hints | Function signatures throughout |
 | CI/CD | GitHub Actions (tests on every push) |
+| SOLID (SRP/ISP) | Focused modules, clean API exports (v1.6.1) |
 
 ### Planned
 
@@ -264,9 +265,9 @@ Minimum security layer to claim "end-to-end secure."
 |----------|---------|---------|
 | Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.8, v1.12 |
 | Structured Logging | JSON logs with correlation IDs | v1.10 |
-| SOLID Refactor | Extract classes, dependency injection | v1.11 (partial) |
 | Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.12 |
 | Retry with Backoff | Exponential backoff for API failures | v1.12 |
+| SOLID (OCP/DIP) | Strategy pattern, dependency injection | Future |
 | Config Extraction | YAML config with validation | — |
 | Contract Tests | Scheduled daily API schema validation | — |
 | Pre-commit Hooks | Ruff lint/format | — |
@@ -330,6 +331,6 @@ tests/
 
 ---
 
-*Last updated: 2026-01-21*
+*Last updated: 2026-01-22*
 
 For implementation details and session notes, see [DEVLOG.md](DEVLOG.md).

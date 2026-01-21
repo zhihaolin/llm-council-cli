@@ -559,10 +559,21 @@ async def test_stage1():
 Deleted frontend/, start.sh, backend/main.py
 
 ### Phase 2: Extract CLI Modules ✅
-Created presenters.py, orchestrators.py, chat_session.py (applies SRP)
+Created presenters.py, orchestrators.py, chat_session.py, utils.py (applies SRP)
 
-### Phase 3: Split Council Module (Pending)
-Apply SRP to backend/council.py
+### Phase 3: Split Council Module ✅
+Split 1,722-line council.py into focused modules:
+```
+backend/council/
+├── __init__.py       # Public API exports
+├── aggregation.py    # Ranking calculations
+├── debate.py         # Debate orchestration
+├── orchestrator.py   # Stage 1-2-3 flow
+├── parsers.py        # Regex/text parsing
+├── prompts.py        # Prompt templates
+├── react.py          # ReAct chairman logic
+└── streaming.py      # Event generators
+```
 
 ### Phase 4: Apply OCP/DIP (Future)
 Add strategy pattern and dependency injection
