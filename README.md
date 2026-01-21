@@ -89,7 +89,7 @@ uv run llm-council chat
 └────────────────────────────────────────────┘
 Commands: /help, /history, /use <id>, /new, /debate, /parallel, /stream, /rounds, /mode, /exit
 
-debate(2)∥> What is the capital of France?
+debate(2)> What is the capital of France?
 ```
 
 Slash commands:

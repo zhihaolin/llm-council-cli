@@ -875,6 +875,8 @@ async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
     from rich.live import Live
     from rich.table import Table
     from rich.text import Text
+    from rich.spinner import Spinner
+    from rich.console import Group
     from backend.council import run_debate_council_streaming
 
     rounds_data = []
@@ -884,8 +886,8 @@ async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
 
     # Track model status: "querying", "done", "error"
     model_status = {}
-    model_results = {}
     completed_panels = []
+    live_display = None
 
     def build_status_table() -> Table:
         """Build a table showing current status of all models."""
@@ -893,128 +895,131 @@ async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
         table.add_column("Model", style="bold")
         table.add_column("Status")
 
-        for model in COUNCIL_MODELS:
+        for model in model_status:
             short_name = model.split("/")[-1]
             status = model_status.get(model, "waiting")
 
             if status == "querying":
-                status_text = Text("⠋ querying...", style="yellow")
+                # Use Rich Spinner for animation
+                spinner = Spinner("dots", text="querying...", style="yellow")
+                table.add_row(short_name, spinner)
             elif status == "done":
-                status_text = Text("✓ done", style="green")
+                table.add_row(short_name, Text("✓ done", style="green"))
             elif status == "error":
-                status_text = Text("✗ error", style="red")
+                table.add_row(short_name, Text("✗ error", style="red"))
             else:
-                status_text = Text("○ waiting", style="dim")
-
-            table.add_row(short_name, status_text)
+                table.add_row(short_name, Text("○ waiting", style="dim"))
 
         return table
 
-    def print_completed_panels():
-        """Print all completed panels so far."""
-        for panel in completed_panels:
-            console.print(panel)
+    def print_round_header(round_num: int, round_type: str):
+        """Print the round header."""
+        color = {"initial": "cyan", "critique": "yellow", "defense": "magenta"}.get(
+            round_type, "white"
+        )
+        console.print()
+        console.print(f"[bold {color}]━━━ ROUND {round_num}: {round_type.upper()} ━━━[/bold {color}]")
+        console.print()
+
+    async for event in run_debate_council_streaming(query, max_rounds):
+        event_type = event["type"]
+
+        if event_type == "round_start":
+            current_round_num = event["round_number"]
+            current_round_type = event["round_type"]
+
+            # Reset for new round
+            model_status.clear()
+            completed_panels.clear()
+
+            # Print round header
+            print_round_header(current_round_num, current_round_type)
+
+        elif event_type == "model_start":
+            model = event["model"]
+            model_status[model] = "querying"
+            # Start or update live display
+            if live_display is None:
+                live_display = Live(build_status_table(), console=console, refresh_per_second=10, transient=True)
+                live_display.start()
+            else:
+                live_display.update(build_status_table())
+
+        elif event_type == "model_complete":
+            model = event["model"]
+            response_data = event.get("response", {})
+            model_status[model] = "done"
+            if live_display:
+                live_display.update(build_status_table())
+
+            # Check if model used web search
+            searched = bool(response_data.get("tool_calls_made"))
+            content = response_data.get("response", "")
+            panel = build_model_panel(model, content, color="", searched=searched)
+            completed_panels.append(panel)
+
+        elif event_type == "model_error":
+            model = event["model"]
+            error = event.get("error", "Unknown error")
+            model_status[model] = "error"
+            if live_display:
+                live_display.update(build_status_table())
+
+            panel = Panel(
+                f"[red]Error: {error}[/red]",
+                title=f"[bold red]{model.split('/')[-1]}[/bold red]",
+                border_style="red",
+            )
+            completed_panels.append(panel)
+
+        elif event_type == "round_complete":
+            # Stop live display (transient=True clears it)
+            if live_display:
+                live_display.stop()
+                live_display = None
+
+            # Print all completed panels
+            for panel in completed_panels:
+                console.print(panel)
+                console.print()
+
+            responses = event.get("responses", [])
+            rounds_data.append({
+                "round_number": current_round_num,
+                "round_type": current_round_type,
+                "responses": responses,
+            })
+
+        elif event_type == "synthesis_start":
             console.print()
-        completed_panels.clear()
+            console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
+            console.print()
 
-    with Live(console=console, refresh_per_second=10) as live:
-        async for event in run_debate_council_streaming(query, max_rounds):
-            event_type = event["type"]
+            # Show spinner for chairman
+            model_status.clear()
+            model_status[CHAIRMAN_MODEL] = "querying"
+            live_display = Live(build_status_table(), console=console, refresh_per_second=10, transient=True)
+            live_display.start()
 
-            if event_type == "round_start":
-                # Print any pending panels from previous round
-                live.stop()
-                print_completed_panels()
+        elif event_type == "synthesis_complete":
+            synthesis_data = event["synthesis"]
 
-                current_round_num = event["round_number"]
-                current_round_type = event["round_type"]
+            # Stop live display (transient=True clears it)
+            if live_display:
+                live_display.stop()
+                live_display = None
 
-                # Reset model status for new round
-                model_status.clear()
-                model_results.clear()
+            content = synthesis_data.get("response", "")
+            console.print(build_model_panel(CHAIRMAN_MODEL, content, "green"))
+            console.print()
 
-                # Print round header
-                color = {"initial": "cyan", "critique": "yellow", "defense": "magenta"}.get(
-                    current_round_type, "white"
-                )
-                console.print()
-                console.print(f"[bold {color}]━━━ ROUND {current_round_num}: {current_round_type.upper()} ━━━[/bold {color}]")
-                console.print()
-
-                live.start()
-
-            elif event_type == "model_start":
-                model = event["model"]
-                model_status[model] = "querying"
-                live.update(build_status_table())
-
-            elif event_type == "model_complete":
-                model = event["model"]
-                response_data = event.get("response", {})
-                model_status[model] = "done"
-                model_results[model] = response_data
-                live.update(build_status_table())
-
-                # Check if model used web search
-                searched = bool(response_data.get("tool_calls_made"))
-                content = response_data.get("response", "")
-                panel = build_model_panel(model, content, color="", searched=searched)
-                completed_panels.append(panel)
-
-            elif event_type == "model_error":
-                model = event["model"]
-                error = event.get("error", "Unknown error")
-                model_status[model] = "error"
-                live.update(build_status_table())
-
-                panel = Panel(
-                    f"[red]Error: {error}[/red]",
-                    title=f"[bold red]{model.split('/')[-1]}[/bold red]",
-                    border_style="red",
-                )
-                completed_panels.append(panel)
-
-            elif event_type == "round_complete":
-                # Stop live display and print all completed panels
-                live.stop()
-                print_completed_panels()
-
-                responses = event.get("responses", [])
-                rounds_data.append({
-                    "round_number": current_round_num,
-                    "round_type": current_round_type,
-                    "responses": responses,
-                })
-
-                live.start()
-
-            elif event_type == "synthesis_start":
-                live.stop()
-                print_completed_panels()
-                console.print()
-                console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
-                console.print()
-
-                # Show spinner for chairman
-                model_status.clear()
-                model_status[CHAIRMAN_MODEL] = "querying"
-                live.start()
-                live.update(build_status_table())
-
-            elif event_type == "synthesis_complete":
-                synthesis_data = event["synthesis"]
-                model_status[CHAIRMAN_MODEL] = "done"
-                live.update(build_status_table())
-                live.stop()
-
-                content = synthesis_data.get("response", "")
-                console.print(build_model_panel(CHAIRMAN_MODEL, content, "green"))
-                console.print()
-
-            elif event_type == "complete":
-                live.stop()
-                rounds_data = event.get("rounds", rounds_data)
-                synthesis_data = event.get("synthesis", synthesis_data)
+        elif event_type == "complete":
+            # Ensure live display is stopped
+            if live_display:
+                live_display.stop()
+                live_display = None
+            rounds_data = event.get("rounds", rounds_data)
+            synthesis_data = event.get("synthesis", synthesis_data)
 
     return rounds_data, synthesis_data
 

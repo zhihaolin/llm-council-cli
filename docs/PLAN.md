@@ -293,18 +293,18 @@ async def read_file(path: str) -> str:
 
 ### Planned
 
-| Practice | Details |
-|----------|---------|
-| Pydantic Models | `CouncilConfig`, `ModelResponse`, `DebateRound` |
-| Config Extraction | YAML config with validation |
-| Structured Logging | JSON logs with correlation IDs |
-| Contract Tests | Scheduled daily API schema validation |
-| Pre-commit Hooks | Ruff lint/format |
-| Type Checking | Pyright (basic) |
-| Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked |
-| Custom Exceptions | `CouncilError`, `ModelTimeoutError` |
-| Retry with Backoff | Exponential backoff for API failures |
-| SOLID Refactor | Extract classes, dependency injection |
+| Practice | Details | Roadmap |
+|----------|---------|---------|
+| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.6 |
+| Retry with Backoff | Exponential backoff for API failures | v1.6 |
+| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.8, v1.12 |
+| Structured Logging | JSON logs with correlation IDs | v1.9 |
+| SOLID Refactor | Extract classes, dependency injection | v1.13 (partial) |
+| Config Extraction | YAML config with validation | — |
+| Contract Tests | Scheduled daily API schema validation | — |
+| Pre-commit Hooks | Ruff lint/format | — |
+| Type Checking | Pyright (basic) | — |
+| Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |
 
 ---
 

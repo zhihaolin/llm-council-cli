@@ -80,14 +80,9 @@ def format_prompt_mode(
     stream_enabled: bool = False,
     parallel_enabled: bool = False,
 ) -> str:
-    """Format the prompt mode indicator."""
+    """Format the prompt mode indicator (mode shown in banner, not prompt)."""
     if debate_enabled:
-        mode = f"debate({debate_rounds})"
-        if parallel_enabled:
-            mode += "∥"  # Parallel symbol
-        elif stream_enabled:
-            mode += "~"  # Stream symbol
-        return mode
+        return f"debate({debate_rounds})"
     return "rank"
 
 
