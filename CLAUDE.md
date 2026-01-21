@@ -29,6 +29,16 @@ These three principles are non-negotiable for this project:
   2. Migrate incrementally (each commit passes tests)
   3. Remove old code only after full migration
 
+### 4. Green CI, Always
+- CI must be passing at all times
+- Never merge/push code that breaks CI
+- If CI breaks, fixing it is the top priority
+
+### 5. Trunk is Always Deployable
+- Master/trunk must be in a deployable state at any point in time
+- No "work in progress" commits that break functionality
+- Feature flags over feature branches for incomplete work
+
 **When refactoring**: Never make large, sweeping changes in a single commit. Break into small, safe steps.
 
 ---
