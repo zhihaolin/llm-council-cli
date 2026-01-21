@@ -304,6 +304,11 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Yields `{'type': 'token', 'content': str}` for each token
   - Yields `{'type': 'done', 'content': str}` when complete
   - Yields `{'type': 'error', 'error': str}` on failure
+- `query_model_streaming_with_tools()`: Streaming with tool calling support
+  - Combines token streaming with function calling (used for initial round with web search)
+  - Yields `{'type': 'tool_call', 'tool': str, 'args': dict}` when model calls a tool
+  - Yields `{'type': 'tool_result', 'tool': str, 'result': str}` after tool execution
+  - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
 **`backend/council.py`**
 - `debate_round_streaming()`: Yields events as each model completes (parallel mode, not token streaming)
