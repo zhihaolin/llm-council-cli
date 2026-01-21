@@ -10,7 +10,7 @@
 | v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | Token Streaming | ✅ Complete |
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
-| v1.6 | ReAct Chairman | Planned |
+| v1.6 | ReAct Chairman | ✅ Complete |
 | v1.7 | Self-Reflection Round | Planned |
 | v1.8 | Workflow State Machine | Planned |
 | v1.9 | File/Document Upload | Planned |
@@ -65,46 +65,19 @@
 - Shared `httpx.AsyncClient` for connection reuse
 - Performance: total time = max(model times) instead of sum
 
+### v1.6: ReAct Chairman
+- Chairman uses ReAct pattern: Reason → Act → Observe → Repeat
+- `search_web` tool to verify facts during synthesis
+- Max 3 iterations to prevent infinite loops
+- Enabled by default for both ranking and debate modes
+- `/react on|off` command in chat REPL
+- `--no-react` flag to disable in CLI
+- Works with parallel and streaming modes
+- Color-coded trace display (Thought=cyan, Action=yellow, Observation=dim)
+
 ---
 
 ## Next Up
-
-### v1.6: ReAct Chairman
-
-Chairman uses ReAct pattern: Reason → Act → Observe → Repeat.
-
-**Features:**
-- Chairman can call `search_web` tool to verify facts
-- Reasoning loop: "Do I have enough info? No → search → synthesize"
-- Max iterations limit (default: 3)
-- Thought/Action/Observation trace streams token-by-token
-- Enabled by default for both ranking and debate modes
-- `--no-react` flag to disable
-
-**Example output:**
-```
-━━━ CHAIRMAN'S REASONING ━━━
-
-Thought: The responses disagree on the 2024 election date. I should verify.
-
-Action: search_web("2024 US presidential election date")
-
-Observation: November 5, 2024
-
-Thought: Now I can synthesize with the correct date.
-
-Action: synthesize
-
-━━━ CHAIRMAN'S SYNTHESIS ━━━
-```
-
-**Implementation:**
-- `synthesize_with_react()` async generator yields trace events
-- Chairman prompt includes ReAct format instructions
-- Streaming display with color-coded trace (Thought=cyan, Action=yellow, Observation=dim)
-
-**Future enhancement:**
-- `ask_model(model, question)` tool to re-query specific council models for clarification
 
 ### v1.7: Self-Reflection Round
 
@@ -282,7 +255,7 @@ Minimum security layer to claim "end-to-end secure."
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 70 tests |
+| Test Suite | pytest + pytest-asyncio, 84 tests |
 | Type Hints | Function signatures throughout |
 | CI/CD | GitHub Actions (tests on every push) |
 
@@ -350,8 +323,9 @@ tests/
 ├── test_conversation_context.py # 5 tests
 ├── test_debate.py               # 15 tests
 ├── test_ranking_parser.py       # 14 tests
+├── test_react.py                # 11 tests
 ├── test_search.py               # 17 tests
-├── test_streaming.py            # 8 tests
+├── test_streaming.py            # 10 tests
 └── integration/                 # CLI tests (planned)
 ```
 

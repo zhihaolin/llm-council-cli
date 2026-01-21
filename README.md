@@ -72,6 +72,28 @@ The CLI shows which models used search with a subtle `• searched` indicator.
 
 ![Models autonomously searching for current information](images/search.png)
 
+### ReAct Chairman
+
+The chairman uses ReAct (Reasoning + Acting) to verify facts before synthesizing. If model responses disagree on factual claims, the chairman can search to verify before producing the final answer.
+
+```
+━━━ CHAIRMAN'S REASONING ━━━
+
+Thought: The responses disagree on the current Bitcoin price. I should verify.
+
+Action: search_web("bitcoin price today")
+
+Observation: Bitcoin is currently trading at $67,234...
+
+Thought: Now I can synthesize with verified data.
+
+Action: synthesize()
+
+━━━ CHAIRMAN'S SYNTHESIS ━━━
+```
+
+ReAct is enabled by default. Disable with `--no-react` or `/react off` in chat mode.
+
 ### Interactive Chat Mode
 
 Multi-turn conversations with persistent history. The chat REPL remembers context and lets you switch between ranking and debate modes on the fly.
@@ -85,9 +107,9 @@ uv run llm-council chat
 │ Resumed conversation                       │
 │ Previous Topic Title                       │
 │ ID: abc12345                               │
-│ Mode: Debate (2 rounds) [parallel]         │
+│ Mode: Debate (2 rounds) [parallel] [react] │
 └────────────────────────────────────────────┘
-Commands: /help, /history, /use <id>, /new, /debate, /parallel, /stream, /rounds, /mode, /exit
+Commands: /help, /history, /use <id>, /new, /debate, /parallel, /stream, /react, /rounds, /mode, /exit
 
 debate(2)> What is the capital of France?
 ```
@@ -99,6 +121,7 @@ Slash commands:
 - `/debate on|off` — Toggle debate mode
 - `/parallel on|off` — Toggle parallel mode (default: on)
 - `/stream on|off` — Toggle streaming mode
+- `/react on|off` — Toggle ReAct reasoning (default: on)
 - `/rounds N` — Set debate rounds
 - `/mode` — Show current mode
 - `/exit` — Exit chat
@@ -267,6 +290,7 @@ uv run llm-council interactive
 | `--rounds N` | `-r N` | Number of debate rounds (default: 2) |
 | `--stream` | | Stream token-by-token (sequential, debate mode) |
 | `--parallel` | `-p` | Run models in parallel with progress spinners (debate mode) |
+| `--no-react` | | Disable ReAct reasoning for chairman |
 | `--new` | | Start a new conversation (chat mode) |
 | `--max-turns N` | `-t N` | Context turns to include (chat mode, default: 6) |
 
@@ -330,7 +354,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 72 tests |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 84 tests |
 | **Type Hints** | ✅ | Throughout codebase |
 | **CI/CD** | ✅ | GitHub Actions (tests on every push) |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
@@ -365,6 +389,7 @@ tests/
 ├── test_conversation_context.py # Context extraction (5 tests)
 ├── test_debate.py               # Debate mode (15 tests)
 ├── test_ranking_parser.py       # Ranking extraction (14 tests)
+├── test_react.py                # ReAct chairman (11 tests)
 ├── test_search.py               # Web search & tool calling (17 tests)
 ├── test_streaming.py            # Streaming & parallel (10 tests)
 └── integration/                 # CLI integration tests (planned)
@@ -382,7 +407,7 @@ tests/
 | v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | Token Streaming | ✅ Complete |
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
-| v1.6 | ReAct Chairman | Planned |
+| v1.6 | ReAct Chairman | ✅ Complete |
 | v1.7 | Self-Reflection Round | Planned |
 | v1.8 | Workflow State Machine | Planned |
 | v1.9 | File/Document Upload | Planned |

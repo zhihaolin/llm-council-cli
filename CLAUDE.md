@@ -374,7 +374,7 @@ def clear_streaming_output():
 
 ## Testing
 
-### Test Suite (72 tests)
+### Test Suite (84 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
@@ -383,6 +383,7 @@ tests/
 ├── test_conversation_context.py # 5 tests - conversation context handling
 ├── test_debate.py               # 15 tests - debate mode
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
+├── test_react.py                # 11 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling
 ├── test_streaming.py            # 10 tests - streaming & parallel mode
 └── integration/                 # CLI tests (planned)
@@ -509,5 +510,75 @@ async def query_with_model(model: str):
 
 ### CLI Display (`cli/main.py`)
 - `run_debate_parallel()` uses Rich `Live` display with a status table
-- Status states: "⠋ querying..." → "✓ done" / "✗ error"
+- Status states: "⠋ thinking..." → "✓ done" / "✗ error"
 - Panels appear as models complete (fastest first)
+
+## ReAct Chairman
+
+### Overview
+The chairman uses the ReAct (Reasoning + Acting) pattern to synthesize final answers. This allows fact verification before synthesis.
+
+**Pattern:** Thought → Action → Observation → Repeat (max 3 iterations)
+
+**Available tools:**
+- `search_web(query)` - Verify facts or get current information
+- `synthesize()` - Produce final answer (terminal action)
+
+### CLI Usage
+```bash
+llm-council query --debate "Question"         # ReAct enabled by default
+llm-council query --debate --no-react "Q"     # Disable ReAct
+```
+
+### Chat REPL Commands
+- `/react on` - Enable ReAct reasoning
+- `/react off` - Disable ReAct reasoning
+- `/mode` - Show current mode (includes `[react]` indicator)
+
+### Example Output
+```
+━━━ CHAIRMAN'S REASONING ━━━
+
+Thought: The responses disagree on the current Bitcoin price. I should verify.
+
+Action: search_web("bitcoin price today")
+
+Observation: Bitcoin is currently trading at $67,234...
+
+Thought: Now I can synthesize with verified data.
+
+Action: synthesize()
+
+━━━ CHAIRMAN'S SYNTHESIS ━━━
+
+[Final answer panel]
+```
+
+### Implementation
+
+**`backend/council.py`:**
+- `parse_react_output()` - Extracts Thought/Action from model output using regex
+- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
+- `build_react_context_debate()` - Formats debate rounds for chairman
+- `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
+- `synthesize_with_react()` - Async generator implementing the ReAct loop
+  - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events
+  - Max 3 iterations to prevent infinite loops
+  - If model says `synthesize()` without content, asks for synthesis directly
+
+**`cli/main.py`:**
+- `run_react_synthesis()` - Displays ReAct trace with color coding
+  - Thought: cyan
+  - Action: yellow
+  - Observation: dim
+- Works with parallel, streaming, and batch modes
+- Synthesis streaming only happens when model didn't provide inline answer
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Default state | Enabled | Most questions benefit from potential fact verification |
+| Max iterations | 3 | Prevents infinite search loops |
+| Streaming | Trace only | Token streaming for Thought/Action would be noisy |
+| Empty synthesize() | Re-prompt | Model sometimes forgets to provide answer after action |
