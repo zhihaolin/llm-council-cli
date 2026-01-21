@@ -384,6 +384,12 @@ tests/
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
 | v1.6 | Retry & Fallback Logic | Planned |
 | v1.7 | File/Document Upload | Planned |
+| v1.8 | Security Foundations | Planned |
+| v1.9 | Observability (OpenTelemetry) | Planned |
+| v1.10 | ReAct Chairman | Planned |
+| v1.11 | Self-Reflection Round | Planned |
+| v1.12 | Workflow State Machine | Planned |
+| v1.13 | Tool Registry (MCP) | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 

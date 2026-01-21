@@ -12,9 +12,12 @@
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
 | v1.6 | Retry & Fallback Logic | Planned |
 | v1.7 | File/Document Upload | Planned |
-| v1.8 | Cost Tracking | Planned |
-| v1.9 | Export Conversations | Planned |
-| v1.10 | Configurable Council | Planned |
+| v1.8 | Security Foundations | Planned |
+| v1.9 | Observability | Planned |
+| v1.10 | ReAct Chairman | Planned |
+| v1.11 | Self-Reflection Round | Planned |
+| v1.12 | Workflow State Machine | Planned |
+| v1.13 | Tool Registry | Planned |
 
 ---
 
@@ -133,50 +136,145 @@ llm-council query --file ./data.csv --file ./schema.json "Validate this data"
 - Large files truncated with warning
 - Multiple `--file` flags supported
 
-### v1.8: Cost Tracking
+### v1.8: Security Foundations
 
-Show estimated API cost per query using OpenRouter pricing data.
-
-```bash
-llm-council query "Question"
-# ... response ...
-# 💰 Estimated cost: $0.0234 (3 models × 3 rounds)
-```
+Minimum security layer to claim "end-to-end secure."
 
 **Features:**
-- Per-model token counting
-- Real-time pricing from OpenRouter API
-- Session cost accumulator
-- `/cost` command in chat REPL
+- API key authentication for web endpoints
+- Input validation (query length limits, content filtering)
+- Audit logging (who queried what, when, which models responded)
+- Environment-based secrets (no hardcoded keys)
 
-### v1.9: Export Conversations
+**Implementation:**
+- FastAPI middleware for auth (`X-API-Key` header)
+- Pydantic models for input validation
+- Append-only audit log (JSON lines file)
+- `AuditEntry`: timestamp, user_id, query_hash, models_used, latency_ms
 
-Save conversations to various formats.
+### v1.9: Observability
 
-```bash
-/export conversation.md    # Markdown
-/export conversation.json  # Raw JSON
-/export conversation.pdf   # PDF (requires weasyprint)
+Structured logging and tracing for production visibility.
+
+**Features:**
+- Structured JSON logging with correlation IDs
+- OpenTelemetry tracing (spans per round, per model)
+- Basic metrics: request count, latency p50/p95, error rate
+- `/metrics` endpoint (Prometheus format)
+
+**Implementation:**
+- `structlog` for JSON logging
+- `opentelemetry-sdk` + `opentelemetry-exporter-otlp` for tracing
+- Correlation ID generated per request, flows through all logs
+- Spans: `council.query` → `council.round.{n}` → `council.model.{name}`
+
+### v1.10: ReAct Chairman
+
+Chairman uses ReAct pattern: Reason → Act → Observe → Repeat.
+
+**Features:**
+- Chairman can call tools (search, re-query specific models)
+- Reasoning loop: "Do I have enough info? No → search → synthesize"
+- Max iterations limit (default: 3)
+- Thought/Action/Observation trace visible in output
+
+**Example output:**
+```
+Thought: The responses disagree on the 2024 election date. I should verify.
+Action: search_web("2024 US presidential election date")
+Observation: November 5, 2024
+Thought: Now I can synthesize with the correct date.
+Action: synthesize
 ```
 
-### v1.10: Configurable Council
+**Implementation:**
+- `synthesize_with_react()` replaces `stage3_synthesize_final()` when enabled
+- Chairman prompt includes ReAct format instructions
+- `--react` flag to enable (off by default for cost)
 
-Select models per query instead of hardcoded config.
+### v1.11: Self-Reflection Round
 
-```bash
-llm-council query --models gpt-4o,claude-3,gemini "Question"
-llm-council query --preset fast      # gpt-4o-mini × 3
-llm-council query --preset thorough  # gpt-4o, claude-3-opus, gemini-pro
+Models evaluate and improve their own outputs before peer review.
+
+**Features:**
+- New round type: `reflection`
+- Each model critiques its OWN previous response
+- Outputs: identified weaknesses + improved response
+- Inserted after Round 1 (initial) when enabled
+
+**Flow with reflection:**
+```
+Round 1: Initial → Round 1.5: Self-Reflection → Round 2: Critique → Round 3: Defense
 ```
 
-### v1.11+: Future
+**Implementation:**
+- `debate_round_reflection()` function
+- Prompt: "Review your response. Identify weaknesses. Provide an improved version."
+- `--reflect` flag to enable
+- Reflection visible in output as separate round
+
+### v1.12: Workflow State Machine
+
+Formal state management with checkpoints for reliability.
+
+**Features:**
+- Defined states: `pending → querying → ranking → synthesizing → complete → failed`
+- Checkpoint after each stage (can resume on failure)
+- Workflow runs stored in SQLite (not just JSON files)
+- `--resume <run-id>` to continue interrupted runs
+
+**State transitions:**
+```
+pending ──→ querying ──→ ranking ──→ synthesizing ──→ complete
+    │           │           │             │
+    └───────────┴───────────┴─────────────┴──→ failed
+```
+
+**Implementation:**
+- `WorkflowState` enum + `WorkflowRun` Pydantic model
+- SQLite table: `workflow_runs(id, state, query, checkpoint_data, created_at, updated_at)`
+- `checkpoint_data` stores serialized round results
+- On resume: load checkpoint, skip completed stages
+
+### v1.13: Tool Registry
+
+Pluggable tools with registration protocol for extensibility.
+
+**Features:**
+- Tool registry: `register_tool(name, schema, handler)`
+- Built-in tools: `search_web`, `read_file`, `execute_code`
+- Tools described to models dynamically based on registry
+- MCP-compatible tool definitions (Model Context Protocol)
+
+**Example:**
+```python
+@tool_registry.register(
+    name="read_file",
+    description="Read contents of a file",
+    parameters={"path": {"type": "string", "description": "File path"}}
+)
+async def read_file(path: str) -> str:
+    return Path(path).read_text()
+```
+
+**Implementation:**
+- `ToolRegistry` class with `register()`, `list_tools()`, `execute()`
+- Tools auto-converted to OpenAI function-calling format
+- `ENABLED_TOOLS` config to control which tools models can use
+- Sandboxed execution for `execute_code` (subprocess with timeout)
+
+---
+
+### v1.14+: Future
 
 | Version | Feature |
 |---------|---------|
-| v1.11 | Image input (multimodal) |
-| v1.12 | Web UI streaming |
-| v1.13 | Code execution tool |
-| v1.14 | Local models (Ollama) |
+| v1.14 | Cost tracking & token counting |
+| v1.15 | Export conversations (MD/JSON/PDF) |
+| v1.16 | Configurable council (`--models`, `--preset`) |
+| v1.17 | Image input (multimodal) |
+| v1.18 | Web UI streaming |
+| v1.19 | Local models (Ollama) |
 | v2.0 | Docker packaging |
 
 ---
