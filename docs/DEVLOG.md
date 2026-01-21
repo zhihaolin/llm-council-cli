@@ -4,6 +4,48 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.6.2: CI Quality Gates
+*January 2026*
+
+### Overview
+Added linting, type checking, and coverage enforcement to CI pipeline.
+
+### Changes
+
+**New dev dependencies:**
+- `ruff>=0.4.0` - Linting and formatting
+- `pyright>=1.1.350` - Static type checking
+
+**CI pipeline** (`.github/workflows/test.yml`):
+```
+lint job (runs first):
+  → ruff check
+  → ruff format --check
+  → pyright
+
+test job (runs after lint):
+  → pytest with --cov-fail-under=65
+```
+
+**Code fixes:**
+- 208 auto-fixed issues (import sorting, modern type hints)
+- Removed unused imports and variables
+
+### Configuration
+
+| Tool | Config |
+|------|--------|
+| Ruff | line-length=100, select E/W/F/I/UP |
+| Pyright | basic mode, warnings for optional types |
+| Coverage | 65% threshold on backend core |
+
+### Results
+- All checks pass in CI
+- 66% backend coverage
+- 0 pyright errors (31 warnings)
+
+---
+
 ## v1.6.1: SOLID Refactoring
 *January 2026*
 
