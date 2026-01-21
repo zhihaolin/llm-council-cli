@@ -1206,30 +1206,66 @@ async def run_debate_token_streaming(
         round_num: int,
         round_type: str,
         build_prompt_fn,
+        with_tools: bool = False,
     ) -> List[Dict[str, Any]]:
-        """Stream a single round (critique/defense), one model at a time."""
+        """Stream a single round (critique/defense), one model at a time.
+
+        Args:
+            round_num: The round number
+            round_type: Type of round ("critique" or "defense")
+            build_prompt_fn: Function that takes model name and returns prompt
+            with_tools: If True, enable web search tool for this round
+        """
         yield {"type": "round_start", "round_number": round_num, "round_type": round_type}
 
         responses = []
+        tools = [SEARCH_TOOL] if with_tools else None
+
         for model in COUNCIL_MODELS:
             yield {"type": "model_start", "model": model}
 
             prompt = build_prompt_fn(model)
             messages = [{"role": "user", "content": prompt}]
             full_content = ""
+            tool_calls_made = []
 
-            async for event in query_model_streaming(model, messages):
-                if event["type"] == "token":
-                    full_content += event["content"]
-                    yield {"type": "token", "model": model, "content": event["content"]}
-                elif event["type"] == "error":
-                    yield {"type": "model_error", "model": model, "error": event["error"]}
-                    break
+            if with_tools:
+                # Use streaming with tool support
+                async for event in query_model_streaming_with_tools(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_executor=execute_tool
+                ):
+                    if event["type"] == "token":
+                        full_content += event["content"]
+                        yield {"type": "token", "model": model, "content": event["content"]}
+                    elif event["type"] == "tool_call":
+                        yield {"type": "tool_call", "model": model, "tool": event["tool"], "args": event["args"]}
+                    elif event["type"] == "tool_result":
+                        yield {"type": "tool_result", "model": model, "tool": event["tool"], "result": event["result"]}
+                    elif event["type"] == "done":
+                        full_content = event.get("content", full_content)
+                        tool_calls_made = event.get("tool_calls_made", [])
+                    elif event["type"] == "error":
+                        yield {"type": "model_error", "model": model, "error": event["error"]}
+                        break
+            else:
+                # Regular streaming without tools
+                async for event in query_model_streaming(model, messages):
+                    if event["type"] == "token":
+                        full_content += event["content"]
+                        yield {"type": "token", "model": model, "content": event["content"]}
+                    elif event["type"] == "error":
+                        yield {"type": "model_error", "model": model, "error": event["error"]}
+                        break
 
             if full_content:
                 result = {"model": model, "response": full_content}
                 if round_type == "defense":
                     result["revised_answer"] = parse_revised_answer(full_content)
+                if tool_calls_made:
+                    result["tool_calls_made"] = tool_calls_made
                 responses.append(result)
                 yield {"type": "model_complete", "model": model, "response": result}
 
@@ -1338,7 +1374,7 @@ Format your response as follows:
 [Your updated, improved answer to the original question]"""
 
     defense_responses = []
-    async for event in stream_round(3, "defense", build_defense_prompt):
+    async for event in stream_round(3, "defense", build_defense_prompt, with_tools=True):
         yield event
         if event["type"] == "round_complete":
             defense_responses = event["responses"]
