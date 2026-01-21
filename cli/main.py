@@ -76,6 +76,7 @@ def print_chat_banner(
     debate_enabled: bool,
     debate_rounds: int,
     stream_enabled: bool = False,
+    parallel_enabled: bool = False,
 ) -> None:
     """Show chat banner with conversation details."""
     short_id = conversation_id[:8]
@@ -84,7 +85,7 @@ def print_chat_banner(
         f"[chat.meta]{status} conversation[/chat.meta]\n"
         f"[chat.accent]{title}[/chat.accent]\n"
         f"[chat.meta]ID: {short_id}[/chat.meta]\n"
-        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled)}"
+        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled)}"
     )
     console.print()
     console.print(Panel(
@@ -295,7 +296,8 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
     resumed = False
     debate_enabled = True
     debate_rounds = DEFAULT_DEBATE_ROUNDS
-    stream_enabled = True
+    parallel_enabled = True
+    stream_enabled = False
 
     if not start_new and conversations:
         conversation_id = conversations[0]["id"]
@@ -315,12 +317,13 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         debate_enabled=debate_enabled,
         debate_rounds=debate_rounds,
         stream_enabled=stream_enabled,
+        parallel_enabled=parallel_enabled,
     )
 
     while True:
         try:
             user_input = console.input(
-                build_chat_prompt(debate_enabled, debate_rounds, stream_enabled)
+                build_chat_prompt(debate_enabled, debate_rounds, stream_enabled, parallel_enabled)
             ).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[chat.meta]Exiting chat.[/chat.meta]")
@@ -366,6 +369,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled=debate_enabled,
                         debate_rounds=debate_rounds,
                         stream_enabled=stream_enabled,
+                        parallel_enabled=parallel_enabled,
                     )
                 continue
             if command == "new":
@@ -379,6 +383,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     debate_enabled=debate_enabled,
                     debate_rounds=debate_rounds,
                     stream_enabled=stream_enabled,
+                    parallel_enabled=parallel_enabled,
                 )
                 continue
             if command == "debate":
@@ -386,7 +391,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Usage: /debate on|off[/chat.error]")
                     continue
                 debate_enabled = argument == "on"
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
                 continue
             if command == "rounds":
                 if not argument:
@@ -401,19 +406,32 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Rounds must be at least 2.[/chat.error]")
                     continue
                 debate_rounds = rounds_value
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
+                continue
+            if command == "parallel":
+                if argument not in ("on", "off"):
+                    console.print("[chat.error]Usage: /parallel on|off[/chat.error]")
+                    continue
+                parallel_enabled = argument == "on"
+                if parallel_enabled:
+                    stream_enabled = False  # Parallel and stream are mutually exclusive
+                if parallel_enabled and not debate_enabled:
+                    console.print("[chat.meta]Note: Parallel only applies in debate mode.[/chat.meta]")
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
                 continue
             if command == "stream":
                 if argument not in ("on", "off"):
                     console.print("[chat.error]Usage: /stream on|off[/chat.error]")
                     continue
                 stream_enabled = argument == "on"
+                if stream_enabled:
+                    parallel_enabled = False  # Stream and parallel are mutually exclusive
                 if stream_enabled and not debate_enabled:
                     console.print("[chat.meta]Note: Streaming only applies in debate mode.[/chat.meta]")
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
                 continue
             if command == "mode":
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled))
+                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled))
                 continue
 
             console.print("[chat.error]Unknown command. Type /help for options.[/chat.error]")
@@ -442,8 +460,14 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         console.print()
 
         if debate_enabled:
-            if stream_enabled:
-                # Streaming mode - shows responses as they complete
+            if parallel_enabled:
+                # Parallel mode - runs models in parallel with progress spinners
+                debate_rounds_data, synthesis = await run_debate_parallel(
+                    full_query,
+                    debate_rounds,
+                )
+            elif stream_enabled:
+                # Streaming mode - shows responses as they complete (sequential)
                 debate_rounds_data, synthesis = await run_debate_streaming(
                     full_query,
                     debate_rounds,
@@ -465,8 +489,8 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 title = await title_task
                 storage.update_conversation_title(conversation_id, title)
 
-            if not stream_enabled:
-                # Only print rounds if not streaming (streaming already displayed them)
+            if not stream_enabled and not parallel_enabled:
+                # Only print rounds if not streaming/parallel (they already displayed them)
                 for round_data in debate_rounds_data:
                     print_debate_round(round_data, round_data["round_number"])
                 print_debate_synthesis(synthesis)

@@ -85,11 +85,11 @@ uv run llm-council chat
 │ Resumed conversation                       │
 │ Previous Topic Title                       │
 │ ID: abc12345                               │
-│ Mode: Council (ranking)                    │
+│ Mode: Debate (2 rounds) [parallel]         │
 └────────────────────────────────────────────┘
-Commands: /help, /history, /use <id>, /new, /debate, /rounds, /mode, /exit
+Commands: /help, /history, /use <id>, /new, /debate, /parallel, /stream, /rounds, /mode, /exit
 
-(ranking) > What is the capital of France?
+debate(2)∥> What is the capital of France?
 ```
 
 Slash commands:
@@ -97,6 +97,7 @@ Slash commands:
 - `/use <id>` — Switch to a conversation by ID prefix
 - `/new` — Start a new conversation
 - `/debate on|off` — Toggle debate mode
+- `/parallel on|off` — Toggle parallel mode (default: on)
 - `/stream on|off` — Toggle streaming mode
 - `/rounds N` — Set debate rounds
 - `/mode` — Show current mode

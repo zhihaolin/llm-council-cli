@@ -11,6 +11,7 @@ CHAT_COMMANDS = {
     "new": "Start a new conversation",
     "debate": "Toggle debate mode (on/off)",
     "rounds": "Set debate rounds",
+    "parallel": "Toggle parallel mode (on/off)",
     "stream": "Toggle streaming mode (on/off)",
     "mode": "Show current mode",
     "exit": "Exit chat",
@@ -57,11 +58,14 @@ def format_chat_mode_line(
     debate_enabled: bool,
     debate_rounds: int,
     stream_enabled: bool = False,
+    parallel_enabled: bool = False,
 ) -> str:
     """Format the current chat mode line for display."""
     if debate_enabled:
         mode_str = f"Debate ({debate_rounds} rounds)"
-        if stream_enabled:
+        if parallel_enabled:
+            mode_str += " [parallel]"
+        elif stream_enabled:
             mode_str += " [streaming]"
         return (
             "[chat.meta]Mode:[/chat.meta] "
@@ -74,10 +78,16 @@ def format_prompt_mode(
     debate_enabled: bool,
     debate_rounds: int,
     stream_enabled: bool = False,
+    parallel_enabled: bool = False,
 ) -> str:
     """Format the prompt mode indicator."""
     if debate_enabled:
-        return f"debate({debate_rounds})"
+        mode = f"debate({debate_rounds})"
+        if parallel_enabled:
+            mode += "∥"  # Parallel symbol
+        elif stream_enabled:
+            mode += "~"  # Stream symbol
+        return mode
     return "rank"
 
 
@@ -85,9 +95,10 @@ def build_chat_prompt(
     debate_enabled: bool,
     debate_rounds: int,
     stream_enabled: bool = False,
+    parallel_enabled: bool = False,
 ) -> str:
     """Build the chat prompt string with mode indicator."""
-    mode = format_prompt_mode(debate_enabled, debate_rounds, stream_enabled)
+    mode = format_prompt_mode(debate_enabled, debate_rounds, stream_enabled, parallel_enabled)
     return f"[chat.prompt]{mode}>[/chat.prompt] "
 
 
