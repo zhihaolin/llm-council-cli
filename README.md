@@ -73,7 +73,7 @@ The CLI shows which models used search with a subtle `• searched` indicator.
 Multi-turn conversations with persistent history. The chat REPL remembers context and lets you switch between ranking and debate modes on the fly.
 
 ```bash
-uv run python -m cli chat
+uv run llm-council chat
 ```
 
 ```
@@ -212,13 +212,13 @@ Get your API keys:
 
 ```bash
 # Standard deliberation (all 3 stages)
-uv run python -m cli query "What is the best programming language for beginners?"
+uv run llm-council query "What is the best programming language for beginners?"
 
 # Debate mode (models critique each other)
-uv run python -m cli query --debate "Should AI be regulated?"
+uv run llm-council query --debate "Should AI be regulated?"
 
 # Simple output (just the final answer)
-uv run python -m cli query --simple "What is 2+2?"
+uv run llm-council query --simple "What is 2+2?"
 ```
 
 ---
@@ -229,27 +229,27 @@ uv run python -m cli query --simple "What is 2+2?"
 
 ```bash
 # Query with full deliberation output
-uv run python -m cli query "Your question"
+uv run llm-council query "Your question"
 
 # Query with debate mode
-uv run python -m cli query --debate "Complex question"
-uv run python -m cli query --debate --rounds 3 "Very complex question"
+uv run llm-council query --debate "Complex question"
+uv run llm-council query --debate --rounds 3 "Very complex question"
 
 # Simple output (final answer only, no stages)
-uv run python -m cli query --simple "Quick question"
+uv run llm-council query --simple "Quick question"
 
 # Final answer with formatting (skip stages 1 & 2)
-uv run python -m cli query --final-only "Question"
+uv run llm-council query --final-only "Question"
 
 # Show current council configuration
-uv run python -m cli models
+uv run llm-council models
 
 # Interactive chat with history
-uv run python -m cli chat
-uv run python -m cli chat --new  # Start fresh conversation
+uv run llm-council chat
+uv run llm-council chat --new  # Start fresh conversation
 
 # Interactive TUI
-uv run python -m cli interactive
+uv run llm-council interactive
 ```
 
 ### Flags
