@@ -46,6 +46,8 @@
 - Streaming enabled by default with debate mode
 - Dimmed text while streaming, replaced with rendered markdown panel on completion
 - Terminal line-wrap tracking for clean output clearing
+- Streaming with tool calling support (`query_model_streaming_with_tools`)
+- Web search enabled in defense round (Round 3) for evidence gathering
 
 ---
 

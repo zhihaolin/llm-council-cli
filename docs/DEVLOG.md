@@ -8,12 +8,15 @@ Technical decisions and implementation notes for LLM Council.
 *January 2026*
 
 ### Overview
-Added token-by-token streaming for debate mode. Responses stream as they generate, then are replaced with rendered markdown panels.
+Added token-by-token streaming for debate mode. Responses stream as they generate, then are replaced with rendered markdown panels. Also added streaming with tool calling support for web search during initial and defense rounds.
 
 ### Implementation
 
 **Backend (`backend/openrouter.py`):**
 - `query_model_streaming()` - Async generator yielding SSE tokens
+- `query_model_streaming_with_tools()` - Streaming + tool calling combined
+  - Uses `index` as primary key for tool call chunks (id only in first chunk)
+  - Yields `tool_call` and `tool_result` events during search
 - Parses `data: ` lines from OpenRouter streaming response
 - Yields `{'type': 'token'}`, `{'type': 'done'}`, `{'type': 'error'}` events
 
@@ -21,11 +24,15 @@ Added token-by-token streaming for debate mode. Responses stream as they generat
 - `debate_round_streaming()` - Model-completion streaming (parallel)
 - `run_debate_council_streaming()` - Full debate with completion events
 - `run_debate_token_streaming()` - Sequential token-by-token streaming
+- `stream_round(with_tools=True)` - Generic round streaming with optional tool support
+- Web search enabled in Round 1 (initial) and Round 3 (defense)
 
 **CLI (`cli/main.py`):**
 - `run_debate_streaming()` - Rich-based streaming display
 - `track_output()` - Tracks terminal line wrapping for accurate clearing
 - ANSI escape codes for cursor movement (`\033[{n}A\033[J`)
+- Handles `tool_call` events to show "searching..." indicator
+- Handles `tool_result` events to resume streaming display
 
 **CLI (`cli/chat.py`):**
 - `/stream on|off` command
@@ -40,6 +47,8 @@ Added token-by-token streaming for debate mode. Responses stream as they generat
 | Model order | Sequential | Parallel token streams would be chaotic |
 | Display | Stream dimmed → replace with panel | Readable while streaming, clean final output |
 | Line tracking | Count wraps | Terminal wrapping breaks naive newline counting |
+| Tool call parsing | Use index as key | id only appears in first chunk of streamed tool calls |
+| Defense search | Enabled | Models can find evidence to support their defense |
 
 ### Tests
 - `test_streaming.py` - 8 tests for streaming event order, model identity, error handling

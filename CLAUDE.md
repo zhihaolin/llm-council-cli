@@ -142,22 +142,26 @@ Models are hardcoded in `backend/config.py`. Chairman can be same or different f
 ## Web Search / Tool Calling
 
 ### How It Works
-Models in Stage 1 receive a `search_web` tool definition. They autonomously decide when to use it based on the query:
+Models receive a `search_web` tool definition and autonomously decide when to use it:
 - Questions about current events, prices, weather → model calls search
 - General knowledge questions → model answers directly
 
+**Rounds with search enabled:**
+- **Round 1 (Initial):** Models can search to gather facts for their initial response
+- **Round 3 (Defense):** Models can search to find evidence supporting their defense
+
+Round 2 (Critique) does not have search - models critique existing responses without introducing new facts.
+
 ### Tool Calling Flow
 ```
-1. Send request to OpenRouter with tools=[SEARCH_TOOL]
-2. Model response may include:
-   - Normal content (no tool needed)
-   - tool_calls: [{"function": {"name": "search_web", "arguments": {"query": "..."}}}]
-3. If tool_calls:
-   a. Parse the arguments
+1. Send request to OpenRouter with tools=[SEARCH_TOOL], stream=True
+2. Stream response tokens, accumulating any tool_calls chunks
+3. If tool_calls detected:
+   a. Parse arguments (using index as key - id only in first chunk)
    b. Execute search_web(query) → Tavily API
    c. Send tool result back to model
-   d. Get final response with search context
-4. Return final response
+   d. Continue streaming final response
+4. Yield done event with full content and tool_calls_made
 ```
 
 ### Configuration

@@ -66,6 +66,10 @@ llm-council "What is the current price of Bitcoin?"
 
 The CLI shows which models used search with a subtle `• searched` indicator.
 
+**Search-enabled rounds in debate mode:**
+- Round 1 (Initial): Models search to gather facts for their position
+- Round 3 (Defense): Models search to find evidence supporting their defense
+
 ![Models autonomously searching for current information](images/search.png)
 
 ### Interactive Chat Mode
