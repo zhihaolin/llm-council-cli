@@ -339,6 +339,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 | **Test Suite** | ✅ | pytest + pytest-asyncio, 84 tests |
 | **Type Hints** | ✅ | Throughout codebase |
 | **CI/CD** | ✅ | GitHub Actions (tests on every push) |
+| **SOLID (SRP/ISP)** | ✅ | Focused modules, clean API exports |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
 | **Structured Logging** | 🔜 | JSON logs with correlation IDs (planned) |
 | **Config Management** | 🔜 | YAML config with validation (planned) |
@@ -390,6 +391,7 @@ tests/
 | v1.4 | Token Streaming | ✅ Complete |
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
 | v1.6 | ReAct Chairman | ✅ Complete |
+| v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.7 | Self-Reflection Round | Planned |
 | v1.8 | Workflow State Machine | Planned |
 | v1.9 | File/Document Upload | Planned |
