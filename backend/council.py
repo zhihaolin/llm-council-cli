@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from typing import List, Dict, Any, Tuple, AsyncGenerator
-from .openrouter import query_models_parallel, query_model, query_model_with_tools, query_model_streaming
+from .openrouter import query_models_parallel, query_model, query_model_with_tools, query_model_streaming, query_model_streaming_with_tools
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 from .search import SEARCH_TOOL, search_web, format_search_results
 
@@ -1149,8 +1149,8 @@ async def run_debate_token_streaming(
 
     async def stream_initial_round_with_tools():
         """
-        Initial round with tool support (web search).
-        Uses query_model_with_tools instead of streaming to support tool calls.
+        Initial round with tool support (web search) AND token streaming.
+        Uses query_model_streaming_with_tools for both streaming and tool calling.
         """
         yield {"type": "round_start", "round_number": 1, "round_type": "initial"}
 
@@ -1160,26 +1160,37 @@ async def run_debate_token_streaming(
         for model in COUNCIL_MODELS:
             yield {"type": "model_start", "model": model}
 
+            full_content = ""
+            tool_calls_made = []
+
             try:
-                response = await query_model_with_tools(
+                async for event in query_model_streaming_with_tools(
                     model=model,
                     messages=messages,
                     tools=tools,
                     tool_executor=execute_tool
-                )
+                ):
+                    if event["type"] == "token":
+                        full_content += event["content"]
+                        yield {"type": "token", "model": model, "content": event["content"]}
+                    elif event["type"] == "tool_call":
+                        # Yield tool call event so CLI can show "searching..."
+                        yield {"type": "tool_call", "model": model, "tool": event["tool"], "args": event["args"]}
+                    elif event["type"] == "tool_result":
+                        yield {"type": "tool_result", "model": model, "tool": event["tool"], "result": event["result"]}
+                    elif event["type"] == "done":
+                        full_content = event.get("content", full_content)
+                        tool_calls_made = event.get("tool_calls_made", [])
+                    elif event["type"] == "error":
+                        yield {"type": "model_error", "model": model, "error": event["error"]}
+                        break
 
-                if response and response.get("content"):
-                    content = response["content"]
-                    # Yield content as a single "token" for display compatibility
-                    yield {"type": "token", "model": model, "content": content}
-
-                    result = {"model": model, "response": content}
-                    if response.get("tool_calls_made"):
-                        result["tool_calls_made"] = response["tool_calls_made"]
+                if full_content:
+                    result = {"model": model, "response": full_content}
+                    if tool_calls_made:
+                        result["tool_calls_made"] = tool_calls_made
                     responses.append(result)
                     yield {"type": "model_complete", "model": model, "response": result}
-                else:
-                    yield {"type": "model_error", "model": model, "error": "No response"}
 
             except Exception as e:
                 yield {"type": "model_error", "model": model, "error": str(e)}

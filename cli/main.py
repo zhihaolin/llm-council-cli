@@ -17,7 +17,6 @@ import typer
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.spinner import Spinner
 from rich.table import Table
 from rich.markdown import Markdown
 from rich.theme import Theme
@@ -728,7 +727,6 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
         )
 
     current_round_type = ""
-    spinner_live = None
 
     async for event in run_debate_token_streaming(query, max_rounds):
         event_type = event["type"]
@@ -748,42 +746,43 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
             current_col = 0
             short_name = current_model.split("/")[-1]
 
-            # Initial round doesn't stream (uses tool calling), show spinner instead
-            if current_round_type == "initial":
-                spinner_text = Text.assemble(
-                    (f"{short_name}: ", "grey62"),
-                    ("querying (with web search)...", "grey62 italic"),
-                )
-                spinner_live = Live(
-                    Spinner("dots", text=spinner_text),
-                    console=console,
-                    refresh_per_second=10,
-                )
-                spinner_live.start()
-            else:
-                # Streaming rounds: show header for token display
-                header = f"{short_name}: "
-                track_output(header)
-                console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+            # All rounds now stream - show header for token display
+            header = f"{short_name}: "
+            track_output(header)
+            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
 
         elif event_type == "token":
             current_content += event["content"]
-            # Only show streaming preview for non-initial rounds
-            if current_round_type != "initial":
-                token = event["content"]
-                track_output(token)
-                console.print(f"[grey62]{token}[/grey62]", end="")
+            token = event["content"]
+            track_output(token)
+            console.print(f"[grey62]{token}[/grey62]", end="")
+
+        elif event_type == "tool_call":
+            # Model is calling a tool (e.g., web search)
+            tool_name = event.get("tool", "tool")
+            # Clear current streaming output and show search indicator
+            console.print()
+            track_output("\n")
+            clear_streaming_output()
+            console.print(f"[grey62]{current_model.split('/')[-1]}: [italic]searching...[/italic][/grey62]", end="")
+            line_count = 1
+            current_col = 0
+
+        elif event_type == "tool_result":
+            # Tool finished, clear search indicator and resume streaming header
+            console.print()
+            track_output("\n")
+            clear_streaming_output()
+            short_name = current_model.split("/")[-1]
+            header = f"{short_name}: "
+            track_output(header)
+            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
 
         elif event_type == "model_complete":
-            # Stop spinner if running (initial round)
-            if spinner_live:
-                spinner_live.stop()
-                spinner_live = None
-            else:
-                # Clear streaming output for non-initial rounds
-                console.print()  # End the streaming line
-                track_output("\n")
-                clear_streaming_output()
+            # Clear streaming output
+            console.print()  # End the streaming line
+            track_output("\n")
+            clear_streaming_output()
             # Show rendered panel (check if model used web search)
             response_data = event.get("response", {})
             searched = bool(response_data.get("tool_calls_made"))
@@ -791,13 +790,8 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
             console.print()
 
         elif event_type == "model_error":
-            # Stop spinner if running (initial round)
-            if spinner_live:
-                spinner_live.stop()
-                spinner_live = None
-            else:
-                console.print()
-                clear_streaming_output()
+            console.print()
+            clear_streaming_output()
             console.print(Panel(
                 f"[bold red]Error: {event.get('error', 'Unknown')}[/bold red]",
                 title=f"[bold red]{current_model.split('/')[-1]}[/bold red]",
