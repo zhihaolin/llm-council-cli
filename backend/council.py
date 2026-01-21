@@ -1145,13 +1145,58 @@ async def run_debate_token_streaming(
     """
     query_with_date = get_date_context() + user_query
     rounds = []
+    tools = [SEARCH_TOOL]
+
+    async def stream_initial_round_with_tools():
+        """
+        Initial round with tool support (web search).
+        Uses query_model_with_tools instead of streaming to support tool calls.
+        """
+        yield {"type": "round_start", "round_number": 1, "round_type": "initial"}
+
+        responses = []
+        messages = [{"role": "user", "content": query_with_date}]
+
+        for model in COUNCIL_MODELS:
+            yield {"type": "model_start", "model": model}
+
+            try:
+                response = await query_model_with_tools(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_executor=execute_tool
+                )
+
+                if response and response.get("content"):
+                    content = response["content"]
+                    # Yield content as a single "token" for display compatibility
+                    yield {"type": "token", "model": model, "content": content}
+
+                    result = {"model": model, "response": content}
+                    if response.get("tool_calls_made"):
+                        result["tool_calls_made"] = response["tool_calls_made"]
+                    responses.append(result)
+                    yield {"type": "model_complete", "model": model, "response": result}
+                else:
+                    yield {"type": "model_error", "model": model, "error": "No response"}
+
+            except Exception as e:
+                yield {"type": "model_error", "model": model, "error": str(e)}
+
+        yield {
+            "type": "round_complete",
+            "round_number": 1,
+            "round_type": "initial",
+            "responses": responses
+        }
 
     async def stream_round(
         round_num: int,
         round_type: str,
         build_prompt_fn,
     ) -> List[Dict[str, Any]]:
-        """Stream a single round, one model at a time."""
+        """Stream a single round (critique/defense), one model at a time."""
         yield {"type": "round_start", "round_number": round_num, "round_type": round_type}
 
         responses = []
@@ -1184,12 +1229,9 @@ async def run_debate_token_streaming(
             "responses": responses
         }
 
-    # Round 1: Initial responses
-    def build_initial_prompt(model):
-        return query_with_date
-
+    # Round 1: Initial responses (with tool support for web search)
     initial_responses = []
-    async for event in stream_round(1, "initial", build_initial_prompt):
+    async for event in stream_initial_round_with_tools():
         yield event
         if event["type"] == "round_complete":
             initial_responses = event["responses"]

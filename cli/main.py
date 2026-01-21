@@ -17,6 +17,7 @@ import typer
 from rich.console import Console, Group
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.spinner import Spinner
 from rich.table import Table
 from rich.markdown import Markdown
 from rich.theme import Theme
@@ -713,23 +714,29 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
                     line_count += 1
                     current_col = 0
 
-    def build_model_panel(model: str, content: str, color: str = "blue") -> Panel:
+    def build_model_panel(model: str, content: str, color: str = "blue", searched: bool = False) -> Panel:
         """Build a panel with rendered markdown."""
         short_name = model.split("/")[-1]
+        title = f"[bold {color}]{short_name}[/bold {color}]"
+        if searched:
+            title += " [dim]• searched[/dim]"
         return Panel(
             Markdown(content) if content.strip() else Text("(empty)", style="dim"),
-            title=f"[bold {color}]{short_name}[/bold {color}]",
+            title=title,
             border_style=color,
             padding=(1, 2),
         )
+
+    current_round_type = ""
+    spinner_live = None
 
     async for event in run_debate_token_streaming(query, max_rounds):
         event_type = event["type"]
 
         if event_type == "round_start":
             round_num = event["round_number"]
-            round_type = event["round_type"]
-            color, label = type_styles.get(round_type, ("white", round_type.title()))
+            current_round_type = event["round_type"]
+            color, label = type_styles.get(current_round_type, ("white", current_round_type.title()))
             console.print()
             console.print(f"[bold {color}]━━━ ROUND {round_num}: {label} ━━━[/bold {color}]")
             console.print()
@@ -739,31 +746,58 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
             current_content = ""
             line_count = 0  # Reset - track_output will count actual lines
             current_col = 0
-            # Print model header
             short_name = current_model.split("/")[-1]
-            header = f"{short_name}: "
-            track_output(header)
-            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
+            # Initial round doesn't stream (uses tool calling), show spinner instead
+            if current_round_type == "initial":
+                spinner_text = Text.assemble(
+                    (f"{short_name}: ", "grey62"),
+                    ("querying (with web search)...", "grey62 italic"),
+                )
+                spinner_live = Live(
+                    Spinner("dots", text=spinner_text),
+                    console=console,
+                    refresh_per_second=10,
+                )
+                spinner_live.start()
+            else:
+                # Streaming rounds: show header for token display
+                header = f"{short_name}: "
+                track_output(header)
+                console.print(f"[grey62]{short_name}:[/grey62] ", end="")
 
         elif event_type == "token":
             current_content += event["content"]
-            # Print token, track lines including wrapping
-            token = event["content"]
-            track_output(token)
-            console.print(f"[grey62]{token}[/grey62]", end="")
+            # Only show streaming preview for non-initial rounds
+            if current_round_type != "initial":
+                token = event["content"]
+                track_output(token)
+                console.print(f"[grey62]{token}[/grey62]", end="")
 
         elif event_type == "model_complete":
-            # Clear streaming output
-            console.print()  # End the streaming line
-            track_output("\n")
-            clear_streaming_output()
-            # Show rendered panel
-            console.print(build_model_panel(current_model, current_content))
+            # Stop spinner if running (initial round)
+            if spinner_live:
+                spinner_live.stop()
+                spinner_live = None
+            else:
+                # Clear streaming output for non-initial rounds
+                console.print()  # End the streaming line
+                track_output("\n")
+                clear_streaming_output()
+            # Show rendered panel (check if model used web search)
+            response_data = event.get("response", {})
+            searched = bool(response_data.get("tool_calls_made"))
+            console.print(build_model_panel(current_model, current_content, searched=searched))
             console.print()
 
         elif event_type == "model_error":
-            console.print()
-            clear_streaming_output()
+            # Stop spinner if running (initial round)
+            if spinner_live:
+                spinner_live.stop()
+                spinner_live = None
+            else:
+                console.print()
+                clear_streaming_output()
             console.print(Panel(
                 f"[bold red]Error: {event.get('error', 'Unknown')}[/bold red]",
                 title=f"[bold red]{current_model.split('/')[-1]}[/bold red]",
