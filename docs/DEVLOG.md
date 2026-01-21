@@ -62,6 +62,59 @@ cli/
 
 ---
 
+## v1.6: ReAct Chairman
+*January 2026*
+
+### Overview
+The chairman now uses the ReAct (Reasoning + Acting) pattern to verify facts before synthesizing. If model responses disagree on factual claims, the chairman can search to verify.
+
+### Implementation
+
+**Backend (`backend/council.py`):**
+- `parse_react_output()` - Extracts Thought/Action from model output using regex
+- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
+- `build_react_context_debate()` - Formats debate rounds for chairman
+- `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
+- `synthesize_with_react()` - Async generator implementing the ReAct loop
+  - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events
+  - Max 3 iterations to prevent infinite loops
+
+**CLI (`cli/main.py`):**
+- `run_react_synthesis()` - Displays ReAct trace with color coding
+  - Thought: cyan
+  - Action: yellow
+  - Observation: dim
+- Works with parallel, streaming, and batch modes
+
+**CLI (`cli/chat.py`):**
+- `/react on|off` command
+- ReAct enabled by default
+
+### ReAct Pattern
+
+```
+Thought: The responses disagree on the current Bitcoin price. I should verify.
+Action: search_web("bitcoin price today")
+Observation: Bitcoin is currently trading at $67,234...
+Thought: Now I can synthesize with verified data.
+Action: synthesize()
+[Final synthesis]
+```
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Default state | Enabled | Most questions benefit from potential fact verification |
+| Max iterations | 3 | Prevents infinite search loops |
+| Streaming | Trace only | Token streaming for Thought/Action would be noisy |
+| Empty synthesize() | Re-prompt | Model sometimes forgets to provide answer after action |
+
+### Tests
+- `test_react.py` - 11 tests for parsing, loop behavior, integration, and streaming
+
+---
+
 ## v1.5: Parallel Execution with Progress
 *January 2026*
 

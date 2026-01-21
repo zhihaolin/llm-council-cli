@@ -31,21 +31,29 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - `format_search_results()`: Converts search results to LLM-readable text
 - Requires `TAVILY_API_KEY` in `.env` (optional - gracefully degrades if missing)
 
-**`council.py`** - The Core Logic
-- `get_date_context()`: Returns current date string to prepend to prompts (models know today's date)
-- `execute_tool()`: Dispatches tool calls to appropriate handlers (currently only `search_web`)
+**`council/`** - The Core Logic (v1.6.1 modular structure)
+
+```
+backend/council/
+├── __init__.py       # Public API exports (backward compatible)
+├── orchestrator.py   # Stage 1-2-3 flow
+├── debate.py         # Debate orchestration
+├── streaming.py      # Event generators for parallel/streaming modes
+├── react.py          # ReAct chairman logic
+├── prompts.py        # All prompt templates
+├── parsers.py        # Regex/text parsing utilities
+└── aggregation.py    # Ranking calculations
+```
+
+Key functions (all exported from `backend.council`):
 - `stage1_collect_responses()`: Parallel queries to all council models with tool support
-  - Models receive `SEARCH_TOOL` and can autonomously decide when to search
-  - Returns `tool_calls_made` for each model if any searches were performed
-- `stage2_collect_rankings()`:
-  - Anonymizes responses as "Response A, B, C, etc."
-  - Creates `label_to_model` mapping for de-anonymization
-  - Prompts models to evaluate and rank (with strict format requirements)
-  - Returns tuple: (rankings_list, label_to_model_dict)
-  - Each ranking includes both raw text and `parsed_ranking` list
+- `stage2_collect_rankings()`: Anonymizes responses and collects peer rankings
 - `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
-- `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section, handles both numbered lists and plain format
-- `calculate_aggregate_rankings()`: Computes average rank position across all peer evaluations
+- `run_full_council()`: Orchestrates the complete 3-stage flow
+- `run_debate_council()`: Orchestrates complete debate flow
+- `synthesize_with_react()`: ReAct reasoning loop for chairman
+- `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section
+- `calculate_aggregate_rankings()`: Computes average rank position
 
 **`storage.py`**
 - JSON-based conversation storage in `data/conversations/`
@@ -145,36 +153,34 @@ llm-council --debate --simple "Question"           # Just final answer
 | Defense format | Structured sections | Easy to parse revised answers |
 | Default rounds | 2 | Sufficient for most questions |
 
-### Debate Functions in `council.py`
+### Debate Functions (in `council/debate.py`)
 
 **`debate_round_critique(query, initial_responses)`**
 - Each model receives all responses and critiques the others
 - Models are told their own model name so they skip self-critique
 - Prompt requests structured format: `## Critique of [Model Name]`
 
-**`extract_critiques_for_model(target_model, critique_responses)`**
-- Parses all critique responses to find sections about a specific model
-- Uses regex to match `## Critique of [model_name]` headers
-- Returns concatenated critiques with attribution
-
 **`debate_round_defense(query, initial_responses, critique_responses)`**
 - Each model receives their original response + all critiques of them
 - Prompt requests: "Addressing Critiques" + "Revised Response" sections
 - Returns both full response and parsed `revised_answer`
 
+**`run_debate_council(query, max_rounds)`**
+- Orchestrates complete debate flow
+- `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
+
+### Parsing Functions (in `council/parsers.py`)
+
+**`extract_critiques_for_model(target_model, critique_responses)`**
+- Parses all critique responses to find sections about a specific model
+- Uses regex to match `## Critique of [model_name]` headers
+
 **`parse_revised_answer(defense_response)`**
 - Extracts content after `## Revised Response` header
 - Falls back to full response if section not found
 
-**`synthesize_debate(query, rounds, num_rounds)`**
-- Chairman receives full debate transcript
-- Considers evolution of arguments, valid critiques, consensus points
-- Produces final synthesized answer
-
-**`run_debate_council(query, max_rounds)`**
-- Orchestrates complete debate flow
-- `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
-- Additional rounds alternate between critique and defense
+**`parse_react_output(text)`**
+- Extracts Thought/Action from ReAct model output
 
 ### Debate Data Structure
 
@@ -201,20 +207,27 @@ llm-council --debate --simple "Question"           # Just final answer
 }
 ```
 
-### CLI Display Functions in `main.py`
+### CLI Structure (v1.6.1 modular)
 
-**`print_debate_round(round_data, round_num)`**
-- Color-coded by round type (cyan=initial, yellow=critique, magenta=defense)
-- Shows each model's response in a Rich panel
-- Includes `• searched` indicator if model used web search
+```
+cli/
+├── main.py           # Command routing only
+├── presenters.py     # All print_* display functions
+├── orchestrators.py  # run_* execution with progress
+├── chat_session.py   # Chat REPL logic
+├── chat.py           # Command parsing utilities
+└── utils.py          # Constants
+```
 
-**`print_debate_synthesis(synthesis)`**
-- Green-styled panel for final answer
-- Same format as Stage 3 synthesis
+**Display functions (in `cli/presenters.py`):**
+- `print_debate_round()` - Color-coded by round type
+- `print_debate_synthesis()` - Green-styled panel for final answer
+- `print_stage1/2/3()` - Standard mode output
 
-**`run_debate_with_progress(query, max_rounds)`**
-- Progress spinners for each round
-- Reports completion status after each round
+**Orchestration (in `cli/orchestrators.py`):**
+- `run_debate_with_progress()` - Progress spinners for each round
+- `run_debate_parallel()` - Parallel execution with Rich Live display
+- `run_react_synthesis()` - ReAct trace display
 
 ### API Costs
 | Mode | API Calls (5 models) |
@@ -265,12 +278,12 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Yields `{'type': 'tool_result', 'tool': str, 'result': str}` after tool execution
   - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
-**`backend/council.py`**
+**`backend/council/streaming.py`**
 - `debate_round_streaming()`: Yields events as each model completes (parallel mode, not token streaming)
 - `run_debate_council_streaming()`: Full debate with model-completion events
 - `run_debate_token_streaming()`: Full debate with token-by-token streaming (sequential)
 
-**`cli/main.py`**
+**`cli/orchestrators.py`**
 - `run_debate_streaming()`: Renders streaming output with Rich
   - Tracks terminal line wrapping for accurate clearing
   - Uses ANSI escape codes for cursor movement
@@ -435,7 +448,7 @@ async def get_shared_client() -> httpx.AsyncClient:
         return _shared_client
 ```
 
-**Per-model Timeout (`backend/council.py`):**
+**Per-model Timeout (`backend/council/streaming.py`):**
 ```python
 async def query_with_model(model: str):
     try:
@@ -458,7 +471,7 @@ async def query_with_model(model: str):
 6. synthesis_start → synthesis_complete → complete
 ```
 
-### CLI Display (`cli/main.py`)
+### CLI Display (`cli/orchestrators.py`)
 - `run_debate_parallel()` uses Rich `Live` display with a status table
 - Status states: "⠋ thinking..." → "✓ done" / "✗ error"
 - Panels appear as models complete (fastest first)
@@ -506,23 +519,26 @@ Action: synthesize()
 
 ### Implementation
 
-**`backend/council.py`:**
-- `parse_react_output()` - Extracts Thought/Action from model output using regex
-- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
-- `build_react_context_debate()` - Formats debate rounds for chairman
-- `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
+**`backend/council/react.py`:**
 - `synthesize_with_react()` - Async generator implementing the ReAct loop
   - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events
   - Max 3 iterations to prevent infinite loops
   - If model says `synthesize()` without content, asks for synthesis directly
 
-**`cli/main.py`:**
+**`backend/council/prompts.py`:**
+- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
+- `build_react_context_debate()` - Formats debate rounds for chairman
+- `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
+
+**`backend/council/parsers.py`:**
+- `parse_react_output()` - Extracts Thought/Action from model output using regex
+
+**`cli/orchestrators.py`:**
 - `run_react_synthesis()` - Displays ReAct trace with color coding
   - Thought: cyan
   - Action: yellow
   - Observation: dim
 - Works with parallel, streaming, and batch modes
-- Synthesis streaming only happens when model didn't provide inline answer
 
 ### Key Design Decisions
 
