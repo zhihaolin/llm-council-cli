@@ -1,5 +1,14 @@
 # LLM Council - Roadmap
 
+## Immediate TODO
+
+- [ ] Install Docker Desktop (`brew install --cask docker`)
+- [ ] Test Docker build: `docker build -t llm-council .`
+- [ ] Test Docker run: `docker run -e OPENROUTER_API_KEY=xxx llm-council query "test"`
+- [ ] Fix any issues found during testing
+
+---
+
 ## Current Status
 
 | Version | Feature | Status |
