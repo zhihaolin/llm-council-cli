@@ -378,8 +378,9 @@ tests/
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | Token Streaming | ✅ Complete |
-| v1.5 | File/Document Upload | Planned |
-| v1.6 | Image Input (Multimodal) | Planned |
+| v1.5 | Parallel Execution with Progress | Planned |
+| v1.6 | Retry & Fallback Logic | Planned |
+| v1.7 | File/Document Upload | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 
