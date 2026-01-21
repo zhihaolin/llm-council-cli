@@ -361,9 +361,6 @@ uv sync --extra dev
 
 # Run all tests
 uv run pytest tests/ -v
-
-# Run with coverage report
-uv run pytest tests/ --cov=backend --cov-report=term-missing
 ```
 
 ### Test Structure
@@ -395,7 +392,7 @@ tests/
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
 | v1.6 | ReAct Chairman | ✅ Complete |
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
-| v1.6.2 | CI Quality Gates (ruff, pyright, coverage) | ✅ Complete |
+| v1.6.2 | CI Quality Gates (ruff, pyright) | ✅ Complete |
 | v1.7 | Self-Reflection Round | Planned |
 | v1.8 | Workflow State Machine | Planned |
 | v1.9 | File/Document Upload | Planned |

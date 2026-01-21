@@ -314,8 +314,7 @@ Minimum security layer to claim "end-to-end secure."
 ## Testing
 
 ```bash
-uv run pytest tests/ -v                    # Run all tests
-uv run pytest tests/ --cov=backend         # With coverage
+uv run pytest tests/ -v
 ```
 
 ```

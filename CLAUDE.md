@@ -395,8 +395,7 @@ tests/
 
 ### Running Tests
 ```bash
-uv run pytest tests/ -v              # Run all tests
-uv run pytest tests/ --cov=backend   # With coverage
+uv run pytest tests/ -v
 ```
 
 ### CI/CD
