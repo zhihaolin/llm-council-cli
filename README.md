@@ -264,6 +264,8 @@ uv run llm-council interactive
 | `--final-only` | `-f` | Show only chairman's synthesis (with formatting) |
 | `--debate` | `-d` | Enable debate mode |
 | `--rounds N` | `-r N` | Number of debate rounds (default: 2) |
+| `--stream` | | Stream token-by-token (sequential, debate mode) |
+| `--parallel` | `-p` | Run models in parallel with progress spinners (debate mode) |
 | `--new` | | Start a new conversation (chat mode) |
 | `--max-turns N` | `-t N` | Context turns to include (chat mode, default: 6) |
 
@@ -327,7 +329,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 70 tests |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 72 tests |
 | **Type Hints** | ✅ | Throughout codebase |
 | **CI/CD** | ✅ | GitHub Actions (tests on every push) |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
@@ -363,7 +365,7 @@ tests/
 ├── test_debate.py               # Debate mode (15 tests)
 ├── test_ranking_parser.py       # Ranking extraction (14 tests)
 ├── test_search.py               # Web search & tool calling (17 tests)
-├── test_streaming.py            # Token streaming (8 tests)
+├── test_streaming.py            # Streaming & parallel (10 tests)
 └── integration/                 # CLI integration tests (planned)
 ```
 
@@ -378,7 +380,7 @@ tests/
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | Token Streaming | ✅ Complete |
-| v1.5 | Parallel Execution with Progress | Planned |
+| v1.5 | Parallel Execution with Progress | ✅ Complete |
 | v1.6 | Retry & Fallback Logic | Planned |
 | v1.7 | File/Document Upload | Planned |
 

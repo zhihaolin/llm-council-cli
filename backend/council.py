@@ -774,9 +774,12 @@ async def debate_round_streaming(
     round_type: str,
     user_query: str,
     context: Dict[str, Any],
+    model_timeout: float = 120.0,
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Stream a single debate round, yielding events as each model completes.
+
+    Runs all models in parallel and yields results as they complete.
 
     Args:
         round_type: One of "initial", "critique", or "defense"
@@ -784,6 +787,7 @@ async def debate_round_streaming(
         context: Context dict containing:
             - For critique: {"initial_responses": [...]}
             - For defense: {"initial_responses": [...], "critique_responses": [...]}
+        model_timeout: Timeout in seconds for each model (default: 120s)
 
     Yields:
         {'type': 'model_start', 'model': str}
@@ -908,21 +912,34 @@ Format your response as follows:
     else:
         raise ValueError(f"Unknown round type: {round_type}")
 
-    # Wrapper to include model identity in result
+    # Wrapper to include model identity in result with timeout
     async def query_with_model(model: str):
         try:
-            result = await query_funcs[model](model)
+            # Apply per-model timeout
+            result = await asyncio.wait_for(
+                query_funcs[model](model),
+                timeout=model_timeout
+            )
             return model, result, None
+        except asyncio.TimeoutError:
+            return model, None, f"Timeout after {model_timeout}s"
         except Exception as e:
             return model, None, str(e)
 
-    # Create tasks
-    tasks = [asyncio.create_task(query_with_model(model)) for model in COUNCIL_MODELS]
+    # Emit model_start events for all models (so CLI can show spinners)
+    for model in COUNCIL_MODELS:
+        yield {"type": "model_start", "model": model}
+
+    # Create tasks and map them back to models
+    tasks = {
+        asyncio.create_task(query_with_model(model)): model
+        for model in COUNCIL_MODELS
+    }
 
     # Collect responses as they complete
     responses = []
 
-    for completed_task in asyncio.as_completed(tasks):
+    for completed_task in asyncio.as_completed(tasks.keys()):
         model, result, error = await completed_task
         if error:
             yield {"type": "model_error", "model": model, "error": error}

@@ -389,3 +389,80 @@ async def test_defense_round_streaming():
     # Defense responses should have revised_answer parsed
     for event in model_completes:
         assert "revised_answer" in event["response"]
+
+
+# =============================================================================
+# Test: model_start events emitted for all models
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_streaming_emits_model_start_events():
+    """
+    Verify that debate_round_streaming emits model_start events
+    for all models before completions.
+    """
+    from backend.council import debate_round_streaming
+
+    async def mock_query(model, messages, *args, **kwargs):
+        return {"content": f"Response from {model}"}
+
+    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_streaming(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
+
+    # Should have model_start events for each model
+    model_starts = [e for e in events if e["type"] == "model_start"]
+    assert len(model_starts) == len(SAMPLE_MODELS)
+
+    # model_start events should come before model_complete events
+    start_indices = [i for i, e in enumerate(events) if e["type"] == "model_start"]
+    complete_indices = [i for i, e in enumerate(events) if e["type"] == "model_complete"]
+
+    assert max(start_indices) < min(complete_indices), \
+        "All model_start events should come before any model_complete"
+
+
+# =============================================================================
+# Test: Per-model timeout functionality
+# =============================================================================
+
+@pytest.mark.asyncio
+async def test_streaming_handles_model_timeout():
+    """
+    Verify that debate_round_streaming handles model timeouts gracefully.
+    """
+    from backend.council import debate_round_streaming
+
+    async def mock_query(model, messages, *args, **kwargs):
+        if model == SAMPLE_MODELS[0]:
+            # This model will timeout
+            await asyncio.sleep(10)
+            return {"content": "Should not reach this"}
+        return {"content": f"Response from {model}"}
+
+    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_streaming(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+                model_timeout=0.1,  # Very short timeout
+            ):
+                events.append(event)
+
+    # Should have model_error for the timed out model
+    model_errors = [e for e in events if e["type"] == "model_error"]
+    assert len(model_errors) == 1
+    assert model_errors[0]["model"] == SAMPLE_MODELS[0]
+    assert "Timeout" in model_errors[0]["error"]
+
+    # Other models should complete successfully
+    model_completes = [e for e in events if e["type"] == "model_complete"]
+    assert len(model_completes) == len(SAMPLE_MODELS) - 1

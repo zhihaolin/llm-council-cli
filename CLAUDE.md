@@ -370,7 +370,7 @@ def clear_streaming_output():
 
 ## Testing
 
-### Test Suite (70 tests)
+### Test Suite (72 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
@@ -380,7 +380,7 @@ tests/
 ├── test_debate.py               # 15 tests - debate mode
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
 ├── test_search.py               # 17 tests - web search & tool calling
-├── test_streaming.py            # 8 tests - streaming mode
+├── test_streaming.py            # 10 tests - streaming & parallel mode
 └── integration/                 # CLI tests (planned)
 ```
 
@@ -449,3 +449,61 @@ CLI: Display rounds with color-coded headers + synthesis
 ```
 
 The entire flow is async/parallel where possible to minimize latency.
+
+## Parallel Execution Mode
+
+### Overview
+The `--parallel` flag runs all models concurrently within each round, showing live progress spinners. This dramatically reduces total time (max(model times) instead of sum).
+
+### CLI Usage
+```bash
+llm-council query --debate --parallel "Question"   # Parallel with spinners
+llm-council query --debate --stream "Question"     # Sequential with token streaming
+```
+
+### Implementation
+
+**Shared HTTP Client (`backend/openrouter.py`):**
+```python
+_shared_client: Optional[httpx.AsyncClient] = None
+_client_lock = asyncio.Lock()
+
+async def get_shared_client() -> httpx.AsyncClient:
+    """Get or create a shared httpx.AsyncClient for connection reuse."""
+    global _shared_client
+    async with _client_lock:
+        if _shared_client is None or _shared_client.is_closed:
+            _shared_client = httpx.AsyncClient(
+                timeout=DEFAULT_TIMEOUT,
+                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+            )
+        return _shared_client
+```
+
+**Per-model Timeout (`backend/council.py`):**
+```python
+async def query_with_model(model: str):
+    try:
+        result = await asyncio.wait_for(
+            query_funcs[model](model),
+            timeout=model_timeout  # Default: 120s
+        )
+        return model, result, None
+    except asyncio.TimeoutError:
+        return model, None, f"Timeout after {model_timeout}s"
+```
+
+**Event Flow:**
+```
+1. round_start event
+2. model_start events for all models (CLI shows spinners)
+3. model_complete/model_error events as each finishes
+4. round_complete event with all responses
+5. Repeat for each round
+6. synthesis_start → synthesis_complete → complete
+```
+
+### CLI Display (`cli/main.py`)
+- `run_debate_parallel()` uses Rich `Live` display with a status table
+- Status states: "⠋ querying..." → "✓ done" / "✗ error"
+- Panels appear as models complete (fastest first)

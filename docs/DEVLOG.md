@@ -4,6 +4,50 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.5: Parallel Execution with Progress
+*January 2026*
+
+### Overview
+Run all models in parallel within each round with live progress spinners. Total round time = max(model times) instead of sum(model times).
+
+### Implementation
+
+**Backend (`backend/openrouter.py`):**
+- `get_shared_client()` - Returns shared `httpx.AsyncClient` for connection reuse
+- `close_shared_client()` - Clean shutdown of shared client
+- `shared_client_context()` - Context manager for automatic cleanup
+- Connection limits: `max_connections=20`, `max_keepalive_connections=10`
+
+**Backend (`backend/council.py`):**
+- `debate_round_streaming()` enhanced with:
+  - `model_timeout` parameter (default: 120s)
+  - `asyncio.wait_for()` for per-model timeout
+  - `model_start` events emitted before parallel execution
+  - `asyncio.as_completed()` for yielding results as they finish
+- Error handling: `model_error` event with "Timeout" message on timeout
+
+**CLI (`cli/main.py`):**
+- `run_debate_parallel()` - Rich Live display with status table
+- `build_model_panel()` - Moved to module level for shared use
+- `build_status_table()` - Shows spinner status for each model
+- Status states: "⠋ querying...", "✓ done", "✗ error"
+- `--parallel` / `-p` flag for debate mode
+
+### Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Timeout | Per-model 120s | Prevents single slow model from blocking |
+| Connection reuse | Shared httpx.AsyncClient | Reduces connection overhead |
+| Progress display | Rich Live + status table | Shows all models simultaneously |
+| Event order | model_start first, then completions | CLI can show spinners before any completes |
+
+### Tests
+- `test_streaming_emits_model_start_events()` - Verifies model_start before completions
+- `test_streaming_handles_model_timeout()` - Verifies timeout handling with model_error event
+
+---
+
 ## v1.4: Token Streaming
 *January 2026*
 
@@ -51,7 +95,7 @@ Added token-by-token streaming for debate mode. Responses stream as they generat
 | Defense search | Enabled | Models can find evidence to support their defense |
 
 ### Tests
-- `test_streaming.py` - 8 tests for streaming event order, model identity, error handling
+- `test_streaming.py` - 10 tests for streaming event order, model identity, error handling, timeout
 
 ---
 
@@ -200,7 +244,7 @@ tests/
 ├── test_debate.py               # 15 tests
 ├── test_ranking_parser.py       # 14 tests
 ├── test_search.py               # 17 tests
-├── test_streaming.py            # 8 tests
+├── test_streaming.py            # 10 tests
 └── integration/                 # CLI tests (planned)
 ```
 
@@ -218,10 +262,10 @@ tests/
 | Web search | 17 | Tool calling, search_web, format_search_results |
 | Chat commands | 10 | Command parsing, aliases, mode formatting |
 | Conversation context | 5 | Pair extraction, context selection |
-| Streaming | 8 | Event order, model identity, error handling |
+| Streaming | 10 | Event order, model identity, error handling, timeout |
 | CLI imports | 1 | Module import verification |
 
-**Results:** 70 passed (parsing, tool calling, streaming, and chat logic)
+**Results:** 72 passed (parsing, tool calling, streaming, parallel, and chat logic)
 
 ---
 

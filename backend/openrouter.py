@@ -1,10 +1,53 @@
 """OpenRouter API client for making LLM requests."""
 
+import asyncio
 import json
 import httpx
 from typing import List, Dict, Any, Optional, Callable, AsyncGenerator
+from contextlib import asynccontextmanager
 
 from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+
+
+# Shared client for connection reuse
+_shared_client: Optional[httpx.AsyncClient] = None
+_client_lock = asyncio.Lock()
+
+# Default timeout for model queries
+DEFAULT_TIMEOUT = 120.0
+
+
+async def get_shared_client() -> httpx.AsyncClient:
+    """Get or create a shared httpx.AsyncClient for connection reuse."""
+    global _shared_client
+    async with _client_lock:
+        if _shared_client is None or _shared_client.is_closed:
+            _shared_client = httpx.AsyncClient(
+                timeout=DEFAULT_TIMEOUT,
+                limits=httpx.Limits(
+                    max_connections=20,
+                    max_keepalive_connections=10,
+                ),
+            )
+        return _shared_client
+
+
+async def close_shared_client():
+    """Close the shared client. Call this when shutting down."""
+    global _shared_client
+    async with _client_lock:
+        if _shared_client is not None and not _shared_client.is_closed:
+            await _shared_client.aclose()
+            _shared_client = None
+
+
+@asynccontextmanager
+async def shared_client_context():
+    """Context manager that ensures shared client is closed on exit."""
+    try:
+        yield await get_shared_client()
+    finally:
+        await close_shared_client()
 
 
 async def query_model(

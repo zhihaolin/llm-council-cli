@@ -664,6 +664,20 @@ async def run_debate_with_progress(query: str, max_rounds: int = 2) -> tuple:
     return rounds, synthesis
 
 
+def build_model_panel(model: str, content: str, color: str = "blue", searched: bool = False) -> Panel:
+    """Build a panel with rendered markdown for a model response."""
+    short_name = model.split("/")[-1]
+    title = f"[bold {color}]{short_name}[/bold {color}]"
+    if searched:
+        title += " [dim]• searched[/dim]"
+    return Panel(
+        Markdown(content) if content.strip() else Text("(empty)", style="dim"),
+        title=title,
+        border_style=color if color else "white",
+        padding=(1, 2),
+    )
+
+
 async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
     """
     Run debate with token-by-token streaming.
@@ -712,19 +726,6 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
                 if current_col >= terminal_width:
                     line_count += 1
                     current_col = 0
-
-    def build_model_panel(model: str, content: str, color: str = "blue", searched: bool = False) -> Panel:
-        """Build a panel with rendered markdown."""
-        short_name = model.split("/")[-1]
-        title = f"[bold {color}]{short_name}[/bold {color}]"
-        if searched:
-            title += " [dim]• searched[/dim]"
-        return Panel(
-            Markdown(content) if content.strip() else Text("(empty)", style="dim"),
-            title=title,
-            border_style=color,
-            padding=(1, 2),
-        )
 
     current_round_type = ""
 
@@ -840,6 +841,160 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
     return rounds_data, synthesis_data
 
 
+async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
+    """
+    Run debate with parallel execution and progress spinners.
+
+    Shows all models querying simultaneously with spinners,
+    then displays panels as each model completes.
+    """
+    from rich.live import Live
+    from rich.table import Table
+    from rich.text import Text
+    from backend.council import run_debate_council_streaming
+
+    rounds_data = []
+    synthesis_data = None
+    current_round_type = ""
+    current_round_num = 0
+
+    # Track model status: "querying", "done", "error"
+    model_status = {}
+    model_results = {}
+    completed_panels = []
+
+    def build_status_table() -> Table:
+        """Build a table showing current status of all models."""
+        table = Table(show_header=False, box=None, padding=(0, 1))
+        table.add_column("Model", style="bold")
+        table.add_column("Status")
+
+        for model in COUNCIL_MODELS:
+            short_name = model.split("/")[-1]
+            status = model_status.get(model, "waiting")
+
+            if status == "querying":
+                status_text = Text("⠋ querying...", style="yellow")
+            elif status == "done":
+                status_text = Text("✓ done", style="green")
+            elif status == "error":
+                status_text = Text("✗ error", style="red")
+            else:
+                status_text = Text("○ waiting", style="dim")
+
+            table.add_row(short_name, status_text)
+
+        return table
+
+    def print_completed_panels():
+        """Print all completed panels so far."""
+        for panel in completed_panels:
+            console.print(panel)
+            console.print()
+        completed_panels.clear()
+
+    with Live(console=console, refresh_per_second=10) as live:
+        async for event in run_debate_council_streaming(query, max_rounds):
+            event_type = event["type"]
+
+            if event_type == "round_start":
+                # Print any pending panels from previous round
+                live.stop()
+                print_completed_panels()
+
+                current_round_num = event["round_number"]
+                current_round_type = event["round_type"]
+
+                # Reset model status for new round
+                model_status.clear()
+                model_results.clear()
+
+                # Print round header
+                color = {"initial": "cyan", "critique": "yellow", "defense": "magenta"}.get(
+                    current_round_type, "white"
+                )
+                console.print()
+                console.print(f"[bold {color}]━━━ ROUND {current_round_num}: {current_round_type.upper()} ━━━[/bold {color}]")
+                console.print()
+
+                live.start()
+
+            elif event_type == "model_start":
+                model = event["model"]
+                model_status[model] = "querying"
+                live.update(build_status_table())
+
+            elif event_type == "model_complete":
+                model = event["model"]
+                response_data = event.get("response", {})
+                model_status[model] = "done"
+                model_results[model] = response_data
+                live.update(build_status_table())
+
+                # Check if model used web search
+                searched = bool(response_data.get("tool_calls_made"))
+                content = response_data.get("response", "")
+                panel = build_model_panel(model, content, color="", searched=searched)
+                completed_panels.append(panel)
+
+            elif event_type == "model_error":
+                model = event["model"]
+                error = event.get("error", "Unknown error")
+                model_status[model] = "error"
+                live.update(build_status_table())
+
+                panel = Panel(
+                    f"[red]Error: {error}[/red]",
+                    title=f"[bold red]{model.split('/')[-1]}[/bold red]",
+                    border_style="red",
+                )
+                completed_panels.append(panel)
+
+            elif event_type == "round_complete":
+                # Stop live display and print all completed panels
+                live.stop()
+                print_completed_panels()
+
+                responses = event.get("responses", [])
+                rounds_data.append({
+                    "round_number": current_round_num,
+                    "round_type": current_round_type,
+                    "responses": responses,
+                })
+
+                live.start()
+
+            elif event_type == "synthesis_start":
+                live.stop()
+                print_completed_panels()
+                console.print()
+                console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
+                console.print()
+
+                # Show spinner for chairman
+                model_status.clear()
+                model_status[CHAIRMAN_MODEL] = "querying"
+                live.start()
+                live.update(build_status_table())
+
+            elif event_type == "synthesis_complete":
+                synthesis_data = event["synthesis"]
+                model_status[CHAIRMAN_MODEL] = "done"
+                live.update(build_status_table())
+                live.stop()
+
+                content = synthesis_data.get("response", "")
+                console.print(build_model_panel(CHAIRMAN_MODEL, content, "green"))
+                console.print()
+
+            elif event_type == "complete":
+                live.stop()
+                rounds_data = event.get("rounds", rounds_data)
+                synthesis_data = event.get("synthesis", synthesis_data)
+
+    return rounds_data, synthesis_data
+
+
 @app.command()
 def chat(
     max_turns: int = typer.Option(
@@ -889,7 +1044,12 @@ def query(
     stream: bool = typer.Option(
         False,
         "--stream",
-        help="Stream responses as they complete (debate mode only)",
+        help="Stream token-by-token (sequential, debate mode only)",
+    ),
+    parallel: bool = typer.Option(
+        False,
+        "--parallel", "-p",
+        help="Run models in parallel with progress spinners (debate mode only)",
     ),
 ):
     """
@@ -901,7 +1061,8 @@ def query(
         llm-council -f "Just give me the answer"
         llm-council --debate "Complex question"
         llm-council --debate --rounds 3 "Very complex question"
-        llm-council --debate --stream "Watch responses appear live"
+        llm-council --debate --stream "Watch responses stream token-by-token"
+        llm-council --debate --parallel "Watch models query in parallel"
     """
     if not question:
         question = typer.prompt("Enter your question")
@@ -919,23 +1080,28 @@ def query(
         mode_desc = f"Debate ({rounds} rounds)"
         if stream:
             mode_desc += " [streaming]"
+        elif parallel:
+            mode_desc += " [parallel]"
         console.print(f"[dim]Mode: {mode_desc}[/dim]")
     console.print()
 
     if debate:
         # Run debate mode
         if stream:
-            # Streaming mode - shows responses as they complete
+            # Streaming mode - shows responses token-by-token (sequential)
             debate_rounds, synthesis = asyncio.run(run_debate_streaming(question, rounds))
+        elif parallel:
+            # Parallel mode - runs models in parallel with progress spinners
+            debate_rounds, synthesis = asyncio.run(run_debate_parallel(question, rounds))
         else:
-            # Batch mode - shows progress spinners
+            # Batch mode - shows single progress spinner per round
             debate_rounds, synthesis = asyncio.run(run_debate_with_progress(question, rounds))
 
         if debate_rounds is None:
             raise typer.Exit(1)
 
-        if stream:
-            # Streaming mode already displayed everything via Live
+        if stream or parallel:
+            # Streaming/parallel mode already displayed everything via Live
             pass
         elif simple:
             # Just print the final answer as plain text
