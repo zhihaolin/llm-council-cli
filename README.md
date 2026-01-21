@@ -4,7 +4,6 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://github.com/zhihaolin/llm-council-cli/actions/workflows/test.yml/badge.svg)](https://github.com/zhihaolin/llm-council-cli/actions/workflows/test.yml)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Coverage](https://img.shields.io/badge/coverage-66%25-brightgreen)](pyproject.toml)
 
 **Multi-model deliberation for better answers.**
 
@@ -338,7 +337,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 84 tests, 66% coverage |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 84 tests |
 | **Linting** | ✅ | Ruff (check + format) in CI |
 | **Type Checking** | ✅ | Pyright in basic mode |
 | **Type Hints** | ✅ | Throughout codebase |

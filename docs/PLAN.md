@@ -256,7 +256,7 @@ Minimum security layer to claim "end-to-end secure."
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 84 tests, 66% coverage |
+| Test Suite | pytest + pytest-asyncio, 84 tests |
 | Linting | Ruff check + format in CI |
 | Type Checking | Pyright in basic mode |
 | Type Hints | Function signatures throughout |

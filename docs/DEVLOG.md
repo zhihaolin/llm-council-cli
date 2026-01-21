@@ -8,7 +8,7 @@ Technical decisions and implementation notes for LLM Council.
 *January 2026*
 
 ### Overview
-Added linting, type checking, and coverage enforcement to CI pipeline.
+Added linting and type checking to CI pipeline.
 
 ### Changes
 
@@ -24,7 +24,7 @@ lint job (runs first):
   → pyright
 
 test job (runs after lint):
-  → pytest with --cov-fail-under=65
+  → pytest
 ```
 
 **Code fixes:**
@@ -37,12 +37,13 @@ test job (runs after lint):
 |------|--------|
 | Ruff | line-length=100, select E/W/F/I/UP |
 | Pyright | basic mode, warnings for optional types |
-| Coverage | 65% threshold on backend core |
 
 ### Results
 - All checks pass in CI
-- 66% backend coverage
 - 0 pyright errors (31 warnings)
+
+### Note on Coverage
+Line coverage was initially added but later removed. TDD discipline matters more than coverage metrics—line coverage only measures "was code executed" not "does code work correctly."
 
 ---
 
