@@ -99,7 +99,7 @@ class TestReactLoop:
 
         mock_response = {"content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
 
-        with patch("backend.council.query_model_streaming") as mock_stream:
+        with patch("backend.council.react.query_model_streaming") as mock_stream:
             # Mock streaming to yield the full response
             async def mock_generator():
                 yield {"type": "token", "content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
@@ -133,8 +133,8 @@ class TestReactLoop:
                 # Second call: after search, chairman synthesizes
                 yield {"type": "done", "content": REACT_RESPONSE_AFTER_SEARCH}
 
-        with patch("backend.council.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("backend.council.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("backend.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+            with patch("backend.council.react.search_web", new_callable=AsyncMock) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Bitcoin is at $67,234",
@@ -160,8 +160,8 @@ class TestReactLoop:
         async def mock_generator():
             yield {"type": "done", "content": REACT_RESPONSE_WITH_SEARCH}
 
-        with patch("backend.council.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("backend.council.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("backend.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+            with patch("backend.council.react.search_web", new_callable=AsyncMock) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Test result",
@@ -191,7 +191,7 @@ class TestReactLoop:
             else:
                 yield {"type": "done", "content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
 
-        with patch("backend.council.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+        with patch("backend.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
             events = []
             async for event in synthesize_with_react("test query", "test context"):
                 events.append(event)
@@ -263,7 +263,7 @@ class TestReactStreaming:
                 yield {"type": "token", "content": token}
             yield {"type": "done", "content": "".join(tokens)}
 
-        with patch("backend.council.query_model_streaming", return_value=mock_generator()):
+        with patch("backend.council.react.query_model_streaming", return_value=mock_generator()):
             events = []
             async for event in synthesize_with_react("test", "context"):
                 events.append(event)
@@ -287,8 +287,8 @@ class TestReactStreaming:
             else:
                 yield {"type": "done", "content": REACT_RESPONSE_AFTER_SEARCH}
 
-        with patch("backend.council.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("backend.council.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("backend.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+            with patch("backend.council.react.search_web", new_callable=AsyncMock) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Bitcoin is at $67,234",

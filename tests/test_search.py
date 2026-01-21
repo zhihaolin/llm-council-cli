@@ -138,7 +138,7 @@ class TestExecuteTool:
             "results": [{"title": "T", "url": "U", "content": "C"}]
         }
 
-        with patch("backend.council.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("backend.council.orchestrator.search_web", new_callable=AsyncMock) as mock_search:
             mock_search.return_value = mock_search_result
 
             result = await execute_tool("search_web", {"query": "test"})
@@ -344,9 +344,9 @@ class TestStage1ToolIntegration:
             "tool_calls_made": [{"tool": "search_web", "args": {"query": "test"}, "result_preview": "..."}]
         }
 
-        with patch("backend.council.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch("backend.council.orchestrator.query_model_with_tools", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = mock_response
-            with patch("backend.council.COUNCIL_MODELS", ["test/model"]):
+            with patch("backend.council.orchestrator.COUNCIL_MODELS", ["test/model"]):
                 results = await stage1_collect_responses("What is the current price of BTC?")
 
                 assert len(results) == 1
@@ -363,9 +363,9 @@ class TestStage1ToolIntegration:
             "tool_calls_made": []
         }
 
-        with patch("backend.council.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch("backend.council.orchestrator.query_model_with_tools", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = mock_response
-            with patch("backend.council.COUNCIL_MODELS", ["test/model"]):
+            with patch("backend.council.orchestrator.COUNCIL_MODELS", ["test/model"]):
                 results = await stage1_collect_responses("What is 2+2?")
 
                 assert len(results) == 1

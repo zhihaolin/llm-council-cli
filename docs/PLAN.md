@@ -4,7 +4,7 @@
 
 | Version | Feature | Status |
 |---------|---------|--------|
-| v1.0 | CLI + TUI + Web UI | ✅ Complete |
+| v1.0 | CLI + TUI | ✅ Complete |
 | v1.1 | Web Search (Tool Calling) | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |
@@ -26,7 +26,6 @@
 ### v1.0: Core Platform
 - CLI with Typer + Rich (progress indicators, formatted output)
 - Interactive TUI with Textual
-- React web interface
 - 3-stage deliberation: responses → anonymous ranking → synthesis
 
 ### v1.1: Web Search

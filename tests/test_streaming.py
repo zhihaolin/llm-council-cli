@@ -46,9 +46,9 @@ async def test_debate_round_streaming_yields_as_completed():
         await asyncio.sleep(delays.get(model, 0.01))
         return {"content": f"Response from {model}"}
 
-    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
-        with patch("backend.council.query_model", side_effect=mock_query):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.streaming.query_model", side_effect=mock_query):
+            with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
                 async for event in debate_round_streaming(
                     round_type="initial",
                     user_query="Test question",
@@ -92,9 +92,9 @@ async def test_streaming_preserves_model_identity():
     async def mock_query(model, messages, *args, **kwargs):
         return {"content": expected_responses[model]}
 
-    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
-        with patch("backend.council.query_model", side_effect=mock_query):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.streaming.query_model", side_effect=mock_query):
+            with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
                 events = []
                 async for event in debate_round_streaming(
                     round_type="initial",
@@ -128,9 +128,9 @@ async def test_streaming_handles_model_failure():
             return None  # Simulate failure
         return {"content": f"Response from {model}"}
 
-    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
-        with patch("backend.council.query_model", side_effect=mock_query):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.streaming.query_model", side_effect=mock_query):
+            with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
                 events = []
                 async for event in debate_round_streaming(
                     round_type="initial",
@@ -170,9 +170,9 @@ async def test_round_complete_contains_all_responses():
     async def mock_query(model, messages, *args, **kwargs):
         return {"content": f"Response from {model}"}
 
-    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
-        with patch("backend.council.query_model", side_effect=mock_query):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.streaming.query_model", side_effect=mock_query):
+            with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
                 events = []
                 async for event in debate_round_streaming(
                     round_type="initial",
@@ -213,9 +213,9 @@ async def test_debate_streaming_event_order():
     async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
         return {"content": f"Response from {model}"}
 
-    with patch("backend.council.query_model", side_effect=mock_query):
-        with patch("backend.council.query_model_with_tools", side_effect=mock_query_tools):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model", side_effect=mock_query):
+        with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query_tools):
+            with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
                 events = []
                 async for event in run_debate_council_streaming(
                     user_query="Test question",
@@ -281,26 +281,28 @@ async def test_streaming_same_result_as_batch():
     async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
         return {"content": f"Initial response from {model}"}
 
-    # Run batch mode
-    with patch("backend.council.query_model", side_effect=mock_query):
-        with patch("backend.council.query_model_with_tools", side_effect=mock_query_tools):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
-                batch_rounds, batch_synthesis = await run_debate_council(
-                    "Test question",
-                    max_rounds=2,
-                )
+    # Run batch mode (debate module)
+    with patch("backend.council.debate.query_model", side_effect=mock_query):
+        with patch("backend.council.debate.query_model_with_tools", side_effect=mock_query_tools):
+            with patch("backend.council.debate.COUNCIL_MODELS", SAMPLE_MODELS):
+                with patch("backend.council.debate.CHAIRMAN_MODEL", SAMPLE_MODELS[0]):
+                    batch_rounds, batch_synthesis = await run_debate_council(
+                        "Test question",
+                        max_rounds=2,
+                    )
 
-    # Run streaming mode and collect final result
-    with patch("backend.council.query_model", side_effect=mock_query):
-        with patch("backend.council.query_model_with_tools", side_effect=mock_query_tools):
-            with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
-                stream_result = None
-                async for event in run_debate_council_streaming(
-                    "Test question",
-                    max_rounds=2,
-                ):
-                    if event["type"] == "complete":
-                        stream_result = event
+    # Run streaming mode and collect final result (streaming module)
+    with patch("backend.council.streaming.query_model", side_effect=mock_query):
+        with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query_tools):
+            with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
+                with patch("backend.council.streaming.CHAIRMAN_MODEL", SAMPLE_MODELS[0]):
+                    stream_result = None
+                    async for event in run_debate_council_streaming(
+                        "Test question",
+                        max_rounds=2,
+                    ):
+                        if event["type"] == "complete":
+                            stream_result = event
 
     # Both should have same number of rounds
     assert len(stream_result["rounds"]) == len(batch_rounds)
@@ -331,8 +333,8 @@ async def test_critique_round_streaming():
         for m in SAMPLE_MODELS
     ]
 
-    with patch("backend.council.query_model", side_effect=mock_query):
-        with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model", side_effect=mock_query):
+        with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
             events = []
             async for event in debate_round_streaming(
                 round_type="critique",
@@ -370,8 +372,8 @@ async def test_defense_round_streaming():
         for m in SAMPLE_MODELS
     ]
 
-    with patch("backend.council.query_model", side_effect=mock_query):
-        with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model", side_effect=mock_query):
+        with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
             events = []
             async for event in debate_round_streaming(
                 round_type="defense",
@@ -406,8 +408,8 @@ async def test_streaming_emits_model_start_events():
     async def mock_query(model, messages, *args, **kwargs):
         return {"content": f"Response from {model}"}
 
-    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
-        with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
             events = []
             async for event in debate_round_streaming(
                 round_type="initial",
@@ -446,8 +448,8 @@ async def test_streaming_handles_model_timeout():
             return {"content": "Should not reach this"}
         return {"content": f"Response from {model}"}
 
-    with patch("backend.council.query_model_with_tools", side_effect=mock_query):
-        with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("backend.council.streaming.query_model_with_tools", side_effect=mock_query):
+        with patch("backend.council.streaming.COUNCIL_MODELS", SAMPLE_MODELS):
             events = []
             async for event in debate_round_streaming(
                 round_type="initial",

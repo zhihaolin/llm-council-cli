@@ -296,23 +296,6 @@ uv run llm-council interactive
 
 ---
 
-## Web UI
-
-A React-based web interface is also available:
-
-```bash
-# Start both backend and frontend
-./start.sh
-
-# Or manually:
-# Terminal 1: uv run python -m backend.main
-# Terminal 2: cd frontend && npm run dev
-```
-
-Then open http://localhost:5173
-
----
-
 ## Configuration
 
 ### Models
@@ -338,9 +321,8 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 
 | Component | Technology |
 |-----------|------------|
-| Backend | Python 3.10+, FastAPI, async httpx |
+| Backend | Python 3.10+, async httpx |
 | CLI | Typer, Rich, Textual |
-| Frontend | React, Vite, react-markdown |
 | LLM Access | OpenRouter API (unified access to GPT, Claude, Gemini, etc.) |
 | Web Search | Tavily API (LLM-optimized search) |
 | Testing | pytest, pytest-asyncio, pytest-cov |
@@ -401,7 +383,7 @@ tests/
 
 | Version | Feature | Status |
 |---------|---------|--------|
-| v1.0 | CLI + TUI + Web UI | ✅ Complete |
+| v1.0 | CLI + TUI | ✅ Complete |
 | v1.1 | Autonomous Web Search | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |

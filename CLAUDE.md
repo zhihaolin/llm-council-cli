@@ -14,7 +14,6 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
 - Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
 - Uses environment variable `OPENROUTER_API_KEY` from `.env`
-- Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
 
 **`openrouter.py`**
 - `query_model()`: Single async model query
@@ -52,45 +51,7 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 - JSON-based conversation storage in `data/conversations/`
 - Each conversation: `{id, created_at, messages[]}`
 - Assistant messages contain: `{role, stage1, stage2, stage3}`
-- Note: metadata (label_to_model, aggregate_rankings) is NOT persisted to storage, only returned via API
-
-**`main.py`**
-- FastAPI app with CORS enabled for localhost:5173 and localhost:3000
-- POST `/api/conversations/{id}/message` returns metadata in addition to stages
-- Metadata includes: label_to_model mapping and aggregate_rankings
-
-### Frontend Structure (`frontend/src/`)
-
-**`App.jsx`**
-- Main orchestration: manages conversations list and current conversation
-- Handles message sending and metadata storage
-- Important: metadata is stored in the UI state for display but not persisted to backend JSON
-
-**`components/ChatInterface.jsx`**
-- Multiline textarea (3 rows, resizable)
-- Enter to send, Shift+Enter for new line
-- User messages wrapped in markdown-content class for padding
-
-**`components/Stage1.jsx`**
-- Tab view of individual model responses
-- ReactMarkdown rendering with markdown-content wrapper
-
-**`components/Stage2.jsx`**
-- **Critical Feature**: Tab view showing RAW evaluation text from each model
-- De-anonymization happens CLIENT-SIDE for display (models receive anonymous labels)
-- Shows "Extracted Ranking" below each evaluation so users can validate parsing
-- Aggregate rankings shown with average position and vote count
-- Explanatory text clarifies that boldface model names are for readability only
-
-**`components/Stage3.jsx`**
-- Final synthesized answer from chairman
-- Green-tinted background (#f0fff0) to highlight conclusion
-
-**Styling (`*.css`)**
-- Light mode theme (not dark mode)
-- Primary color: #4a90e2 (blue)
-- Global markdown styling in `index.css` with `.markdown-content` class
-- 12px padding on all markdown content to prevent cluttered appearance
+- Note: metadata (label_to_model, aggregate_rankings) is NOT persisted to storage
 
 ## Key Design Decisions
 
@@ -108,17 +69,15 @@ This strict format allows reliable parsing while still getting thoughtful evalua
 ### De-anonymization Strategy
 - Models receive: "Response A", "Response B", etc.
 - Backend creates mapping: `{"Response A": "openai/gpt-5.1", ...}`
-- Frontend displays model names in **bold** for readability
-- Users see explanation that original evaluation used anonymous labels
-- This prevents bias while maintaining transparency
+- CLI displays de-anonymized model names for readability
+- This prevents bias during evaluation while maintaining transparency in output
 
 ### Error Handling Philosophy
 - Continue with successful responses if some models fail (graceful degradation)
 - Never fail the entire request due to single model failure
 - Log errors but don't expose to user unless all models fail
 
-### UI/UX Transparency
-- All raw outputs are inspectable via tabs
+### CLI/UX Transparency
 - Parsed rankings shown below raw text for validation
 - Users can verify system's interpretation of model outputs
 - This builds trust and allows debugging of edge cases
@@ -126,15 +85,7 @@ This strict format allows reliable parsing while still getting thoughtful evalua
 ## Important Implementation Details
 
 ### Relative Imports
-All backend modules use relative imports (e.g., `from .config import ...`) not absolute imports. This is critical for Python's module system to work correctly when running as `python -m backend.main`.
-
-### Port Configuration
-- Backend: 8001 (changed from 8000 to avoid conflict)
-- Frontend: 5173 (Vite default)
-- Update both `backend/main.py` and `frontend/src/api.js` if changing
-
-### Markdown Rendering
-All ReactMarkdown components must be wrapped in `<div className="markdown-content">` for proper spacing. This class is defined globally in `index.css`.
+All backend modules use relative imports (e.g., `from .config import ...`) not absolute imports. This is critical for Python's module system to work correctly.
 
 ### Model Configuration
 Models are hardcoded in `backend/config.py`. Chairman can be same or different from council members. The current default is Gemini as chairman per user preference.
@@ -357,16 +308,15 @@ def clear_streaming_output():
    ```bash
    curl -sL "https://github.com/zhihaolin/llm-council-cli/actions/workflows/test.yml/badge.svg" | grep -o 'passing\|failing'
    ```
-2. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
-3. **CORS Issues**: Frontend must match allowed origins in `main.py` CORS middleware
-4. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
-5. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
-6. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
-7. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 10)
+2. **Module Import Errors**: Always run backend modules with relative imports from project root
+3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
+4. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
+5. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
+6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 10)
 
 ## Future Enhancement Ideas
 
-- Configurable council/chairman via UI instead of config file
+- Configurable council/chairman via CLI flags or config file
 - Export conversations to markdown/PDF
 - Model performance analytics over time
 - Custom ranking criteria (not just accuracy/insight)
@@ -423,7 +373,7 @@ Stage 3: Chairman synthesis with full context
     ↓
 Return: {stage1, stage2, stage3, metadata}
     ↓
-Frontend/CLI: Display with tabs + validation UI
+CLI: Display with formatted output
 ```
 
 ### Debate Mode
