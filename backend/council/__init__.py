@@ -19,51 +19,50 @@ Public API:
 """
 
 # Orchestrator - Stage 1-2-3 flow
-from .orchestrator import (
-    execute_tool,
-    stage1_collect_responses,
-    stage2_collect_rankings,
-    stage3_synthesize_final,
-    run_full_council,
-    generate_conversation_title,
-)
+# Aggregation
+from .aggregation import calculate_aggregate_rankings
 
 # Debate mode
 from .debate import (
-    debate_round_initial,
     debate_round_critique,
     debate_round_defense,
-    synthesize_debate,
+    debate_round_initial,
     run_debate_council,
+    synthesize_debate,
 )
+from .orchestrator import (
+    execute_tool,
+    generate_conversation_title,
+    run_full_council,
+    stage1_collect_responses,
+    stage2_collect_rankings,
+    stage3_synthesize_final,
+)
+
+# Parsers
+from .parsers import (
+    extract_critiques_for_model,
+    parse_ranking_from_text,
+    parse_react_output,
+    parse_revised_answer,
+)
+
+# Prompts (for building context)
+from .prompts import (
+    build_react_context_debate,
+    build_react_context_ranking,
+    build_react_prompt,
+    get_date_context,
+)
+
+# ReAct chairman
+from .react import synthesize_with_react
 
 # Streaming
 from .streaming import (
     debate_round_streaming,
     run_debate_council_streaming,
     run_debate_token_streaming,
-)
-
-# ReAct chairman
-from .react import synthesize_with_react
-
-# Parsers
-from .parsers import (
-    parse_ranking_from_text,
-    parse_revised_answer,
-    extract_critiques_for_model,
-    parse_react_output,
-)
-
-# Aggregation
-from .aggregation import calculate_aggregate_rankings
-
-# Prompts (for building context)
-from .prompts import (
-    get_date_context,
-    build_react_context_ranking,
-    build_react_context_debate,
-    build_react_prompt,
 )
 
 __all__ = [

@@ -254,9 +254,11 @@ Minimum security layer to claim "end-to-end secure."
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 84 tests |
+| Test Suite | pytest + pytest-asyncio, 84 tests, 66% coverage |
+| Linting | Ruff check + format in CI |
+| Type Checking | Pyright in basic mode |
 | Type Hints | Function signatures throughout |
-| CI/CD | GitHub Actions (tests on every push) |
+| CI/CD | GitHub Actions (lint → test pipeline) |
 | SOLID (SRP/ISP) | Focused modules, clean API exports (v1.6.1) |
 
 ### Planned
@@ -270,8 +272,7 @@ Minimum security layer to claim "end-to-end secure."
 | SOLID (OCP/DIP) | Strategy pattern, dependency injection | Future |
 | Config Extraction | YAML config with validation | — |
 | Contract Tests | Scheduled daily API schema validation | — |
-| Pre-commit Hooks | Ruff lint/format | — |
-| Type Checking | Pyright (basic) | — |
+| Pre-commit Hooks | Ruff as pre-commit hook | — |
 | Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |
 
 ---

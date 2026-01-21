@@ -3,34 +3,33 @@ LLM Council TUI - Interactive terminal interface using Textual.
 """
 
 import asyncio
+import sys
+
+from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical, ScrollableContainer
+from textual.binding import Binding
+from textual.containers import Container, Horizontal, ScrollableContainer, Vertical
 from textual.widgets import (
-    Header,
-    Footer,
-    Static,
-    Input,
     Button,
+    DataTable,
+    Footer,
+    Header,
+    Input,
+    Label,
+    Markdown,
+    Static,
     TabbedContent,
     TabPane,
-    DataTable,
-    Markdown,
-    LoadingIndicator,
-    Label,
 )
-from textual.binding import Binding
-from textual import work
-from textual.worker import Worker, WorkerState
 
-import sys
 sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
+from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
 from backend.council import (
+    calculate_aggregate_rankings,
     stage1_collect_responses,
     stage2_collect_rankings,
     stage3_synthesize_final,
-    calculate_aggregate_rankings,
 )
-from backend.config import COUNCIL_MODELS, CHAIRMAN_MODEL
 
 
 class QueryInput(Static):
@@ -52,7 +51,7 @@ class StagePanel(Static):
         self.title = title
 
     def compose(self) -> ComposeResult:
-        yield Label(f"Waiting for query...", id=f"{self.id}-content")
+        yield Label("Waiting for query...", id=f"{self.id}-content")
 
 
 class Stage1View(ScrollableContainer):
@@ -82,7 +81,9 @@ class Stage1View(ScrollableContainer):
             self.mount(container)
 
             # Add header and content
-            header = Static(f"[bold cyan]━━━ {model_name} ━━━[/bold cyan]", classes="response-header")
+            header = Static(
+                f"[bold cyan]━━━ {model_name} ━━━[/bold cyan]", classes="response-header"
+            )
             content = Markdown(response, classes="response-content")
             container.mount(header)
             container.mount(content)
@@ -121,10 +122,9 @@ class Stage2View(ScrollableContainer):
         for result in results:
             model = result["model"].split("/")[-1]
             parsed = result.get("parsed_ranking", [])
-            parsed_display = " → ".join([
-                label_to_model.get(label, label).split("/")[-1]
-                for label in parsed
-            ])
+            parsed_display = " → ".join(
+                [label_to_model.get(label, label).split("/")[-1] for label in parsed]
+            )
             eval_text += f"**{model}:** {parsed_display}\n\n"
 
         self.mount(Markdown(eval_text, id="evaluations"))
@@ -380,7 +380,9 @@ class CouncilApp(App):
         await asyncio.sleep(0.5)
 
         # Stage 3
-        status_bar.set_status(f"Stage 3: Chairman ({CHAIRMAN_MODEL.split('/')[-1]}) synthesizing...")
+        status_bar.set_status(
+            f"Stage 3: Chairman ({CHAIRMAN_MODEL.split('/')[-1]}) synthesizing..."
+        )
         stage3_result = await stage3_synthesize_final(query, stage1_results, stage2_results)
 
         stage3_view.update_synthesis(stage3_result)

@@ -2,7 +2,7 @@
 Helpers for CLI chat mode and conversation context.
 """
 
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Any
 
 CHAT_COMMANDS = {
     "help": "Show this help",
@@ -24,7 +24,7 @@ CHAT_COMMAND_ALIASES = {
 }
 
 
-def parse_chat_command(text: str) -> Tuple[str, Optional[str]]:
+def parse_chat_command(text: str) -> tuple[str, str | None]:
     """Parse chat command into (command, argument)."""
     stripped = text.strip()
     if not stripped.startswith(("/", ":")):
@@ -42,12 +42,12 @@ def parse_chat_command(text: str) -> Tuple[str, Optional[str]]:
     return command, argument
 
 
-def list_chat_commands() -> List[str]:
+def list_chat_commands() -> list[str]:
     """Return all supported chat commands."""
     return list(CHAT_COMMANDS.keys())
 
 
-def suggest_chat_commands(prefix: str) -> List[str]:
+def suggest_chat_commands(prefix: str) -> list[str]:
     """Suggest commands matching a prefix."""
     prefix = prefix.lower().strip()
     if not prefix:
@@ -75,10 +75,7 @@ def format_chat_mode_line(
     if react_enabled:
         mode_str += r" \[react]"
 
-    return (
-        "[chat.meta]Mode:[/chat.meta] "
-        f"[chat.accent]{mode_str}[/chat.accent]"
-    )
+    return f"[chat.meta]Mode:[/chat.meta] [chat.accent]{mode_str}[/chat.accent]"
 
 
 def format_prompt_mode(
@@ -104,7 +101,7 @@ def build_chat_prompt(
     return f"[chat.prompt]{mode}>[/chat.prompt] "
 
 
-def extract_assistant_reply(message: Dict[str, Any]) -> str:
+def extract_assistant_reply(message: dict[str, Any]) -> str:
     """Extract the assistant reply text from a stored message."""
     if message.get("stage3"):
         return message["stage3"].get("response", "").strip()
@@ -115,13 +112,13 @@ def extract_assistant_reply(message: Dict[str, Any]) -> str:
     return ""
 
 
-def extract_conversation_pairs(messages: List[Dict[str, Any]]) -> List[Tuple[str, str]]:
+def extract_conversation_pairs(messages: list[dict[str, Any]]) -> list[tuple[str, str]]:
     """
     Extract (user, assistant) pairs from stored conversation messages.
 
     Only Stage 3 (or debate synthesis) is used for assistant context.
     """
-    pairs: List[Tuple[str, str]] = []
+    pairs: list[tuple[str, str]] = []
     pending_user = None
 
     for message in messages:
@@ -139,7 +136,7 @@ def extract_conversation_pairs(messages: List[Dict[str, Any]]) -> List[Tuple[str
     return pairs
 
 
-def select_context_pairs(pairs: List[Tuple[str, str]], max_turns: int) -> List[Tuple[str, str]]:
+def select_context_pairs(pairs: list[tuple[str, str]], max_turns: int) -> list[tuple[str, str]]:
     """
     Select the first pair plus the last N pairs, preserving order.
     """
@@ -150,7 +147,7 @@ def select_context_pairs(pairs: List[Tuple[str, str]], max_turns: int) -> List[T
     return [pairs[0]] + pairs[-max_turns:]
 
 
-def format_context_pairs(pairs: List[Tuple[str, str]]) -> str:
+def format_context_pairs(pairs: list[tuple[str, str]]) -> str:
     """Format conversation pairs into a readable context block."""
     lines = []
     for user_text, assistant_text in pairs:
@@ -160,7 +157,7 @@ def format_context_pairs(pairs: List[Tuple[str, str]]) -> str:
     return "\n".join(lines).rstrip()
 
 
-def build_context_prompt(conversation: Dict[str, Any], max_turns: int) -> str:
+def build_context_prompt(conversation: dict[str, Any], max_turns: int) -> str:
     """Build a context prompt from a conversation record."""
     messages = conversation.get("messages", [])
     pairs = extract_conversation_pairs(messages)

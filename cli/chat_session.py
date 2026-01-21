@@ -6,44 +6,42 @@ Contains run_chat_session and related state management.
 
 import asyncio
 import uuid
-from typing import Optional
 
+from backend import storage
+from backend.council import generate_conversation_title
+from cli.chat import (
+    CHAT_COMMANDS,
+    build_chat_prompt,
+    build_context_prompt,
+    format_chat_mode_line,
+    parse_chat_command,
+)
+from cli.orchestrators import (
+    run_council_with_progress,
+    run_debate_parallel,
+    run_debate_streaming,
+    run_debate_with_progress,
+    run_react_synthesis,
+)
 from cli.presenters import (
     console,
     print_chat_banner,
     print_chat_help,
     print_chat_suggestions,
+    print_debate_round,
+    print_debate_synthesis,
     print_history_table,
     print_stage1,
     print_stage2,
     print_stage3,
-    print_debate_round,
-    print_debate_synthesis,
     print_user_question_panel,
 )
-from cli.orchestrators import (
-    run_react_synthesis,
-    run_council_with_progress,
-    run_debate_with_progress,
-    run_debate_streaming,
-    run_debate_parallel,
-)
-from cli.chat import (
-    CHAT_COMMANDS,
-    build_context_prompt,
-    build_chat_prompt,
-    format_chat_mode_line,
-    parse_chat_command,
-)
-
-from backend.council import generate_conversation_title
-from backend import storage
 
 DEFAULT_CONTEXT_TURNS = 6
 DEFAULT_DEBATE_ROUNDS = 2
 
 
-def resolve_conversation_id(prefix: str, conversations: list) -> Optional[str]:
+def resolve_conversation_id(prefix: str, conversations: list) -> str | None:
     """Resolve a conversation ID by prefix."""
     matches = [item["id"] for item in conversations if item["id"].startswith(prefix)]
     if len(matches) == 1:
@@ -169,7 +167,15 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Usage: /debate on|off[/chat.error]")
                     continue
                 debate_enabled = argument == "on"
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                console.print(
+                    format_chat_mode_line(
+                        debate_enabled,
+                        debate_rounds,
+                        stream_enabled,
+                        parallel_enabled,
+                        react_enabled,
+                    )
+                )
                 continue
             if command == "rounds":
                 if not argument:
@@ -184,7 +190,15 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Rounds must be at least 2.[/chat.error]")
                     continue
                 debate_rounds = rounds_value
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                console.print(
+                    format_chat_mode_line(
+                        debate_enabled,
+                        debate_rounds,
+                        stream_enabled,
+                        parallel_enabled,
+                        react_enabled,
+                    )
+                )
                 continue
             if command == "parallel":
                 if argument not in ("on", "off"):
@@ -194,8 +208,18 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 if parallel_enabled:
                     stream_enabled = False  # Parallel and stream are mutually exclusive
                 if parallel_enabled and not debate_enabled:
-                    console.print("[chat.meta]Note: Parallel only applies in debate mode.[/chat.meta]")
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                    console.print(
+                        "[chat.meta]Note: Parallel only applies in debate mode.[/chat.meta]"
+                    )
+                console.print(
+                    format_chat_mode_line(
+                        debate_enabled,
+                        debate_rounds,
+                        stream_enabled,
+                        parallel_enabled,
+                        react_enabled,
+                    )
+                )
                 continue
             if command == "stream":
                 if argument not in ("on", "off"):
@@ -205,18 +229,44 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 if stream_enabled:
                     parallel_enabled = False  # Stream and parallel are mutually exclusive
                 if stream_enabled and not debate_enabled:
-                    console.print("[chat.meta]Note: Streaming only applies in debate mode.[/chat.meta]")
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                    console.print(
+                        "[chat.meta]Note: Streaming only applies in debate mode.[/chat.meta]"
+                    )
+                console.print(
+                    format_chat_mode_line(
+                        debate_enabled,
+                        debate_rounds,
+                        stream_enabled,
+                        parallel_enabled,
+                        react_enabled,
+                    )
+                )
                 continue
             if command == "react":
                 if argument not in ("on", "off"):
                     console.print("[chat.error]Usage: /react on|off[/chat.error]")
                     continue
                 react_enabled = argument == "on"
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                console.print(
+                    format_chat_mode_line(
+                        debate_enabled,
+                        debate_rounds,
+                        stream_enabled,
+                        parallel_enabled,
+                        react_enabled,
+                    )
+                )
                 continue
             if command == "mode":
-                console.print(format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled))
+                console.print(
+                    format_chat_mode_line(
+                        debate_enabled,
+                        debate_rounds,
+                        stream_enabled,
+                        parallel_enabled,
+                        react_enabled,
+                    )
+                )
                 continue
 
             console.print("[chat.error]Unknown command. Type /help for options.[/chat.error]")
@@ -266,18 +316,23 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 )
 
             if debate_rounds_data is None:
-                console.print("[chat.error]Error: Debate mode failed to produce responses.[/chat.error]")
+                console.print(
+                    "[chat.error]Error: Debate mode failed to produce responses.[/chat.error]"
+                )
                 continue
 
             # If using ReAct, run synthesis separately
             if use_react_here:
                 from backend.council import build_react_context_debate
+
                 # Only print rounds if batch mode (parallel/streaming already displayed them)
                 if not parallel_enabled and not stream_enabled:
                     for round_data in debate_rounds_data:
                         print_debate_round(round_data, round_data["round_number"])
                 # Run ReAct synthesis
-                context = build_react_context_debate(full_query, debate_rounds_data, len(debate_rounds_data))
+                context = build_react_context_debate(
+                    full_query, debate_rounds_data, len(debate_rounds_data)
+                )
                 synthesis = await run_react_synthesis(full_query, context)
                 print_debate_synthesis(synthesis)
             elif not stream_enabled and not parallel_enabled:
@@ -305,6 +360,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
             # If using ReAct, run synthesis separately
             if use_react_here:
                 from backend.council import build_react_context_ranking
+
                 # Show Stage 1 and 2 first
                 print_stage1(stage1)
                 print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])

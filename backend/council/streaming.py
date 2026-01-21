@@ -5,27 +5,28 @@ Contains async generators that yield events as models complete or stream tokens.
 """
 
 import asyncio
-from typing import Any, AsyncGenerator, Callable, Dict, List
+from collections.abc import AsyncGenerator, Callable
+from typing import Any
 
-from ..config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from ..config import CHAIRMAN_MODEL, COUNCIL_MODELS
 from ..openrouter import (
     query_model,
     query_model_streaming,
-    query_model_with_tools,
     query_model_streaming_with_tools,
+    query_model_with_tools,
 )
-from ..search import SEARCH_TOOL, search_web, format_search_results
-from .parsers import parse_revised_answer, extract_critiques_for_model
+from ..search import SEARCH_TOOL, format_search_results, search_web
+from .parsers import extract_critiques_for_model, parse_revised_answer
 from .prompts import (
-    get_date_context,
     build_critique_prompt,
-    build_defense_prompt,
     build_debate_synthesis_prompt,
+    build_defense_prompt,
     format_responses_for_critique,
+    get_date_context,
 )
 
 
-async def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
+async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
     """
     Execute a tool and return the result as a string.
 
@@ -47,9 +48,9 @@ async def execute_tool(tool_name: str, tool_args: Dict[str, Any]) -> str:
 async def debate_round_streaming(
     round_type: str,
     user_query: str,
-    context: Dict[str, Any],
+    context: dict[str, Any],
     model_timeout: float = 120.0,
-) -> AsyncGenerator[Dict[str, Any], None]:
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream a single debate round, yielding events as each model completes.
 
@@ -79,16 +80,13 @@ async def debate_round_streaming(
 
         async def query_initial(model: str):
             response = await query_model_with_tools(
-                model=model,
-                messages=messages,
-                tools=tools,
-                tool_executor=execute_tool
+                model=model, messages=messages, tools=tools, tool_executor=execute_tool
             )
             if response is None:
                 return None
-            result = {"model": model, "response": response.get('content', '')}
-            if response.get('tool_calls_made'):
-                result['tool_calls_made'] = response['tool_calls_made']
+            result = {"model": model, "response": response.get("content", "")}
+            if response.get("tool_calls_made"):
+                result["tool_calls_made"] = response["tool_calls_made"]
             return result
 
         query_funcs = {model: query_initial for model in COUNCIL_MODELS}
@@ -104,7 +102,7 @@ async def debate_round_streaming(
             response = await query_model(model, messages)
             if response is None:
                 return None
-            return {"model": model, "response": response.get('content', '')}
+            return {"model": model, "response": response.get("content", "")}
 
         query_funcs = {model: query_critique for model in COUNCIL_MODELS}
 
@@ -112,7 +110,7 @@ async def debate_round_streaming(
         # Defense round
         initial_responses = context.get("initial_responses", [])
         critique_responses = context.get("critique_responses", [])
-        model_to_response = {r['model']: r['response'] for r in initial_responses}
+        model_to_response = {r["model"]: r["response"] for r in initial_responses}
 
         async def query_defense(model: str):
             original_response = model_to_response.get(model, "")
@@ -122,11 +120,11 @@ async def debate_round_streaming(
             response = await query_model(model, messages)
             if response is None:
                 return None
-            content = response.get('content', '')
+            content = response.get("content", "")
             return {
                 "model": model,
                 "response": content,
-                "revised_answer": parse_revised_answer(content)
+                "revised_answer": parse_revised_answer(content),
             }
 
         query_funcs = {model: query_defense for model in COUNCIL_MODELS}
@@ -138,10 +136,7 @@ async def debate_round_streaming(
     async def query_with_model(model: str):
         try:
             # Apply per-model timeout
-            result = await asyncio.wait_for(
-                query_funcs[model](model),
-                timeout=model_timeout
-            )
+            result = await asyncio.wait_for(query_funcs[model](model), timeout=model_timeout)
             return model, result, None
         except asyncio.TimeoutError:
             return model, None, f"Timeout after {model_timeout}s"
@@ -153,10 +148,7 @@ async def debate_round_streaming(
         yield {"type": "model_start", "model": model}
 
     # Create tasks and map them back to models
-    tasks = {
-        asyncio.create_task(query_with_model(model)): model
-        for model in COUNCIL_MODELS
-    }
+    tasks = {asyncio.create_task(query_with_model(model)): model for model in COUNCIL_MODELS}
 
     # Collect responses as they complete
     responses = []
@@ -176,10 +168,8 @@ async def debate_round_streaming(
 
 
 async def run_debate_council_streaming(
-    user_query: str,
-    max_rounds: int = 2,
-    skip_synthesis: bool = False
-) -> AsyncGenerator[Dict[str, Any], None]:
+    user_query: str, max_rounds: int = 2, skip_synthesis: bool = False
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream the complete debate flow, yielding events as each model completes.
 
@@ -210,16 +200,14 @@ async def run_debate_council_streaming(
     ):
         if event["type"] == "round_complete":
             initial_responses = event["responses"]
-            rounds.append({
-                "round_number": 1,
-                "round_type": "initial",
-                "responses": initial_responses
-            })
+            rounds.append(
+                {"round_number": 1, "round_type": "initial", "responses": initial_responses}
+            )
             yield {
                 "type": "round_complete",
                 "round_number": 1,
                 "round_type": "initial",
-                "responses": initial_responses
+                "responses": initial_responses,
             }
         else:
             yield event
@@ -231,8 +219,8 @@ async def run_debate_council_streaming(
             "rounds": rounds,
             "synthesis": {
                 "model": "error",
-                "response": "Not enough models responded to conduct a debate. Need at least 2 models."
-            }
+                "response": "Not enough models responded to conduct a debate. Need at least 2 models.",
+            },
         }
         return
 
@@ -247,16 +235,14 @@ async def run_debate_council_streaming(
     ):
         if event["type"] == "round_complete":
             critique_responses = event["responses"]
-            rounds.append({
-                "round_number": 2,
-                "round_type": "critique",
-                "responses": critique_responses
-            })
+            rounds.append(
+                {"round_number": 2, "round_type": "critique", "responses": critique_responses}
+            )
             yield {
                 "type": "round_complete",
                 "round_number": 2,
                 "round_type": "critique",
-                "responses": critique_responses
+                "responses": critique_responses,
             }
         else:
             yield event
@@ -275,16 +261,14 @@ async def run_debate_council_streaming(
     ):
         if event["type"] == "round_complete":
             defense_responses = event["responses"]
-            rounds.append({
-                "round_number": 3,
-                "round_type": "defense",
-                "responses": defense_responses
-            })
+            rounds.append(
+                {"round_number": 3, "round_type": "defense", "responses": defense_responses}
+            )
             yield {
                 "type": "round_complete",
                 "round_number": 3,
                 "round_type": "defense",
-                "responses": defense_responses
+                "responses": defense_responses,
             }
         else:
             yield event
@@ -305,16 +289,18 @@ async def run_debate_council_streaming(
             ):
                 if event["type"] == "round_complete":
                     critique_responses = event["responses"]
-                    rounds.append({
-                        "round_number": round_num,
-                        "round_type": "critique",
-                        "responses": critique_responses
-                    })
+                    rounds.append(
+                        {
+                            "round_number": round_num,
+                            "round_type": "critique",
+                            "responses": critique_responses,
+                        }
+                    )
                     yield {
                         "type": "round_complete",
                         "round_number": round_num,
                         "round_type": "critique",
-                        "responses": critique_responses
+                        "responses": critique_responses,
                     }
                 else:
                     yield event
@@ -333,16 +319,18 @@ async def run_debate_council_streaming(
             ):
                 if event["type"] == "round_complete":
                     defense_responses = event["responses"]
-                    rounds.append({
-                        "round_number": round_num,
-                        "round_type": "defense",
-                        "responses": defense_responses
-                    })
+                    rounds.append(
+                        {
+                            "round_number": round_num,
+                            "round_type": "defense",
+                            "responses": defense_responses,
+                        }
+                    )
                     yield {
                         "type": "round_complete",
                         "round_number": round_num,
                         "round_type": "defense",
-                        "responses": defense_responses
+                        "responses": defense_responses,
                     }
                 else:
                     yield event
@@ -360,13 +348,10 @@ async def run_debate_council_streaming(
         if response is None:
             synthesis = {
                 "model": CHAIRMAN_MODEL,
-                "response": "Error: Unable to generate debate synthesis."
+                "response": "Error: Unable to generate debate synthesis.",
             }
         else:
-            synthesis = {
-                "model": CHAIRMAN_MODEL,
-                "response": response.get('content', '')
-            }
+            synthesis = {"model": CHAIRMAN_MODEL, "response": response.get("content", "")}
         yield {"type": "synthesis_complete", "synthesis": synthesis}
 
     # Final complete event with all data
@@ -374,10 +359,8 @@ async def run_debate_council_streaming(
 
 
 async def run_debate_token_streaming(
-    user_query: str,
-    max_rounds: int = 2,
-    skip_synthesis: bool = False
-) -> AsyncGenerator[Dict[str, Any], None]:
+    user_query: str, max_rounds: int = 2, skip_synthesis: bool = False
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream debate with token-level streaming, one model at a time.
 
@@ -420,19 +403,26 @@ async def run_debate_token_streaming(
 
             try:
                 async for event in query_model_streaming_with_tools(
-                    model=model,
-                    messages=messages,
-                    tools=tools,
-                    tool_executor=execute_tool
+                    model=model, messages=messages, tools=tools, tool_executor=execute_tool
                 ):
                     if event["type"] == "token":
                         full_content += event["content"]
                         yield {"type": "token", "model": model, "content": event["content"]}
                     elif event["type"] == "tool_call":
                         # Yield tool call event so CLI can show "searching..."
-                        yield {"type": "tool_call", "model": model, "tool": event["tool"], "args": event["args"]}
+                        yield {
+                            "type": "tool_call",
+                            "model": model,
+                            "tool": event["tool"],
+                            "args": event["args"],
+                        }
                     elif event["type"] == "tool_result":
-                        yield {"type": "tool_result", "model": model, "tool": event["tool"], "result": event["result"]}
+                        yield {
+                            "type": "tool_result",
+                            "model": model,
+                            "tool": event["tool"],
+                            "result": event["result"],
+                        }
                     elif event["type"] == "done":
                         full_content = event.get("content", full_content)
                         tool_calls_made = event.get("tool_calls_made", [])
@@ -454,7 +444,7 @@ async def run_debate_token_streaming(
             "type": "round_complete",
             "round_number": 1,
             "round_type": "initial",
-            "responses": responses
+            "responses": responses,
         }
 
     async def stream_round(
@@ -462,7 +452,7 @@ async def run_debate_token_streaming(
         round_type: str,
         build_prompt_fn: Callable[[str], str],
         with_tools: bool = False,
-    ) -> AsyncGenerator[Dict[str, Any], None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
         """Stream a single round (critique/defense), one model at a time.
 
         Args:
@@ -487,18 +477,25 @@ async def run_debate_token_streaming(
             if with_tools:
                 # Use streaming with tool support
                 async for event in query_model_streaming_with_tools(
-                    model=model,
-                    messages=messages,
-                    tools=round_tools,
-                    tool_executor=execute_tool
+                    model=model, messages=messages, tools=round_tools, tool_executor=execute_tool
                 ):
                     if event["type"] == "token":
                         full_content += event["content"]
                         yield {"type": "token", "model": model, "content": event["content"]}
                     elif event["type"] == "tool_call":
-                        yield {"type": "tool_call", "model": model, "tool": event["tool"], "args": event["args"]}
+                        yield {
+                            "type": "tool_call",
+                            "model": model,
+                            "tool": event["tool"],
+                            "args": event["args"],
+                        }
                     elif event["type"] == "tool_result":
-                        yield {"type": "tool_result", "model": model, "tool": event["tool"], "result": event["result"]}
+                        yield {
+                            "type": "tool_result",
+                            "model": model,
+                            "tool": event["tool"],
+                            "result": event["result"],
+                        }
                     elif event["type"] == "done":
                         full_content = event.get("content", full_content)
                         tool_calls_made = event.get("tool_calls_made", [])
@@ -528,7 +525,7 @@ async def run_debate_token_streaming(
             "type": "round_complete",
             "round_number": round_num,
             "round_type": round_type,
-            "responses": responses
+            "responses": responses,
         }
 
     # Round 1: Initial responses (with tool support for web search)
@@ -537,11 +534,9 @@ async def run_debate_token_streaming(
         yield event
         if event["type"] == "round_complete":
             initial_responses = event["responses"]
-            rounds.append({
-                "round_number": 1,
-                "round_type": "initial",
-                "responses": initial_responses
-            })
+            rounds.append(
+                {"round_number": 1, "round_type": "initial", "responses": initial_responses}
+            )
 
     if len(initial_responses) < 2:
         yield {
@@ -549,8 +544,8 @@ async def run_debate_token_streaming(
             "rounds": rounds,
             "synthesis": {
                 "model": "error",
-                "response": "Not enough models responded to conduct a debate."
-            }
+                "response": "Not enough models responded to conduct a debate.",
+            },
         }
         return
 
@@ -565,14 +560,12 @@ async def run_debate_token_streaming(
         yield event
         if event["type"] == "round_complete":
             critique_responses = event["responses"]
-            rounds.append({
-                "round_number": 2,
-                "round_type": "critique",
-                "responses": critique_responses
-            })
+            rounds.append(
+                {"round_number": 2, "round_type": "critique", "responses": critique_responses}
+            )
 
     # Round 3: Defense
-    model_to_response = {r['model']: r['response'] for r in initial_responses}
+    model_to_response = {r["model"]: r["response"] for r in initial_responses}
 
     def build_defense_prompt_for_model(model):
         original = model_to_response.get(model, "")
@@ -584,11 +577,9 @@ async def run_debate_token_streaming(
         yield event
         if event["type"] == "round_complete":
             defense_responses = event["responses"]
-            rounds.append({
-                "round_number": 3,
-                "round_type": "defense",
-                "responses": defense_responses
-            })
+            rounds.append(
+                {"round_number": 3, "round_type": "defense", "responses": defense_responses}
+            )
 
     # Chairman synthesis with streaming (skip if using ReAct mode)
     synthesis = None

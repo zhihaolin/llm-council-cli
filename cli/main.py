@@ -10,36 +10,33 @@ Usage:
 
 import asyncio
 import sys
-from typing import Optional
 
 import typer
-from rich.table import Table
 from rich.markdown import Markdown
+from rich.table import Table
 
 # Add project root to path for imports
 sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
 
-from cli.utils import DEFAULT_CONTEXT_TURNS
+from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
+from cli.chat_session import run_chat_session
+from cli.orchestrators import (
+    run_council_with_progress,
+    run_debate_parallel,
+    run_debate_streaming,
+    run_debate_with_progress,
+    run_react_synthesis,
+)
 from cli.presenters import (
     console,
-    print_stage1,
-    print_stage2,
-    print_stage3,
     print_debate_round,
     print_debate_synthesis,
     print_query_header,
+    print_stage1,
+    print_stage2,
+    print_stage3,
 )
-from cli.orchestrators import (
-    run_react_synthesis,
-    run_council_with_progress,
-    run_debate_with_progress,
-    run_debate_streaming,
-    run_debate_parallel,
-)
-from cli.chat_session import run_chat_session
-
-from backend.config import COUNCIL_MODELS, CHAIRMAN_MODEL
-
+from cli.utils import DEFAULT_CONTEXT_TURNS
 
 app = typer.Typer(
     name="llm-council",
@@ -71,28 +68,32 @@ def chat(
 
 @app.command()
 def query(
-    question: Optional[str] = typer.Argument(
+    question: str | None = typer.Argument(
         None,
         help="The question to ask the council",
     ),
     simple: bool = typer.Option(
         False,
-        "--simple", "-s",
+        "--simple",
+        "-s",
         help="Simple output mode (just the final answer)",
     ),
     final_only: bool = typer.Option(
         False,
-        "--final-only", "-f",
+        "--final-only",
+        "-f",
         help="Show only the final answer (skip stages 1 & 2)",
     ),
     debate: bool = typer.Option(
         False,
-        "--debate", "-d",
+        "--debate",
+        "-d",
         help="Enable debate mode (models critique and defend positions)",
     ),
     rounds: int = typer.Option(
         2,
-        "--rounds", "-r",
+        "--rounds",
+        "-r",
         help="Number of debate rounds (default: 2 = initial + critique + defense)",
     ),
     stream: bool = typer.Option(
@@ -102,7 +103,8 @@ def query(
     ),
     parallel: bool = typer.Option(
         False,
-        "--parallel", "-p",
+        "--parallel",
+        "-p",
         help="Run models in parallel with progress spinners (debate mode only)",
     ),
     no_react: bool = typer.Option(
@@ -131,8 +133,7 @@ def query(
         question = typer.prompt("Enter your question")
 
     print_query_header(
-        question, COUNCIL_MODELS, CHAIRMAN_MODEL,
-        debate, rounds, stream, parallel, not no_react
+        question, COUNCIL_MODELS, CHAIRMAN_MODEL, debate, rounds, stream, parallel, not no_react
     )
 
     if debate:
@@ -157,6 +158,7 @@ def query(
         # If ReAct enabled, run ReAct synthesis separately
         if use_react and not stream and not parallel:
             from backend.council import build_react_context_debate
+
             context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
 
             if not simple and not final_only:
@@ -199,6 +201,7 @@ def query(
         # If ReAct enabled, run ReAct synthesis separately
         if use_react:
             from backend.council import build_react_context_ranking
+
             context = build_react_context_ranking(question, stage1, stage2)
 
             if not simple and not final_only:
@@ -238,8 +241,7 @@ def models():
         table.add_row("Member", model)
 
     table.add_row(
-        "[bold yellow]Chairman[/bold yellow]",
-        f"[bold yellow]{CHAIRMAN_MODEL}[/bold yellow]"
+        "[bold yellow]Chairman[/bold yellow]", f"[bold yellow]{CHAIRMAN_MODEL}[/bold yellow]"
     )
 
     console.print(table)
@@ -248,7 +250,7 @@ def models():
 
 @app.command()
 def interactive(
-    question: Optional[str] = typer.Argument(
+    question: str | None = typer.Argument(
         None,
         help="Optional initial question to ask",
     ),
@@ -261,6 +263,7 @@ def interactive(
         llm-council interactive "Start with this question"
     """
     from cli.tui import run_tui
+
     run_tui(query=question)
 
 

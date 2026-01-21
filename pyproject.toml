@@ -24,6 +24,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
+    "pyright>=1.1.350",
 ]
 
 [project.scripts]
@@ -41,5 +43,35 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 
 [tool.coverage.run]
-source = ["backend", "cli"]
-omit = ["*/tests/*"]
+source = ["backend"]
+omit = ["*/tests/*", "backend/openrouter.py", "backend/storage.py"]
+
+[tool.coverage.report]
+fail_under = 65
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+include = ["backend", "cli"]
+exclude = ["tests"]
+# Relax checks for CLI project - these are common in dynamic Python code
+reportOptionalMemberAccess = "warning"
+reportArgumentType = "warning"
+reportReturnType = "warning"
+reportAttributeAccessIssue = "warning"

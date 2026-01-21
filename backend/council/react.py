@@ -6,20 +6,19 @@ before synthesizing the final answer.
 """
 
 import re
-from typing import Any, AsyncGenerator, Dict, List
+from collections.abc import AsyncGenerator
+from typing import Any
 
 from ..config import CHAIRMAN_MODEL
 from ..openrouter import query_model_streaming
-from ..search import search_web, format_search_results
+from ..search import format_search_results, search_web
 from .parsers import parse_react_output
 from .prompts import build_react_prompt
 
 
 async def synthesize_with_react(
-    user_query: str,
-    context: str,
-    max_iterations: int = 3
-) -> AsyncGenerator[Dict[str, Any], None]:
+    user_query: str, context: str, max_iterations: int = 3
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     ReAct synthesis loop for chairman.
 
@@ -55,7 +54,11 @@ async def synthesize_with_react(
                 accumulated_content = event["content"]
             elif event["type"] == "error":
                 # On error, force synthesis with error message
-                yield {"type": "synthesis", "response": f"Error: {event['error']}", "model": CHAIRMAN_MODEL}
+                yield {
+                    "type": "synthesis",
+                    "response": f"Error: {event['error']}",
+                    "model": CHAIRMAN_MODEL,
+                }
                 return
 
         # Parse the response
@@ -66,7 +69,11 @@ async def synthesize_with_react(
 
         if action == "synthesize":
             # Extract synthesis content (everything after "Action: synthesize()")
-            synth_match = re.search(r'Action:\s*synthesize\s*\(\s*\)\s*\n*(.*)', accumulated_content, re.DOTALL | re.IGNORECASE)
+            synth_match = re.search(
+                r"Action:\s*synthesize\s*\(\s*\)\s*\n*(.*)",
+                accumulated_content,
+                re.DOTALL | re.IGNORECASE,
+            )
             synthesis_text = synth_match.group(1).strip() if synth_match else ""
 
             # If model didn't provide synthesis content, ask for it directly
@@ -74,7 +81,12 @@ async def synthesize_with_react(
                 yield {"type": "action", "tool": "synthesize", "args": None}
                 # Request just the synthesis
                 messages.append({"role": "assistant", "content": accumulated_content})
-                messages.append({"role": "user", "content": "Please provide your final synthesized answer now (no Thought/Action format, just the answer):"})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "Please provide your final synthesized answer now (no Thought/Action format, just the answer):",
+                    }
+                )
 
                 synthesis_text = ""
                 async for event in query_model_streaming(CHAIRMAN_MODEL, messages):
@@ -84,7 +96,11 @@ async def synthesize_with_react(
                     elif event["type"] == "done":
                         synthesis_text = event["content"]
 
-                yield {"type": "synthesis", "response": synthesis_text.strip(), "model": CHAIRMAN_MODEL}
+                yield {
+                    "type": "synthesis",
+                    "response": synthesis_text.strip(),
+                    "model": CHAIRMAN_MODEL,
+                }
                 return
 
             yield {"type": "action", "tool": "synthesize", "args": None}
@@ -105,16 +121,30 @@ async def synthesize_with_react(
 
             # Add to conversation for next iteration
             messages.append({"role": "assistant", "content": accumulated_content})
-            messages.append({"role": "user", "content": f"Observation: {observation}\n\nContinue your reasoning:"})
+            messages.append(
+                {
+                    "role": "user",
+                    "content": f"Observation: {observation}\n\nContinue your reasoning:",
+                }
+            )
 
         else:
             # Invalid or missing action - prompt to try again or synthesize
             if iteration < max_iterations:
                 messages.append({"role": "assistant", "content": accumulated_content})
-                messages.append({"role": "user", "content": "Please respond with a valid Action: either search_web(\"query\") or synthesize()"})
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": 'Please respond with a valid Action: either search_web("query") or synthesize()',
+                    }
+                )
             else:
                 # Max iterations reached, force synthesis
-                yield {"type": "synthesis", "response": accumulated_content, "model": CHAIRMAN_MODEL}
+                yield {
+                    "type": "synthesis",
+                    "response": accumulated_content,
+                    "model": CHAIRMAN_MODEL,
+                }
                 return
 
     # Max iterations reached without synthesize

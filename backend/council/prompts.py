@@ -5,7 +5,7 @@ All prompt construction logic is centralized here for easier maintenance.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 
 def get_date_context() -> str:
@@ -57,9 +57,7 @@ Now provide your evaluation and ranking:"""
 
 
 def build_chairman_prompt(
-    user_query: str,
-    stage1_results: List[Dict[str, Any]],
-    stage2_results: List[Dict[str, Any]]
+    user_query: str, stage1_results: list[dict[str, Any]], stage2_results: list[dict[str, Any]]
 ) -> str:
     """
     Build the Stage 3 chairman synthesis prompt.
@@ -72,15 +70,13 @@ def build_chairman_prompt(
     Returns:
         Complete chairman prompt
     """
-    stage1_text = "\n\n".join([
-        f"Model: {result['model']}\nResponse: {result['response']}"
-        for result in stage1_results
-    ])
+    stage1_text = "\n\n".join(
+        [f"Model: {result['model']}\nResponse: {result['response']}" for result in stage1_results]
+    )
 
-    stage2_text = "\n\n".join([
-        f"Model: {result['model']}\nRanking: {result['ranking']}"
-        for result in stage2_results
-    ])
+    stage2_text = "\n\n".join(
+        [f"Model: {result['model']}\nRanking: {result['ranking']}" for result in stage2_results]
+    )
 
     return f"""{get_date_context()}You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, and then ranked each other's responses.
 
@@ -118,11 +114,7 @@ Question: {user_query}
 Title:"""
 
 
-def build_critique_prompt(
-    user_query: str,
-    responses_text: str,
-    model: str
-) -> str:
+def build_critique_prompt(user_query: str, responses_text: str, model: str) -> str:
     """
     Build the debate critique round prompt.
 
@@ -161,11 +153,7 @@ Format your response as follows:
 (Continue for each model except yourself)"""
 
 
-def build_defense_prompt(
-    user_query: str,
-    original_response: str,
-    critiques_for_me: str
-) -> str:
+def build_defense_prompt(user_query: str, original_response: str, critiques_for_me: str) -> str:
     """
     Build the debate defense round prompt.
 
@@ -203,9 +191,7 @@ Format your response as follows:
 
 
 def build_debate_synthesis_prompt(
-    user_query: str,
-    rounds: List[Dict[str, Any]],
-    num_rounds: int
+    user_query: str, rounds: list[dict[str, Any]], num_rounds: int
 ) -> str:
     """
     Build the debate chairman synthesis prompt.
@@ -222,16 +208,16 @@ def build_debate_synthesis_prompt(
     transcript_parts = []
 
     for round_data in rounds:
-        round_num = round_data['round_number']
-        round_type = round_data['round_type']
+        round_num = round_data["round_number"]
+        round_type = round_data["round_type"]
 
-        transcript_parts.append(f"\n{'='*60}")
+        transcript_parts.append(f"\n{'=' * 60}")
         transcript_parts.append(f"ROUND {round_num}: {round_type.upper()}")
-        transcript_parts.append('='*60)
+        transcript_parts.append("=" * 60)
 
-        for response in round_data['responses']:
-            model = response['model']
-            content = response['response']
+        for response in round_data["responses"]:
+            model = response["model"]
+            content = response["response"]
             transcript_parts.append(f"\n**{model}:**\n{content}")
 
     debate_transcript = "\n".join(transcript_parts)
@@ -290,9 +276,7 @@ Begin your reasoning:"""
 
 
 def build_react_context_ranking(
-    user_query: str,
-    stage1_results: List[Dict[str, Any]],
-    stage2_results: List[Dict[str, Any]]
+    user_query: str, stage1_results: list[dict[str, Any]], stage2_results: list[dict[str, Any]]
 ) -> str:
     """
     Build context string for ReAct chairman from ranking mode results.
@@ -305,15 +289,13 @@ def build_react_context_ranking(
     Returns:
         Formatted context string
     """
-    stage1_text = "\n\n".join([
-        f"Model: {result['model']}\nResponse: {result['response']}"
-        for result in stage1_results
-    ])
+    stage1_text = "\n\n".join(
+        [f"Model: {result['model']}\nResponse: {result['response']}" for result in stage1_results]
+    )
 
-    stage2_text = "\n\n".join([
-        f"Model: {result['model']}\nRanking: {result['ranking']}"
-        for result in stage2_results
-    ])
+    stage2_text = "\n\n".join(
+        [f"Model: {result['model']}\nRanking: {result['ranking']}" for result in stage2_results]
+    )
 
     return f"""Original Question: {user_query}
 
@@ -325,9 +307,7 @@ STAGE 2 - Peer Rankings:
 
 
 def build_react_context_debate(
-    user_query: str,
-    rounds: List[Dict[str, Any]],
-    num_rounds: int
+    user_query: str, rounds: list[dict[str, Any]], num_rounds: int
 ) -> str:
     """
     Build context string for ReAct chairman from debate mode results.
@@ -343,16 +323,16 @@ def build_react_context_debate(
     transcript_parts = []
 
     for round_data in rounds:
-        round_num = round_data['round_number']
-        round_type = round_data['round_type']
+        round_num = round_data["round_number"]
+        round_type = round_data["round_type"]
 
-        transcript_parts.append(f"\n{'='*60}")
+        transcript_parts.append(f"\n{'=' * 60}")
         transcript_parts.append(f"ROUND {round_num}: {round_type.upper()}")
-        transcript_parts.append('='*60)
+        transcript_parts.append("=" * 60)
 
-        for response in round_data['responses']:
-            model = response['model']
-            content = response['response']
+        for response in round_data["responses"]:
+            model = response["model"]
+            content = response["response"]
             transcript_parts.append(f"\n**{model}:**\n{content}")
 
     debate_transcript = "\n".join(transcript_parts)
@@ -368,7 +348,7 @@ DEBATE TRANSCRIPT:
 {debate_transcript}"""
 
 
-def format_responses_for_critique(initial_responses: List[Dict[str, Any]]) -> str:
+def format_responses_for_critique(initial_responses: list[dict[str, Any]]) -> str:
     """
     Format initial responses for the critique round.
 
@@ -378,7 +358,6 @@ def format_responses_for_critique(initial_responses: List[Dict[str, Any]]) -> st
     Returns:
         Formatted string of all responses
     """
-    return "\n\n".join([
-        f"**{result['model']}:**\n{result['response']}"
-        for result in initial_responses
-    ])
+    return "\n\n".join(
+        [f"**{result['model']}:**\n{result['response']}" for result in initial_responses]
+    )

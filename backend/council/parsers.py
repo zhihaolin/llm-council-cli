@@ -5,10 +5,9 @@ Handles extraction of rankings, critiques, revised answers, and ReAct output par
 """
 
 import re
-from typing import List, Tuple
 
 
-def parse_ranking_from_text(ranking_text: str) -> List[str]:
+def parse_ranking_from_text(ranking_text: str) -> list[str]:
     """
     Parse the FINAL RANKING section from the model's response.
 
@@ -26,17 +25,17 @@ def parse_ranking_from_text(ranking_text: str) -> List[str]:
             ranking_section = parts[1]
             # Try to extract numbered list format (e.g., "1. Response A")
             # This pattern looks for: number, period, optional space, "Response X"
-            numbered_matches = re.findall(r'\d+\.\s*Response [A-Z]', ranking_section)
+            numbered_matches = re.findall(r"\d+\.\s*Response [A-Z]", ranking_section)
             if numbered_matches:
                 # Extract just the "Response X" part
-                return [re.search(r'Response [A-Z]', m).group() for m in numbered_matches]
+                return [re.search(r"Response [A-Z]", m).group() for m in numbered_matches]
 
             # Fallback: Extract all "Response X" patterns in order
-            matches = re.findall(r'Response [A-Z]', ranking_section)
+            matches = re.findall(r"Response [A-Z]", ranking_section)
             return matches
 
     # Fallback: try to find any "Response X" patterns in order
-    matches = re.findall(r'Response [A-Z]', ranking_text)
+    matches = re.findall(r"Response [A-Z]", ranking_text)
     return matches
 
 
@@ -61,10 +60,7 @@ def parse_revised_answer(defense_response: str) -> str:
     return defense_response
 
 
-def extract_critiques_for_model(
-    target_model: str,
-    critique_responses: List[dict]
-) -> str:
+def extract_critiques_for_model(target_model: str, critique_responses: list[dict]) -> str:
     """
     Extract all critiques directed at a specific model.
 
@@ -77,15 +73,15 @@ def extract_critiques_for_model(
     """
     critiques = []
     # Get just the model name without provider prefix for matching
-    target_name = target_model.split('/')[-1].lower()
+    target_name = target_model.split("/")[-1].lower()
 
     for response in critique_responses:
-        critic_model = response['model']
+        critic_model = response["model"]
         # Skip self-critiques (shouldn't exist, but just in case)
         if critic_model == target_model:
             continue
 
-        content = response['response']
+        content = response["response"]
 
         # Try to extract the section about this model
         # Look for "## Critique of [model]" pattern
@@ -109,7 +105,7 @@ def extract_critiques_for_model(
     return "\n\n".join(critiques)
 
 
-def parse_react_output(text: str) -> Tuple[str, str, str]:
+def parse_react_output(text: str) -> tuple[str, str, str]:
     """
     Parse ReAct output to extract Thought and Action.
 
@@ -126,15 +122,17 @@ def parse_react_output(text: str) -> Tuple[str, str, str]:
     action_args = None
 
     # Extract Thought section
-    thought_match = re.search(r'Thought:\s*(.+?)(?=\n\s*Action:|$)', text, re.DOTALL | re.IGNORECASE)
+    thought_match = re.search(
+        r"Thought:\s*(.+?)(?=\n\s*Action:|$)", text, re.DOTALL | re.IGNORECASE
+    )
     if thought_match:
         thought = thought_match.group(1).strip()
 
     # Extract Action section
-    action_match = re.search(r'Action:\s*(\w+)\s*\(([^)]*)\)', text, re.IGNORECASE)
+    action_match = re.search(r"Action:\s*(\w+)\s*\(([^)]*)\)", text, re.IGNORECASE)
     if action_match:
         action_name = action_match.group(1).lower()
-        args = action_match.group(2).strip().strip('"\'')
+        args = action_match.group(2).strip().strip("\"'")
 
         # Only recognize valid actions
         if action_name == "search_web":
@@ -145,7 +143,7 @@ def parse_react_output(text: str) -> Tuple[str, str, str]:
             action_args = None
     else:
         # Check for synthesize() without args
-        if re.search(r'Action:\s*synthesize\s*\(\s*\)', text, re.IGNORECASE):
+        if re.search(r"Action:\s*synthesize\s*\(\s*\)", text, re.IGNORECASE):
             action = "synthesize"
             action_args = None
 

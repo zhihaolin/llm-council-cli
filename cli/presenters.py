@@ -4,26 +4,25 @@ Presentation functions for CLI output.
 All print_* and display functions for Rich console output.
 """
 
-from typing import Dict, List, Any, Optional
-
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
-from rich.markdown import Markdown
 from rich.text import Text
 from rich.theme import Theme
 
 from cli.chat import CHAT_COMMANDS, format_chat_mode_line, suggest_chat_commands
 
-
-CHAT_THEME = Theme({
-    "chat.accent": "bold #5B8DEF",
-    "chat.prompt": "bold #5B8DEF",
-    "chat.meta": "dim",
-    "chat.command": "#E0B15A",
-    "chat.success": "green",
-    "chat.error": "bold red",
-})
+CHAT_THEME = Theme(
+    {
+        "chat.accent": "bold #5B8DEF",
+        "chat.prompt": "bold #5B8DEF",
+        "chat.meta": "dim",
+        "chat.command": "#E0B15A",
+        "chat.success": "green",
+        "chat.error": "bold red",
+    }
+)
 
 CHAT_BORDER_COLOR = "#5B8DEF"
 
@@ -51,13 +50,17 @@ def print_chat_banner(
         f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled)}"
     )
     console.print()
-    console.print(Panel(
-        body,
-        title="[chat.accent]Council Chat[/chat.accent]",
-        border_style=CHAT_BORDER_COLOR,
-        padding=(1, 2),
-    ))
-    console.print("[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /parallel, /stream, /react, /mode, /exit[/chat.meta]")
+    console.print(
+        Panel(
+            body,
+            title="[chat.accent]Council Chat[/chat.accent]",
+            border_style=CHAT_BORDER_COLOR,
+            padding=(1, 2),
+        )
+    )
+    console.print(
+        "[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /parallel, /stream, /react, /mode, /exit[/chat.meta]"
+    )
     console.print()
 
 
@@ -70,7 +73,9 @@ def print_chat_help() -> None:
     console.print("[chat.command]/new[/chat.command]     Start a new conversation")
     console.print("[chat.command]/debate on|off[/chat.command] Toggle debate mode")
     console.print("[chat.command]/rounds N[/chat.command] Set debate rounds")
-    console.print("[chat.command]/parallel on|off[/chat.command] Toggle parallel mode (debate only)")
+    console.print(
+        "[chat.command]/parallel on|off[/chat.command] Toggle parallel mode (debate only)"
+    )
     console.print("[chat.command]/stream on|off[/chat.command] Toggle streaming (debate only)")
     console.print("[chat.command]/react on|off[/chat.command] Toggle ReAct reasoning")
     console.print("[chat.command]/mode[/chat.command]    Show current mode")
@@ -124,12 +129,14 @@ def print_stage1(results: list) -> None:
         title = f"[bold blue]{model}[/bold blue]"
         if searched:
             title += " [dim]• searched[/dim]"
-        console.print(Panel(
-            Markdown(response),
-            title=title,
-            border_style="blue",
-            padding=(1, 2),
-        ))
+        console.print(
+            Panel(
+                Markdown(response),
+                title=title,
+                border_style="blue",
+                padding=(1, 2),
+            )
+        )
         console.print()
 
 
@@ -162,10 +169,12 @@ def print_stage2(results: list, label_to_model: dict, aggregate: list) -> None:
         parsed = result.get("parsed_ranking", [])
 
         # De-anonymize the parsed ranking for display
-        parsed_display = " → ".join([
-            label_to_model.get(label, label).split("/")[-1]  # Just model name, not provider
-            for label in parsed
-        ])
+        parsed_display = " → ".join(
+            [
+                label_to_model.get(label, label).split("/")[-1]  # Just model name, not provider
+                for label in parsed
+            ]
+        )
 
         console.print(f"  [bold]{model.split('/')[-1]}[/bold]: {parsed_display}")
 
@@ -175,12 +184,14 @@ def print_stage2(results: list, label_to_model: dict, aggregate: list) -> None:
 def print_stage3(result: dict) -> None:
     """Display Stage 3 results."""
     console.print("\n[bold cyan]━━━ STAGE 3: Chairman's Synthesis ━━━[/bold cyan]\n")
-    console.print(Panel(
-        Markdown(result["response"]),
-        title=f"[bold green]Final Answer • {result['model']}[/bold green]",
-        border_style="green",
-        padding=(1, 2),
-    ))
+    console.print(
+        Panel(
+            Markdown(result["response"]),
+            title=f"[bold green]Final Answer • {result['model']}[/bold green]",
+            border_style="green",
+            padding=(1, 2),
+        )
+    )
 
 
 def print_debate_round(round_data: dict, round_num: int) -> None:
@@ -214,27 +225,33 @@ def print_debate_round(round_data: dict, round_num: int) -> None:
         if searched:
             title += " [dim]• searched[/dim]"
 
-        console.print(Panel(
-            Markdown(response),
-            title=title,
-            border_style="blue",
-            padding=(1, 2),
-        ))
+        console.print(
+            Panel(
+                Markdown(response),
+                title=title,
+                border_style="blue",
+                padding=(1, 2),
+            )
+        )
         console.print()
 
 
 def print_debate_synthesis(synthesis: dict) -> None:
     """Display chairman's debate synthesis."""
     console.print("\n[bold cyan]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold cyan]\n")
-    console.print(Panel(
-        Markdown(synthesis["response"]),
-        title=f"[bold green]Final Answer • {synthesis['model']}[/bold green]",
-        border_style="green",
-        padding=(1, 2),
-    ))
+    console.print(
+        Panel(
+            Markdown(synthesis["response"]),
+            title=f"[bold green]Final Answer • {synthesis['model']}[/bold green]",
+            border_style="green",
+            padding=(1, 2),
+        )
+    )
 
 
-def build_model_panel(model: str, content: str, color: str = "blue", searched: bool = False) -> Panel:
+def build_model_panel(
+    model: str, content: str, color: str = "blue", searched: bool = False
+) -> Panel:
     """Build a panel with rendered markdown for a model response."""
     short_name = model.split("/")[-1]
     title = f"[bold {color}]{short_name}[/bold {color}]"
@@ -248,16 +265,25 @@ def build_model_panel(model: str, content: str, color: str = "blue", searched: b
     )
 
 
-def print_query_header(question: str, council_models: list, chairman_model: str,
-                       debate: bool, rounds: int, stream: bool, parallel: bool,
-                       react: bool) -> None:
+def print_query_header(
+    question: str,
+    council_models: list,
+    chairman_model: str,
+    debate: bool,
+    rounds: int,
+    stream: bool,
+    parallel: bool,
+    react: bool,
+) -> None:
     """Print the query header with mode information."""
     console.print()
-    console.print(Panel(
-        f"[bold]{question}[/bold]",
-        title="Query",
-        border_style="white",
-    ))
+    console.print(
+        Panel(
+            f"[bold]{question}[/bold]",
+            title="Query",
+            border_style="white",
+        )
+    )
     console.print()
     console.print(f"[dim]Council: {', '.join([m.split('/')[-1] for m in council_models])}[/dim]")
     console.print(f"[dim]Chairman: {chairman_model.split('/')[-1]}[/dim]")
@@ -279,10 +305,12 @@ def print_query_header(question: str, council_models: list, chairman_model: str,
 def print_user_question_panel(question: str) -> None:
     """Print a user question panel."""
     console.print()
-    console.print(Panel(
-        f"[bold]{question}[/bold]",
-        border_style=CHAT_BORDER_COLOR,
-    ))
+    console.print(
+        Panel(
+            f"[bold]{question}[/bold]",
+            border_style=CHAT_BORDER_COLOR,
+        )
+    )
     console.print()
 
 

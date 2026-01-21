@@ -1,8 +1,9 @@
 """Web search functionality using Tavily API."""
 
 import os
+from typing import Any
+
 import httpx
-from typing import Dict, Any
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TAVILY_API_URL = "https://api.tavily.com/search"
@@ -16,18 +17,15 @@ SEARCH_TOOL = {
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query to look up on the web"
-                }
+                "query": {"type": "string", "description": "The search query to look up on the web"}
             },
-            "required": ["query"]
-        }
-    }
+            "required": ["query"],
+        },
+    },
 }
 
 
-async def search_web(query: str, max_results: int = 5) -> Dict[str, Any]:
+async def search_web(query: str, max_results: int = 5) -> dict[str, Any]:
     """
     Search the web using Tavily API.
 
@@ -39,10 +37,7 @@ async def search_web(query: str, max_results: int = 5) -> Dict[str, Any]:
         Dict with 'results' list containing title, url, and content
     """
     if not TAVILY_API_KEY:
-        return {
-            "error": "TAVILY_API_KEY not configured",
-            "results": []
-        }
+        return {"error": "TAVILY_API_KEY not configured", "results": []}
 
     payload = {
         "api_key": TAVILY_API_KEY,
@@ -62,25 +57,21 @@ async def search_web(query: str, max_results: int = 5) -> Dict[str, Any]:
             # Format results for LLM consumption
             results = []
             for item in data.get("results", []):
-                results.append({
-                    "title": item.get("title", ""),
-                    "url": item.get("url", ""),
-                    "content": item.get("content", ""),
-                })
+                results.append(
+                    {
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                        "content": item.get("content", ""),
+                    }
+                )
 
-            return {
-                "answer": data.get("answer", ""),
-                "results": results
-            }
+            return {"answer": data.get("answer", ""), "results": results}
 
     except Exception as e:
-        return {
-            "error": str(e),
-            "results": []
-        }
+        return {"error": str(e), "results": []}
 
 
-def format_search_results(search_response: Dict[str, Any]) -> str:
+def format_search_results(search_response: dict[str, Any]) -> str:
     """
     Format search results as a string for inclusion in LLM context.
 

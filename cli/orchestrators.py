@@ -4,39 +4,34 @@ Orchestration functions for council and debate execution.
 Contains run_* functions that manage the execution flow with progress indicators.
 """
 
-import sys
 import shutil
-import asyncio
-from typing import Tuple, Optional, List, Dict, Any
+import sys
 
-from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.live import Live
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
-from rich.spinner import Spinner
-from rich.panel import Panel
 
-from cli.presenters import console, build_model_panel
-
+from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
 from backend.council import (
-    stage1_collect_responses,
-    stage2_collect_rankings,
-    stage3_synthesize_final,
     calculate_aggregate_rankings,
     debate_round_critique,
     debate_round_defense,
-    synthesize_debate,
-    run_debate_token_streaming,
     run_debate_council_streaming,
+    run_debate_token_streaming,
+    stage1_collect_responses,
+    stage2_collect_rankings,
+    stage3_synthesize_final,
+    synthesize_debate,
     synthesize_with_react,
 )
-from backend.config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from cli.presenters import build_model_panel, console
 
 
 async def run_react_synthesis(
-    user_query: str,
-    context: str,
-    header: str = "CHAIRMAN'S REASONING"
+    user_query: str, context: str, header: str = "CHAIRMAN'S REASONING"
 ) -> dict:
     """
     Run ReAct synthesis with streaming display.
@@ -75,9 +70,9 @@ async def run_react_synthesis(
             tool = event["tool"]
             args = event.get("args")
             if tool == "search_web":
-                console.print(f"[yellow]Action:[/yellow] search_web(\"{args}\")\n")
+                console.print(f'[yellow]Action:[/yellow] search_web("{args}")\n')
             elif tool == "synthesize":
-                console.print(f"[yellow]Action:[/yellow] synthesize()\n")
+                console.print("[yellow]Action:[/yellow] synthesize()\n")
                 # Next tokens will be synthesis content
                 in_synthesis_streaming = True
 
@@ -92,10 +87,7 @@ async def run_react_synthesis(
             if in_synthesis_streaming:
                 # Add newline after streaming
                 console.print()
-            synthesis_result = {
-                "model": event["model"],
-                "response": event["response"]
-            }
+            synthesis_result = {"model": event["model"], "response": event["response"]}
 
     return synthesis_result
 
@@ -119,8 +111,7 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
     ) as progress:
         # Stage 1
         task1 = progress.add_task(
-            f"[cyan]Stage 1: Querying {len(COUNCIL_MODELS)} models...",
-            total=None
+            f"[cyan]Stage 1: Querying {len(COUNCIL_MODELS)} models...", total=None
         )
         stage1_results = await stage1_collect_responses(query)
         progress.remove_task(task1)
@@ -132,10 +123,7 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
         console.print(f"[green]✓[/green] Stage 1 complete: {len(stage1_results)} responses")
 
         # Stage 2
-        task2 = progress.add_task(
-            "[cyan]Stage 2: Collecting peer rankings...",
-            total=None
-        )
+        task2 = progress.add_task("[cyan]Stage 2: Collecting peer rankings...", total=None)
         stage2_results, label_to_model = await stage2_collect_rankings(query, stage1_results)
         aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
         progress.remove_task(task2)
@@ -145,22 +133,26 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
         # Stage 3 (optional)
         stage3_result = None
         if not skip_synthesis:
-            task3 = progress.add_task(
-                f"[cyan]Stage 3: Chairman synthesizing...",
-                total=None
-            )
+            task3 = progress.add_task("[cyan]Stage 3: Chairman synthesizing...", total=None)
             stage3_result = await stage3_synthesize_final(query, stage1_results, stage2_results)
             progress.remove_task(task3)
 
-            console.print(f"[green]✓[/green] Stage 3 complete: Final answer ready")
+            console.print("[green]✓[/green] Stage 3 complete: Final answer ready")
 
-    return stage1_results, stage2_results, stage3_result, {
-        "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings,
-    }
+    return (
+        stage1_results,
+        stage2_results,
+        stage3_result,
+        {
+            "label_to_model": label_to_model,
+            "aggregate_rankings": aggregate_rankings,
+        },
+    )
 
 
-async def run_debate_with_progress(query: str, max_rounds: int = 2, skip_synthesis: bool = False) -> tuple:
+async def run_debate_with_progress(
+    query: str, max_rounds: int = 2, skip_synthesis: bool = False
+) -> tuple:
     """Run the debate council with progress indicators."""
     rounds = []
 
@@ -173,58 +165,44 @@ async def run_debate_with_progress(query: str, max_rounds: int = 2, skip_synthes
         # Round 1: Initial responses
         task = progress.add_task(
             f"[cyan]Round 1: Collecting initial responses from {len(COUNCIL_MODELS)} models...",
-            total=None
+            total=None,
         )
         initial_responses = await stage1_collect_responses(query)
         progress.remove_task(task)
 
         if len(initial_responses) < 2:
-            console.print("[red]Error: Not enough models responded for debate (need at least 2).[/red]")
+            console.print(
+                "[red]Error: Not enough models responded for debate (need at least 2).[/red]"
+            )
             return None, None
 
-        console.print(f"[green]✓[/green] Round 1 complete: {len(initial_responses)} initial responses")
+        console.print(
+            f"[green]✓[/green] Round 1 complete: {len(initial_responses)} initial responses"
+        )
 
-        rounds.append({
-            "round_number": 1,
-            "round_type": "initial",
-            "responses": initial_responses
-        })
+        rounds.append({"round_number": 1, "round_type": "initial", "responses": initial_responses})
 
         # Round 2: Critiques
-        task = progress.add_task(
-            "[yellow]Round 2: Models critiquing each other...",
-            total=None
-        )
+        task = progress.add_task("[yellow]Round 2: Models critiquing each other...", total=None)
         critique_responses = await debate_round_critique(query, initial_responses)
         progress.remove_task(task)
 
         console.print(f"[green]✓[/green] Round 2 complete: {len(critique_responses)} critiques")
 
-        rounds.append({
-            "round_number": 2,
-            "round_type": "critique",
-            "responses": critique_responses
-        })
+        rounds.append(
+            {"round_number": 2, "round_type": "critique", "responses": critique_responses}
+        )
 
         # Round 3: Defense/Revision
-        task = progress.add_task(
-            "[magenta]Round 3: Models defending and revising...",
-            total=None
-        )
-        defense_responses = await debate_round_defense(
-            query,
-            initial_responses,
-            critique_responses
-        )
+        task = progress.add_task("[magenta]Round 3: Models defending and revising...", total=None)
+        defense_responses = await debate_round_defense(query, initial_responses, critique_responses)
         progress.remove_task(task)
 
-        console.print(f"[green]✓[/green] Round 3 complete: {len(defense_responses)} revised responses")
+        console.print(
+            f"[green]✓[/green] Round 3 complete: {len(defense_responses)} revised responses"
+        )
 
-        rounds.append({
-            "round_number": 3,
-            "round_type": "defense",
-            "responses": defense_responses
-        })
+        rounds.append({"round_number": 3, "round_type": "defense", "responses": defense_responses})
 
         # Additional rounds if requested
         current_responses = defense_responses
@@ -232,57 +210,60 @@ async def run_debate_with_progress(query: str, max_rounds: int = 2, skip_synthes
             if round_num % 2 == 0:
                 # Even rounds: critique
                 task = progress.add_task(
-                    f"[yellow]Round {round_num}: Additional critiques...",
-                    total=None
+                    f"[yellow]Round {round_num}: Additional critiques...", total=None
                 )
                 critique_responses = await debate_round_critique(query, current_responses)
                 progress.remove_task(task)
 
-                console.print(f"[green]✓[/green] Round {round_num} complete: {len(critique_responses)} critiques")
+                console.print(
+                    f"[green]✓[/green] Round {round_num} complete: {len(critique_responses)} critiques"
+                )
 
-                rounds.append({
-                    "round_number": round_num,
-                    "round_type": "critique",
-                    "responses": critique_responses
-                })
+                rounds.append(
+                    {
+                        "round_number": round_num,
+                        "round_type": "critique",
+                        "responses": critique_responses,
+                    }
+                )
             else:
                 # Odd rounds: defense
                 task = progress.add_task(
-                    f"[magenta]Round {round_num}: Defense and revision...",
-                    total=None
+                    f"[magenta]Round {round_num}: Defense and revision...", total=None
                 )
                 defense_responses = await debate_round_defense(
-                    query,
-                    current_responses,
-                    critique_responses
+                    query, current_responses, critique_responses
                 )
                 progress.remove_task(task)
 
-                console.print(f"[green]✓[/green] Round {round_num} complete: {len(defense_responses)} revised responses")
+                console.print(
+                    f"[green]✓[/green] Round {round_num} complete: {len(defense_responses)} revised responses"
+                )
 
-                rounds.append({
-                    "round_number": round_num,
-                    "round_type": "defense",
-                    "responses": defense_responses
-                })
+                rounds.append(
+                    {
+                        "round_number": round_num,
+                        "round_type": "defense",
+                        "responses": defense_responses,
+                    }
+                )
                 current_responses = defense_responses
 
         # Chairman synthesis (optional)
         synthesis = None
         if not skip_synthesis:
-            task = progress.add_task(
-                "[green]Chairman synthesizing debate...",
-                total=None
-            )
+            task = progress.add_task("[green]Chairman synthesizing debate...", total=None)
             synthesis = await synthesize_debate(query, rounds, len(rounds))
             progress.remove_task(task)
 
-            console.print(f"[green]✓[/green] Chairman synthesis complete")
+            console.print("[green]✓[/green] Chairman synthesis complete")
 
     return rounds, synthesis
 
 
-async def run_debate_streaming(query: str, max_rounds: int = 2, skip_synthesis: bool = False) -> tuple:
+async def run_debate_streaming(
+    query: str, max_rounds: int = 2, skip_synthesis: bool = False
+) -> tuple:
     """
     Run debate with token-by-token streaming.
 
@@ -341,7 +322,9 @@ async def run_debate_streaming(query: str, max_rounds: int = 2, skip_synthesis: 
         if event_type == "round_start":
             round_num = event["round_number"]
             current_round_type = event["round_type"]
-            color, label = type_styles.get(current_round_type, ("white", current_round_type.title()))
+            color, label = type_styles.get(
+                current_round_type, ("white", current_round_type.title())
+            )
             console.print()
             console.print(f"[bold {color}]━━━ ROUND {round_num}: {label} ━━━[/bold {color}]")
             console.print()
@@ -366,12 +349,14 @@ async def run_debate_streaming(query: str, max_rounds: int = 2, skip_synthesis: 
 
         elif event_type == "tool_call":
             # Model is calling a tool (e.g., web search)
-            tool_name = event.get("tool", "tool")
             # Clear current streaming output and show search indicator
             console.print()
             track_output("\n")
             clear_streaming_output()
-            console.print(f"[grey62]{current_model.split('/')[-1]}: [italic]searching...[/italic][/grey62]", end="")
+            console.print(
+                f"[grey62]{current_model.split('/')[-1]}: [italic]searching...[/italic][/grey62]",
+                end="",
+            )
             line_count = 1
             current_col = 0
 
@@ -399,19 +384,23 @@ async def run_debate_streaming(query: str, max_rounds: int = 2, skip_synthesis: 
         elif event_type == "model_error":
             console.print()
             clear_streaming_output()
-            console.print(Panel(
-                f"[bold red]Error: {event.get('error', 'Unknown')}[/bold red]",
-                title=f"[bold red]{current_model.split('/')[-1]}[/bold red]",
-                border_style="red",
-            ))
+            console.print(
+                Panel(
+                    f"[bold red]Error: {event.get('error', 'Unknown')}[/bold red]",
+                    title=f"[bold red]{current_model.split('/')[-1]}[/bold red]",
+                    border_style="red",
+                )
+            )
             console.print()
 
         elif event_type == "round_complete":
-            rounds_data.append({
-                "round_number": event["round_number"],
-                "round_type": event["round_type"],
-                "responses": event["responses"],
-            })
+            rounds_data.append(
+                {
+                    "round_number": event["round_number"],
+                    "round_type": event["round_type"],
+                    "responses": event["responses"],
+                }
+            )
 
         elif event_type == "synthesis_start":
             console.print()
@@ -447,7 +436,9 @@ async def run_debate_streaming(query: str, max_rounds: int = 2, skip_synthesis: 
     return rounds_data, synthesis_data
 
 
-async def run_debate_parallel(query: str, max_rounds: int = 2, skip_synthesis: bool = False) -> tuple:
+async def run_debate_parallel(
+    query: str, max_rounds: int = 2, skip_synthesis: bool = False
+) -> tuple:
     """
     Run debate with parallel execution and progress spinners.
 
@@ -498,10 +489,14 @@ async def run_debate_parallel(query: str, max_rounds: int = 2, skip_synthesis: b
             round_type, "white"
         )
         console.print()
-        console.print(f"[bold {color}]━━━ ROUND {round_num}: {round_type.upper()} ━━━[/bold {color}]")
+        console.print(
+            f"[bold {color}]━━━ ROUND {round_num}: {round_type.upper()} ━━━[/bold {color}]"
+        )
         console.print()
 
-    async for event in run_debate_council_streaming(query, max_rounds, skip_synthesis=skip_synthesis):
+    async for event in run_debate_council_streaming(
+        query, max_rounds, skip_synthesis=skip_synthesis
+    ):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -520,7 +515,9 @@ async def run_debate_parallel(query: str, max_rounds: int = 2, skip_synthesis: b
             model_status[model] = "querying"
             # Start or update live display
             if live_display is None:
-                live_display = Live(build_status_table(), console=console, refresh_per_second=10, transient=True)
+                live_display = Live(
+                    build_status_table(), console=console, refresh_per_second=10, transient=True
+                )
                 live_display.start()
             else:
                 live_display.update(build_status_table())
@@ -564,11 +561,13 @@ async def run_debate_parallel(query: str, max_rounds: int = 2, skip_synthesis: b
                 console.print()
 
             responses = event.get("responses", [])
-            rounds_data.append({
-                "round_number": current_round_num,
-                "round_type": current_round_type,
-                "responses": responses,
-            })
+            rounds_data.append(
+                {
+                    "round_number": current_round_num,
+                    "round_type": current_round_type,
+                    "responses": responses,
+                }
+            )
 
         elif event_type == "synthesis_start":
             console.print()
@@ -578,7 +577,9 @@ async def run_debate_parallel(query: str, max_rounds: int = 2, skip_synthesis: b
             # Show spinner for chairman
             model_status.clear()
             model_status[CHAIRMAN_MODEL] = "querying"
-            live_display = Live(build_status_table(), console=console, refresh_per_second=10, transient=True)
+            live_display = Live(
+                build_status_table(), console=console, refresh_per_second=10, transient=True
+            )
             live_display.start()
 
         elif event_type == "synthesis_complete":

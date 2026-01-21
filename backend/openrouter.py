@@ -2,15 +2,16 @@
 
 import asyncio
 import json
-import httpx
-from typing import List, Dict, Any, Optional, Callable, AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
+from typing import Any
+
+import httpx
 
 from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
 
-
 # Shared client for connection reuse
-_shared_client: Optional[httpx.AsyncClient] = None
+_shared_client: httpx.AsyncClient | None = None
 _client_lock = asyncio.Lock()
 
 # Default timeout for model queries
@@ -51,10 +52,8 @@ async def shared_client_context():
 
 
 async def query_model(
-    model: str,
-    messages: List[Dict[str, str]],
-    timeout: float = 120.0
-) -> Optional[Dict[str, Any]]:
+    model: str, messages: list[dict[str, str]], timeout: float = 120.0
+) -> dict[str, Any] | None:
     """
     Query a single model via OpenRouter API.
 
@@ -78,19 +77,15 @@ async def query_model(
 
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                OPENROUTER_API_URL,
-                headers=headers,
-                json=payload
-            )
+            response = await client.post(OPENROUTER_API_URL, headers=headers, json=payload)
             response.raise_for_status()
 
             data = response.json()
-            message = data['choices'][0]['message']
+            message = data["choices"][0]["message"]
 
             return {
-                'content': message.get('content'),
-                'reasoning_details': message.get('reasoning_details')
+                "content": message.get("content"),
+                "reasoning_details": message.get("reasoning_details"),
             }
 
     except Exception as e:
@@ -99,10 +94,8 @@ async def query_model(
 
 
 async def query_model_streaming(
-    model: str,
-    messages: List[Dict[str, str]],
-    timeout: float = 120.0
-) -> AsyncGenerator[Dict[str, Any], None]:
+    model: str, messages: list[dict[str, str]], timeout: float = 120.0
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     Query a model with streaming response.
 
@@ -132,10 +125,7 @@ async def query_model_streaming(
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             async with client.stream(
-                "POST",
-                OPENROUTER_API_URL,
-                headers=headers,
-                json=payload
+                "POST", OPENROUTER_API_URL, headers=headers, json=payload
             ) as response:
                 response.raise_for_status()
 
@@ -170,12 +160,12 @@ async def query_model_streaming(
 
 async def query_model_streaming_with_tools(
     model: str,
-    messages: List[Dict[str, Any]],
-    tools: List[Dict[str, Any]],
-    tool_executor: Callable[[str, Dict[str, Any]], Any],
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    tool_executor: Callable[[str, dict[str, Any]], Any],
     timeout: float = 120.0,
-    max_tool_calls: int = 3
-) -> AsyncGenerator[Dict[str, Any], None]:
+    max_tool_calls: int = 3,
+) -> AsyncGenerator[dict[str, Any], None]:
     """
     Query a model with streaming response AND tool calling support.
 
@@ -217,10 +207,7 @@ async def query_model_streaming_with_tools(
                 tool_calls_buffer = {}  # id -> {name, arguments}
 
                 async with client.stream(
-                    "POST",
-                    OPENROUTER_API_URL,
-                    headers=headers,
-                    json=payload
+                    "POST", OPENROUTER_API_URL, headers=headers, json=payload
                 ) as response:
                     response.raise_for_status()
 
@@ -258,7 +245,7 @@ async def query_model_streaming_with_tools(
                                         tool_calls_buffer[key] = {
                                             "id": None,
                                             "name": "",
-                                            "arguments": ""
+                                            "arguments": "",
                                         }
 
                                     # Capture id from first chunk
@@ -287,16 +274,20 @@ async def query_model_streaming_with_tools(
                     for key, tc_data in tool_calls_buffer.items():
                         tool_name = tc_data["name"]
                         try:
-                            tool_args = json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                            tool_args = (
+                                json.loads(tc_data["arguments"]) if tc_data["arguments"] else {}
+                            )
                         except json.JSONDecodeError:
                             tool_args = {}
 
                         tool_call_id = tc_data["id"] or f"call_{key}"
-                        assistant_msg["tool_calls"].append({
-                            "id": tool_call_id,
-                            "type": "function",
-                            "function": {"name": tool_name, "arguments": json.dumps(tool_args)}
-                        })
+                        assistant_msg["tool_calls"].append(
+                            {
+                                "id": tool_call_id,
+                                "type": "function",
+                                "function": {"name": tool_name, "arguments": json.dumps(tool_args)},
+                            }
+                        )
 
                         # Yield tool call event
                         yield {"type": "tool_call", "tool": tool_name, "args": tool_args}
@@ -308,20 +299,26 @@ async def query_model_streaming_with_tools(
                         except Exception as e:
                             tool_result = f"Error executing tool: {e}"
 
-                        yield {"type": "tool_result", "tool": tool_name, "result": tool_result[:200]}
-
-                        tool_calls_made.append({
+                        yield {
+                            "type": "tool_result",
                             "tool": tool_name,
-                            "args": tool_args,
-                            "result_preview": tool_result[:200] + "..." if len(tool_result) > 200 else tool_result
-                        })
+                            "result": tool_result[:200],
+                        }
+
+                        tool_calls_made.append(
+                            {
+                                "tool": tool_name,
+                                "args": tool_args,
+                                "result_preview": tool_result[:200] + "..."
+                                if len(tool_result) > 200
+                                else tool_result,
+                            }
+                        )
 
                         # Queue tool result to add to conversation
-                        tool_results_to_add.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call_id,
-                            "content": tool_result
-                        })
+                        tool_results_to_add.append(
+                            {"role": "tool", "tool_call_id": tool_call_id, "content": tool_result}
+                        )
 
                     # Add assistant message with all tool calls, then all tool results
                     conversation.append(assistant_msg)
@@ -342,12 +339,12 @@ async def query_model_streaming_with_tools(
 
 async def query_model_with_tools(
     model: str,
-    messages: List[Dict[str, Any]],
-    tools: List[Dict[str, Any]],
-    tool_executor: Callable[[str, Dict[str, Any]], Any],
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    tool_executor: Callable[[str, dict[str, Any]], Any],
     timeout: float = 120.0,
-    max_tool_calls: int = 10
-) -> Optional[Dict[str, Any]]:
+    max_tool_calls: int = 10,
+) -> dict[str, Any] | None:
     """
     Query a model with tool calling support.
 
@@ -380,24 +377,20 @@ async def query_model_with_tools(
             }
 
             try:
-                response = await client.post(
-                    OPENROUTER_API_URL,
-                    headers=headers,
-                    json=payload
-                )
+                response = await client.post(OPENROUTER_API_URL, headers=headers, json=payload)
                 response.raise_for_status()
                 data = response.json()
-                message = data['choices'][0]['message']
+                message = data["choices"][0]["message"]
 
                 # Check if model wants to call a tool
-                if message.get('tool_calls'):
+                if message.get("tool_calls"):
                     # Add assistant message with tool calls
                     conversation.append(message)
 
                     # Process each tool call
-                    for tool_call in message['tool_calls']:
-                        tool_name = tool_call['function']['name']
-                        tool_args = json.loads(tool_call['function']['arguments'])
+                    for tool_call in message["tool_calls"]:
+                        tool_name = tool_call["function"]["name"]
+                        tool_args = json.loads(tool_call["function"]["arguments"])
 
                         # Execute the tool
                         try:
@@ -406,27 +399,33 @@ async def query_model_with_tools(
                         except Exception as e:
                             tool_result = f"Error executing tool: {e}"
 
-                        tool_calls_made.append({
-                            "tool": tool_name,
-                            "args": tool_args,
-                            "result_preview": tool_result[:200] + "..." if len(tool_result) > 200 else tool_result
-                        })
+                        tool_calls_made.append(
+                            {
+                                "tool": tool_name,
+                                "args": tool_args,
+                                "result_preview": tool_result[:200] + "..."
+                                if len(tool_result) > 200
+                                else tool_result,
+                            }
+                        )
 
                         # Add tool result to conversation
-                        conversation.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call['id'],
-                            "content": tool_result
-                        })
+                        conversation.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call["id"],
+                                "content": tool_result,
+                            }
+                        )
 
                     # Continue loop to get next response
                     continue
 
                 # No tool calls - we have the final response
                 return {
-                    'content': message.get('content'),
-                    'reasoning_details': message.get('reasoning_details'),
-                    'tool_calls_made': tool_calls_made
+                    "content": message.get("content"),
+                    "reasoning_details": message.get("reasoning_details"),
+                    "tool_calls_made": tool_calls_made,
                 }
 
             except Exception as e:
@@ -435,15 +434,14 @@ async def query_model_with_tools(
 
     # Max tool calls reached
     return {
-        'content': "Max tool calls reached without final response.",
-        'tool_calls_made': tool_calls_made
+        "content": "Max tool calls reached without final response.",
+        "tool_calls_made": tool_calls_made,
     }
 
 
 async def query_models_parallel(
-    models: List[str],
-    messages: List[Dict[str, str]]
-) -> Dict[str, Optional[Dict[str, Any]]]:
+    models: list[str], messages: list[dict[str, str]]
+) -> dict[str, dict[str, Any] | None]:
     """
     Query multiple models in parallel.
 

@@ -5,15 +5,14 @@ Calculates aggregate rankings from peer evaluations.
 """
 
 from collections import defaultdict
-from typing import Any, Dict, List
+from typing import Any
 
 from .parsers import parse_ranking_from_text
 
 
 def calculate_aggregate_rankings(
-    stage2_results: List[Dict[str, Any]],
-    label_to_model: Dict[str, str]
-) -> List[Dict[str, Any]]:
+    stage2_results: list[dict[str, Any]], label_to_model: dict[str, str]
+) -> list[dict[str, Any]]:
     """
     Calculate aggregate rankings across all models.
 
@@ -28,7 +27,7 @@ def calculate_aggregate_rankings(
     model_positions = defaultdict(list)
 
     for ranking in stage2_results:
-        ranking_text = ranking['ranking']
+        ranking_text = ranking["ranking"]
 
         # Parse the ranking from the structured format
         parsed_ranking = parse_ranking_from_text(ranking_text)
@@ -43,13 +42,15 @@ def calculate_aggregate_rankings(
     for model, positions in model_positions.items():
         if positions:
             avg_rank = sum(positions) / len(positions)
-            aggregate.append({
-                "model": model,
-                "average_rank": round(avg_rank, 2),
-                "rankings_count": len(positions)
-            })
+            aggregate.append(
+                {
+                    "model": model,
+                    "average_rank": round(avg_rank, 2),
+                    "rankings_count": len(positions),
+                }
+            )
 
     # Sort by average rank (lower is better)
-    aggregate.sort(key=lambda x: x['average_rank'])
+    aggregate.sort(key=lambda x: x["average_rank"])
 
     return aggregate
