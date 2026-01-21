@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "llm-council"
 version = "0.1.0"
@@ -28,8 +32,8 @@ llm-council = "cli.main:app"
 [tool.uv]
 package = true
 
-[tool.setuptools.packages.find]
-include = ["cli*", "backend*"]
+[tool.hatch.build.targets.wheel]
+packages = ["cli", "backend"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
