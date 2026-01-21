@@ -956,7 +956,8 @@ Format your response as follows:
 
 async def run_debate_council_streaming(
     user_query: str,
-    max_rounds: int = 2
+    max_rounds: int = 2,
+    skip_synthesis: bool = False
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Stream the complete debate flow, yielding events as each model completes.
@@ -964,6 +965,7 @@ async def run_debate_council_streaming(
     Args:
         user_query: The user's question
         max_rounds: Number of debate rounds (2 = initial + critique + defense)
+        skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
 
     Yields:
         {'type': 'round_start', 'round_number': int, 'round_type': str}
@@ -1127,12 +1129,12 @@ async def run_debate_council_streaming(
 
         round_num += 1
 
-    # Chairman synthesis
-    yield {"type": "synthesis_start"}
-
-    synthesis = await synthesize_debate(user_query, rounds, len(rounds))
-
-    yield {"type": "synthesis_complete", "synthesis": synthesis}
+    # Chairman synthesis (skip if using ReAct mode)
+    synthesis = None
+    if not skip_synthesis:
+        yield {"type": "synthesis_start"}
+        synthesis = await synthesize_debate(user_query, rounds, len(rounds))
+        yield {"type": "synthesis_complete", "synthesis": synthesis}
 
     # Final complete event with all data
     yield {"type": "complete", "rounds": rounds, "synthesis": synthesis}
@@ -1140,7 +1142,8 @@ async def run_debate_council_streaming(
 
 async def run_debate_token_streaming(
     user_query: str,
-    max_rounds: int = 2
+    max_rounds: int = 2,
+    skip_synthesis: bool = False
 ) -> AsyncGenerator[Dict[str, Any], None]:
     """
     Stream debate with token-level streaming, one model at a time.
@@ -1148,6 +1151,7 @@ async def run_debate_token_streaming(
     Args:
         user_query: The user's question
         max_rounds: Number of debate rounds (2 = initial + critique + defense)
+        skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
 
     Yields:
         {'type': 'round_start', 'round_number': int, 'round_type': str}
@@ -1402,20 +1406,22 @@ Format your response as follows:
                 "responses": defense_responses
             })
 
-    # Chairman synthesis with streaming
-    yield {"type": "synthesis_start"}
+    # Chairman synthesis with streaming (skip if using ReAct mode)
+    synthesis = None
+    if not skip_synthesis:
+        yield {"type": "synthesis_start"}
 
-    debate_transcript = []
-    for round_data in rounds:
-        round_num = round_data['round_number']
-        round_type = round_data['round_type']
-        debate_transcript.append(f"\n{'='*60}")
-        debate_transcript.append(f"ROUND {round_num}: {round_type.upper()}")
-        debate_transcript.append('='*60)
-        for resp in round_data['responses']:
-            debate_transcript.append(f"\n**{resp['model']}:**\n{resp['response']}")
+        debate_transcript = []
+        for round_data in rounds:
+            round_num = round_data['round_number']
+            round_type = round_data['round_type']
+            debate_transcript.append(f"\n{'='*60}")
+            debate_transcript.append(f"ROUND {round_num}: {round_type.upper()}")
+            debate_transcript.append('='*60)
+            for resp in round_data['responses']:
+                debate_transcript.append(f"\n**{resp['model']}:**\n{resp['response']}")
 
-    chairman_prompt = f"""{get_date_context()}You are the Chairman of an LLM Council. Multiple AI models have participated in a structured debate to answer a user's question. The debate consisted of {len(rounds)} rounds:
+        chairman_prompt = f"""{get_date_context()}You are the Chairman of an LLM Council. Multiple AI models have participated in a structured debate to answer a user's question. The debate consisted of {len(rounds)} rounds:
 
 1. **Initial Responses**: Each model provided their initial answer
 2. **Critiques**: Each model critically evaluated the other models' responses
@@ -1435,18 +1441,19 @@ Your task as Chairman is to synthesize all of this debate into a single, compreh
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom after deliberation:"""
 
-    messages = [{"role": "user", "content": chairman_prompt}]
-    synthesis_content = ""
+        messages = [{"role": "user", "content": chairman_prompt}]
+        synthesis_content = ""
 
-    async for event in query_model_streaming(CHAIRMAN_MODEL, messages):
-        if event["type"] == "token":
-            synthesis_content += event["content"]
-            yield {"type": "synthesis_token", "content": event["content"]}
-        elif event["type"] == "error":
-            synthesis_content = f"Error: {event['error']}"
+        async for event in query_model_streaming(CHAIRMAN_MODEL, messages):
+            if event["type"] == "token":
+                synthesis_content += event["content"]
+                yield {"type": "synthesis_token", "content": event["content"]}
+            elif event["type"] == "error":
+                synthesis_content = f"Error: {event['error']}"
 
-    synthesis = {"model": CHAIRMAN_MODEL, "response": synthesis_content}
-    yield {"type": "synthesis_complete", "synthesis": synthesis}
+        synthesis = {"model": CHAIRMAN_MODEL, "response": synthesis_content}
+        yield {"type": "synthesis_complete", "synthesis": synthesis}
+
     yield {"type": "complete", "rounds": rounds, "synthesis": synthesis}
 
 
@@ -1659,11 +1666,26 @@ async def synthesize_with_react(
 
         if action == "synthesize":
             # Extract synthesis content (everything after "Action: synthesize()")
-            synth_match = re.search(r'Action:\s*synthesize\s*\(\s*\)\s*\n+(.*)', accumulated_content, re.DOTALL | re.IGNORECASE)
-            if synth_match:
-                synthesis_text = synth_match.group(1).strip()
-            else:
-                synthesis_text = accumulated_content
+            synth_match = re.search(r'Action:\s*synthesize\s*\(\s*\)\s*\n*(.*)', accumulated_content, re.DOTALL | re.IGNORECASE)
+            synthesis_text = synth_match.group(1).strip() if synth_match else ""
+
+            # If model didn't provide synthesis content, ask for it directly
+            if not synthesis_text:
+                yield {"type": "action", "tool": "synthesize", "args": None}
+                # Request just the synthesis
+                messages.append({"role": "assistant", "content": accumulated_content})
+                messages.append({"role": "user", "content": "Please provide your final synthesized answer now (no Thought/Action format, just the answer):"})
+
+                synthesis_text = ""
+                async for event in query_model_streaming(CHAIRMAN_MODEL, messages):
+                    if event["type"] == "token":
+                        synthesis_text += event["content"]
+                        yield {"type": "token", "content": event["content"]}
+                    elif event["type"] == "done":
+                        synthesis_text = event["content"]
+
+                yield {"type": "synthesis", "response": synthesis_text.strip(), "model": CHAIRMAN_MODEL}
+                return
 
             yield {"type": "action", "tool": "synthesize", "args": None}
             yield {"type": "synthesis", "response": synthesis_text, "model": CHAIRMAN_MODEL}

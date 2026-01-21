@@ -66,14 +66,14 @@ def format_chat_mode_line(
     if debate_enabled:
         mode_str = f"Debate ({debate_rounds} rounds)"
         if parallel_enabled:
-            mode_str += " [parallel]"
+            mode_str += r" \[parallel]"
         elif stream_enabled:
-            mode_str += " [streaming]"
+            mode_str += r" \[streaming]"
     else:
         mode_str = "Council (ranking)"
 
     if react_enabled:
-        mode_str += " [react]"
+        mode_str += r" \[react]"
 
     return (
         "[chat.meta]Mode:[/chat.meta] "

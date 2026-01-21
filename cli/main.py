@@ -95,7 +95,7 @@ def print_chat_banner(
         border_style=CHAT_BORDER_COLOR,
         padding=(1, 2),
     ))
-    console.print("[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /stream, /mode, /exit[/chat.meta]")
+    console.print("[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /parallel, /stream, /react, /mode, /exit[/chat.meta]")
     console.print()
 
 
@@ -108,7 +108,9 @@ def print_chat_help() -> None:
     console.print("[chat.command]/new[/chat.command]     Start a new conversation")
     console.print("[chat.command]/debate on|off[/chat.command] Toggle debate mode")
     console.print("[chat.command]/rounds N[/chat.command] Set debate rounds")
+    console.print("[chat.command]/parallel on|off[/chat.command] Toggle parallel mode (debate only)")
     console.print("[chat.command]/stream on|off[/chat.command] Toggle streaming (debate only)")
+    console.print("[chat.command]/react on|off[/chat.command] Toggle ReAct reasoning")
     console.print("[chat.command]/mode[/chat.command]    Show current mode")
     console.print("[chat.command]/exit[/chat.command]    Exit chat")
     console.print()
@@ -297,7 +299,8 @@ async def run_react_synthesis(
     """
     Run ReAct synthesis with streaming display.
 
-    Displays the reasoning trace as it streams, then shows the final synthesis.
+    Shows the reasoning trace (thought/action/observation) without streaming,
+    then streams the final synthesis content.
 
     Args:
         user_query: Original user question
@@ -312,52 +315,21 @@ async def run_react_synthesis(
     console.print(f"\n[bold cyan]━━━ {header} ━━━[/bold cyan]\n")
 
     synthesis_result = None
-    current_text = ""
-    terminal_width = console.width or 80
-
-    # Track lines for clearing streaming output
-    line_count = 0
-    current_col = 0
-
-    def track_output(text: str):
-        """Track line count including terminal wrapping."""
-        nonlocal line_count, current_col
-        for char in text:
-            if char == "\n":
-                line_count += 1
-                current_col = 0
-            else:
-                current_col += 1
-                if current_col >= terminal_width:
-                    line_count += 1
-                    current_col = 0
-
-    def clear_streaming():
-        """Clear the streamed text."""
-        nonlocal line_count, current_col
-        if line_count > 0:
-            sys.stdout.write(f"\033[{line_count}A\033[J")
-            sys.stdout.flush()
-        line_count = 0
-        current_col = 0
+    in_synthesis_streaming = False
 
     async for event in synthesize_with_react(user_query, context):
         event_type = event["type"]
 
         if event_type == "token":
-            # Stream tokens in dim text
-            token = event["content"]
-            sys.stdout.write(f"\033[2m{token}\033[0m")
-            sys.stdout.flush()
-            track_output(token)
-            current_text += token
+            # Only stream tokens during synthesis phase (after empty synthesize())
+            if in_synthesis_streaming:
+                token = event["content"]
+                sys.stdout.write(f"\033[2m{token}\033[0m")
+                sys.stdout.flush()
 
         elif event_type == "thought":
-            # After streaming completes, show formatted thought
-            clear_streaming()
             thought = event["content"]
             console.print(f"[cyan]Thought:[/cyan] {thought}\n")
-            current_text = ""
 
         elif event_type == "action":
             tool = event["tool"]
@@ -366,9 +338,10 @@ async def run_react_synthesis(
                 console.print(f"[yellow]Action:[/yellow] search_web(\"{args}\")\n")
             elif tool == "synthesize":
                 console.print(f"[yellow]Action:[/yellow] synthesize()\n")
+                # Next tokens will be synthesis content
+                in_synthesis_streaming = True
 
         elif event_type == "observation":
-            # Show observation in dim text
             observation = event["content"]
             # Truncate long observations
             if len(observation) > 500:
@@ -376,8 +349,9 @@ async def run_react_synthesis(
             console.print(f"[dim]Observation: {observation}[/dim]\n")
 
         elif event_type == "synthesis":
-            # Clear any remaining streaming text
-            clear_streaming()
+            if in_synthesis_streaming:
+                # Add newline after streaming
+                console.print()
             synthesis_result = {
                 "model": event["model"],
                 "response": event["response"]
@@ -569,20 +543,22 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         console.print()
 
         if debate_enabled:
-            # Determine if we should use ReAct (only for batch mode currently)
-            use_react_here = react_enabled and not parallel_enabled and not stream_enabled
+            # Use ReAct if enabled (works with all modes)
+            use_react_here = react_enabled
 
             if parallel_enabled:
                 # Parallel mode - runs models in parallel with progress spinners
                 debate_rounds_data, synthesis = await run_debate_parallel(
                     full_query,
                     debate_rounds,
+                    skip_synthesis=use_react_here,
                 )
             elif stream_enabled:
                 # Streaming mode - shows responses as they complete (sequential)
                 debate_rounds_data, synthesis = await run_debate_streaming(
                     full_query,
                     debate_rounds,
+                    skip_synthesis=use_react_here,
                 )
             else:
                 # Batch mode - shows progress spinners
@@ -599,12 +575,18 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
             # If using ReAct, run synthesis separately
             if use_react_here:
                 from backend.council import build_react_context_debate
-                # Show rounds first
-                for round_data in debate_rounds_data:
-                    print_debate_round(round_data, round_data["round_number"])
+                # Only print rounds if batch mode (parallel/streaming already displayed them)
+                if not parallel_enabled and not stream_enabled:
+                    for round_data in debate_rounds_data:
+                        print_debate_round(round_data, round_data["round_number"])
                 # Run ReAct synthesis
                 context = build_react_context_debate(full_query, debate_rounds_data, len(debate_rounds_data))
                 synthesis = await run_react_synthesis(full_query, context)
+                print_debate_synthesis(synthesis)
+            elif not stream_enabled and not parallel_enabled:
+                # Batch mode without ReAct - print rounds and synthesis
+                for round_data in debate_rounds_data:
+                    print_debate_round(round_data, round_data["round_number"])
                 print_debate_synthesis(synthesis)
 
             storage.add_debate_message(conversation_id, debate_rounds_data, synthesis)
@@ -612,12 +594,6 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
             if title_task:
                 title = await title_task
                 storage.update_conversation_title(conversation_id, title)
-
-            if not stream_enabled and not parallel_enabled and not use_react_here:
-                # Only print rounds if not streaming/parallel/react (they already displayed them)
-                for round_data in debate_rounds_data:
-                    print_debate_round(round_data, round_data["round_number"])
-                print_debate_synthesis(synthesis)
         else:
             # Standard ranking mode
             use_react_here = react_enabled
@@ -855,11 +831,16 @@ def build_model_panel(model: str, content: str, color: str = "blue", searched: b
     )
 
 
-async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
+async def run_debate_streaming(query: str, max_rounds: int = 2, skip_synthesis: bool = False) -> tuple:
     """
     Run debate with token-by-token streaming.
 
     Streams raw text while generating, then shows rendered markdown panel when complete.
+
+    Args:
+        query: The user's question
+        max_rounds: Number of debate rounds
+        skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
 
     Returns:
         Tuple of (rounds list, synthesis dict)
@@ -906,7 +887,7 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
 
     current_round_type = ""
 
-    async for event in run_debate_token_streaming(query, max_rounds):
+    async for event in run_debate_token_streaming(query, max_rounds, skip_synthesis=skip_synthesis):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -1018,12 +999,17 @@ async def run_debate_streaming(query: str, max_rounds: int = 2) -> tuple:
     return rounds_data, synthesis_data
 
 
-async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
+async def run_debate_parallel(query: str, max_rounds: int = 2, skip_synthesis: bool = False) -> tuple:
     """
     Run debate with parallel execution and progress spinners.
 
     Shows all models querying simultaneously with spinners,
     then displays panels as each model completes.
+
+    Args:
+        query: The user's question
+        max_rounds: Number of debate rounds
+        skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
     """
     from rich.live import Live
     from rich.table import Table
@@ -1054,7 +1040,7 @@ async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
 
             if status == "querying":
                 # Use Rich Spinner for animation
-                spinner = Spinner("dots", text="querying...", style="yellow")
+                spinner = Spinner("dots", text="thinking...", style="yellow")
                 table.add_row(short_name, spinner)
             elif status == "done":
                 table.add_row(short_name, Text("✓ done", style="green"))
@@ -1074,7 +1060,7 @@ async def run_debate_parallel(query: str, max_rounds: int = 2) -> tuple:
         console.print(f"[bold {color}]━━━ ROUND {round_num}: {round_type.upper()} ━━━[/bold {color}]")
         console.print()
 
-    async for event in run_debate_council_streaming(query, max_rounds):
+    async for event in run_debate_council_streaming(query, max_rounds, skip_synthesis=skip_synthesis):
         event_type = event["type"]
 
         if event_type == "round_start":
