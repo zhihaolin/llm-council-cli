@@ -4,6 +4,27 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.6.3: Docker Support
+*January 2026*
+
+### Overview
+Added Docker support for one-command setup. No local Python or dependencies required.
+
+### Usage
+```bash
+# Build
+docker build -t llm-council https://github.com/zhihaolin/llm-council-cli.git
+
+# Run
+docker run -e OPENROUTER_API_KEY=your-key llm-council query "Your question"
+```
+
+### Files Added
+- `Dockerfile` - Multi-stage build with uv for fast installs
+- `.dockerignore` - Excludes tests, docs, .git from image
+
+---
+
 ## v1.6.2: CI Quality Gates
 *January 2026*
 

@@ -13,6 +13,7 @@
 | v1.6 | ReAct Chairman | ✅ Complete |
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates | ✅ Complete |
+| v1.6.3 | Docker Support | ✅ Complete |
 | v1.7 | Self-Reflection Round | Planned |
 | v1.8 | Workflow State Machine | Planned |
 | v1.9 | File/Document Upload | Planned |

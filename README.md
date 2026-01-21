@@ -210,7 +210,24 @@ Slash commands:
 
 ## Quick Start
 
-### 1. Clone and Install
+### Option A: Docker (Recommended)
+
+```bash
+# Build once
+docker build -t llm-council https://github.com/zhihaolin/llm-council-cli.git
+
+# Run
+docker run -e OPENROUTER_API_KEY=your-key llm-council query "What is 2+2?"
+
+# With web search
+docker run -e OPENROUTER_API_KEY=your-key -e TAVILY_API_KEY=your-key \
+  llm-council query "What is the current price of Bitcoin?"
+
+# Debate mode
+docker run -e OPENROUTER_API_KEY=your-key llm-council query --debate "Should AI be regulated?"
+```
+
+### Option B: Local Install
 
 ```bash
 git clone https://github.com/zhihaolin/llm-council-cli.git
@@ -221,34 +238,18 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies
 uv sync
-```
 
-### 2. Configure API Keys
-
-```bash
-# Required: OpenRouter API key (access to all models via one API)
+# Configure API keys
 echo "OPENROUTER_API_KEY=sk-or-v1-your-key-here" > .env
+echo "TAVILY_API_KEY=tvly-your-key-here" >> .env  # Optional, for web search
 
-# Optional: Tavily API key for web search
-echo "TAVILY_API_KEY=tvly-your-key-here" >> .env
+# Run
+uv run llm-council query "What is the best programming language for beginners?"
 ```
 
 Get your API keys:
 - [openrouter.ai](https://openrouter.ai/) — Required, provides access to GPT, Claude, Gemini, etc.
 - [tavily.com](https://tavily.com/) — Optional, enables web search (free tier: 1000 searches/month)
-
-### 3. Query the Council
-
-```bash
-# Standard deliberation (all 3 stages)
-uv run llm-council query "What is the best programming language for beginners?"
-
-# Debate mode (models critique each other)
-uv run llm-council query --debate "Should AI be regulated?"
-
-# Simple output (just the final answer)
-uv run llm-council query --simple "What is 2+2?"
-```
 
 ---
 
@@ -393,6 +394,7 @@ tests/
 | v1.6 | ReAct Chairman | ✅ Complete |
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates (ruff, pyright) | ✅ Complete |
+| v1.6.3 | Docker Support | ✅ Complete |
 | v1.7 | Self-Reflection Round | Planned |
 | v1.8 | Workflow State Machine | Planned |
 | v1.9 | File/Document Upload | Planned |
