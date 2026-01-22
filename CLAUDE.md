@@ -4,7 +4,7 @@ This file contains technical details, architectural decisions, and important imp
 
 ## Core Engineering Principles (SACROSANCT)
 
-These three principles are non-negotiable for this project:
+These principles are non-negotiable for this project:
 
 ### 1. SOLID
 - **S**ingle Responsibility: Each module/class has one reason to change
@@ -38,6 +38,31 @@ These three principles are non-negotiable for this project:
 - Master/trunk must be in a deployable state at any point in time
 - No "work in progress" commits that break functionality
 - Feature flags over feature branches for incomplete work
+
+### 6. YAGNI (You Ain't Gonna Need It)
+- Only build what's needed now
+- Remove unused code and dependencies
+- Avoid speculative features
+
+### 7. Configuration over Code
+- User-editable settings in config files (YAML), not hardcoded
+- Secrets in environment variables, never in config files or code
+
+### 8. Small Atomic Commits
+- Each commit is focused on one change
+- Each commit passes all tests
+- Easy to review, revert, and bisect
+
+### 9. Docs Stay Current (AI-Assisted Coding)
+- Update documentation with every code change
+- AI assistants lose context between sessions
+- Stale docs cause repeated mistakes
+
+### 10. DRY is Not Absolute
+- Don't abstract until you've repeated something 3+ times (Rule of Three)
+- Premature DRY creates tight coupling between unrelated code
+- Sometimes 3 similar lines is better than 1 clever abstraction
+- Duplication is cheaper than the wrong abstraction
 
 **When refactoring**: Never make large, sweeping changes in a single commit. Break into small, safe steps.
 
