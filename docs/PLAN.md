@@ -241,19 +241,19 @@ Graceful handling of API failures with automatic recovery.
 
 ### v1.14: Security Foundations
 
-Minimum security layer to claim "end-to-end secure."
+Minimum security layer for CLI usage.
 
 **Features:**
-- API key authentication for web endpoints
 - Input validation (query length limits, content filtering)
-- Audit logging (who queried what, when, which models responded)
-- Environment-based secrets (no hardcoded keys)
+- Audit logging (queries, models used, timestamps)
+- Environment-based secrets (no hardcoded keys) ✅ already done
+- File upload sandboxing (for v1.7)
 
 **Implementation:**
-- FastAPI middleware for auth (`X-API-Key` header)
 - Pydantic models for input validation
 - Append-only audit log (JSON lines file)
-- `AuditEntry`: timestamp, user_id, query_hash, models_used, latency_ms
+- `AuditEntry`: timestamp, query_hash, models_used, latency_ms
+- File path validation (no traversal attacks)
 
 ---
 
