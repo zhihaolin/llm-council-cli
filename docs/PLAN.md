@@ -14,13 +14,14 @@
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
-| v1.7 | Self-Reflection Round | Planned |
-| v1.8 | Workflow State Machine | Planned |
-| v1.9 | File/Document Upload | Planned |
-| v1.10 | Observability | Planned |
-| v1.11 | Tool Registry | Planned |
-| v1.12 | Retry & Fallback Logic | Planned |
-| v1.13 | Security Foundations | Planned |
+| v1.7 | File/Document Upload | Planned |
+| v1.8 | Strategy Pattern (OCP/DIP) | Planned |
+| v1.9 | Self-Reflection Round | Planned |
+| v1.10 | Workflow State Machine | Planned |
+| v1.11 | Observability | Planned |
+| v1.12 | Tool Registry | Planned |
+| v1.13 | Retry & Fallback Logic | Planned |
+| v1.14 | Security Foundations | Planned |
 
 ---
 
@@ -81,7 +82,47 @@
 
 ## Next Up
 
-### v1.7: Self-Reflection Round
+### v1.7: File/Document Upload
+
+Attach files for the council to review.
+
+```bash
+llm-council query --file ./code.py "Review this code"
+llm-council query --file ./report.pdf "Summarize the key findings"
+llm-council query --file ./data.csv --file ./schema.json "Validate this data"
+```
+
+**Supported formats:**
+- Text: `.txt`, `.md`, `.py`, `.js`, `.json`, `.yaml`, `.csv`
+- Documents: `.pdf` (via `pypdf`), `.docx` (via `python-docx`)
+
+**Implementation:**
+- File content prepended to user query
+- Large files truncated with warning
+- Multiple `--file` flags supported
+
+### v1.8: Strategy Pattern (OCP/DIP)
+
+Apply Open/Closed and Dependency Inversion principles for extensibility.
+
+**Features:**
+- Strategy pattern for round types (initial, critique, defense, reflection)
+- Dependency injection for model querier (testable, swappable)
+- Registry pattern for adding new round types without modifying existing code
+
+**Implementation:**
+- `RoundStrategy` abstract base class with `execute()` and `build_prompt()` methods
+- `InitialRound`, `CritiqueRound`, `DefenseRound` strategy classes
+- `ROUND_STRATEGIES` registry dict for round type lookup
+- `ModelQuerier` protocol for dependency injection
+- Functions accept `models` and `querier` as parameters with defaults
+
+**Benefits:**
+- Add new round types by creating new classes (no modification to existing code)
+- Easy to test with mock queriers
+- Swap OpenRouter for Ollama by injecting different querier
+
+### v1.9: Self-Reflection Round
 
 Models evaluate and improve their own outputs before peer review.
 
@@ -97,12 +138,12 @@ Round 1: Initial → Round 1.5: Self-Reflection → Round 2: Critique → Round 
 ```
 
 **Implementation:**
-- `debate_round_reflection()` function
+- `ReflectionRound` strategy class (builds on v1.8 strategy pattern)
 - Prompt: "Review your response. Identify weaknesses. Provide an improved version."
 - `--reflect` flag to enable
 - Reflection visible in output as separate round
 
-### v1.8: Workflow State Machine
+### v1.10: Workflow State Machine
 
 Formal state management with checkpoints for reliability.
 
@@ -125,26 +166,7 @@ pending ──→ querying ──→ ranking ──→ synthesizing ──→ co
 - `checkpoint_data` stores serialized round results
 - On resume: load checkpoint, skip completed stages
 
-### v1.9: File/Document Upload
-
-Attach files for the council to review.
-
-```bash
-llm-council query --file ./code.py "Review this code"
-llm-council query --file ./report.pdf "Summarize the key findings"
-llm-council query --file ./data.csv --file ./schema.json "Validate this data"
-```
-
-**Supported formats:**
-- Text: `.txt`, `.md`, `.py`, `.js`, `.json`, `.yaml`, `.csv`
-- Documents: `.pdf` (via `pypdf`), `.docx` (via `python-docx`)
-
-**Implementation:**
-- File content prepended to user query
-- Large files truncated with warning
-- Multiple `--file` flags supported
-
-### v1.10: Observability
+### v1.11: Observability
 
 Structured logging and tracing for production visibility.
 
@@ -160,7 +182,7 @@ Structured logging and tracing for production visibility.
 - Correlation ID generated per request, flows through all logs
 - Spans: `council.query` → `council.round.{n}` → `council.model.{name}`
 
-### v1.11: Tool Registry
+### v1.12: Tool Registry
 
 Pluggable tools with registration protocol for extensibility.
 
@@ -187,7 +209,7 @@ async def read_file(path: str) -> str:
 - `ENABLED_TOOLS` config to control which tools models can use
 - Sandboxed execution for `execute_code` (subprocess with timeout)
 
-### v1.12: Retry & Fallback Logic
+### v1.13: Retry & Fallback Logic
 
 Graceful handling of API failures with automatic recovery.
 
@@ -217,7 +239,7 @@ Graceful handling of API failures with automatic recovery.
 - `ModelRateLimitError` - Hit rate limits, backoff required
 - `CouncilQuorumError` - Too few models responded
 
-### v1.13: Security Foundations
+### v1.14: Security Foundations
 
 Minimum security layer to claim "end-to-end secure."
 
@@ -235,17 +257,15 @@ Minimum security layer to claim "end-to-end secure."
 
 ---
 
-### v1.14+: Future
+### v1.15+: Future
 
 | Version | Feature |
 |---------|---------|
-| v1.14 | Cost tracking & token counting |
-| v1.15 | Export conversations (MD/JSON/PDF) |
-| v1.16 | Configurable council (`--models`, `--preset`) |
-| v1.17 | Image input (multimodal) |
-| v1.18 | Web UI streaming |
+| v1.15 | Cost tracking & token counting |
+| v1.16 | Export conversations (MD/JSON/PDF) |
+| v1.17 | Configurable council (`--models`, `--preset`) |
+| v1.18 | Image input (multimodal) |
 | v1.19 | Local models (Ollama) |
-| v2.0 | Docker packaging |
 
 ---
 
@@ -269,11 +289,11 @@ Minimum security layer to claim "end-to-end secure."
 
 | Practice | Details | Roadmap |
 |----------|---------|---------|
-| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.8, v1.12 |
-| Structured Logging | JSON logs with correlation IDs | v1.10 |
-| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.12 |
-| Retry with Backoff | Exponential backoff for API failures | v1.12 |
-| SOLID (OCP/DIP) | Strategy pattern, dependency injection | Future |
+| SOLID (OCP/DIP) | Strategy pattern, dependency injection | v1.8 |
+| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.10, v1.13 |
+| Structured Logging | JSON logs with correlation IDs | v1.11 |
+| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.13 |
+| Retry with Backoff | Exponential backoff for API failures | v1.13 |
 | Contract Tests | Scheduled daily API schema validation | — |
 | Pre-commit Hooks | Ruff as pre-commit hook | — |
 | Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |

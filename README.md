@@ -397,13 +397,14 @@ tests/
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates (ruff, pyright) | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
-| v1.7 | Self-Reflection Round | Planned |
-| v1.8 | Workflow State Machine | Planned |
-| v1.9 | File/Document Upload | Planned |
-| v1.10 | Observability (OpenTelemetry) | Planned |
-| v1.11 | Tool Registry (MCP) | Planned |
-| v1.12 | Retry & Fallback Logic | Planned |
-| v1.13 | Security Foundations | Planned |
+| v1.7 | File/Document Upload | Planned |
+| v1.8 | Strategy Pattern (OCP/DIP) | Planned |
+| v1.9 | Self-Reflection Round | Planned |
+| v1.10 | Workflow State Machine | Planned |
+| v1.11 | Observability (OpenTelemetry) | Planned |
+| v1.12 | Tool Registry (MCP) | Planned |
+| v1.13 | Retry & Fallback Logic | Planned |
+| v1.14 | Security Foundations | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 
