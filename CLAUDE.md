@@ -363,14 +363,10 @@ def clear_streaming_output():
 
 ## Common Gotchas
 
-1. **No gh CLI**: The `gh` CLI is not installed. To check CI status, fetch the badge:
-   ```bash
-   curl -sL "https://github.com/zhihaolin/llm-council-cli/actions/workflows/test.yml/badge.svg" | grep -o 'passing\|failing'
-   ```
-2. **Module Import Errors**: Always run backend modules with relative imports from project root
-3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
-4. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
-5. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
+1. **Module Import Errors**: Always run backend modules with relative imports from project root
+2. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
+3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
+4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 10)
 
 ## Future Enhancement Ideas
