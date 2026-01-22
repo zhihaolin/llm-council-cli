@@ -52,9 +52,14 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 ### Backend Structure (`backend/`)
 
 **`config.py`**
-- Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
-- Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
-- Uses environment variable `OPENROUTER_API_KEY` from `.env`
+- Loads settings from `config.yaml` in project root (falls back to defaults if missing)
+- Exports: `COUNCIL_MODELS`, `CHAIRMAN_MODEL`, `OPENROUTER_API_URL`, `DATA_DIR`
+- API key loaded from environment variable `OPENROUTER_API_KEY` (never in YAML)
+
+**`config.yaml`** (project root)
+- User-editable configuration file
+- Settings: `council_models`, `chairman_model`, `openrouter_api_url`, `data_dir`
+- Optional - defaults are built into `config.py`
 
 **`openrouter.py`**
 - `query_model()`: Single async model query

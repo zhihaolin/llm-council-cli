@@ -5,14 +5,15 @@ These tests verify the multi-round debate logic including critique extraction,
 defense parsing, and debate orchestration.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from backend.council import (
-    extract_critiques_for_model,
-    parse_revised_answer,
     debate_round_critique,
     debate_round_defense,
+    extract_critiques_for_model,
+    parse_revised_answer,
 )
 
 

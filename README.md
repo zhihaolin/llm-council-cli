@@ -302,20 +302,22 @@ uv run llm-council interactive
 
 ### Models
 
-Edit `backend/config.py` to customize the council:
+Edit `config.yaml` in the project root to customize the council:
 
-```python
-# Example configuration (use any OpenRouter-supported models)
-COUNCIL_MODELS = [
-    "openai/gpt-4o-mini",      # Fast, cost-effective
-    "x-ai/grok-3",             # X.AI's latest
-    "deepseek/deepseek-chat",  # Strong reasoning
-]
+```yaml
+# Council models - list of OpenRouter model identifiers
+council_models:
+  - openai/gpt-4o-mini      # Fast, cost-effective
+  - x-ai/grok-3             # X.AI's latest
+  - deepseek/deepseek-chat  # Strong reasoning
 
-CHAIRMAN_MODEL = "openai/gpt-4o-mini"
+# Chairman model - synthesizes the final response
+chairman_model: openai/gpt-4o-mini
 ```
 
 All models are accessed through [OpenRouter](https://openrouter.ai/), which provides a unified API for 200+ models from OpenAI, Anthropic, Google, Meta, and more. Choose models based on your budget and quality requirements.
+
+**Docker users:** Mount a custom config with `-v /path/to/config.yaml:/app/config.yaml`
 
 ---
 
@@ -346,7 +348,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 | **SOLID (SRP/ISP)** | ✅ | Focused modules, clean API exports |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
 | **Structured Logging** | 🔜 | JSON logs with correlation IDs (planned) |
-| **Config Management** | 🔜 | YAML config with validation (planned) |
+| **Config Management** | ✅ | YAML config file (`config.yaml`) |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full engineering roadmap.
 

@@ -1,0 +1,20 @@
+# LLM Council Configuration
+#
+# Edit this file to customize your council setup.
+# API keys should be set in .env (not here).
+
+# Council models - list of OpenRouter model identifiers
+# These models will debate/deliberate on your questions
+council_models:
+  - openai/gpt-4o-mini
+  - x-ai/grok-3
+  - deepseek/deepseek-chat
+
+# Chairman model - synthesizes the final response
+chairman_model: openai/gpt-4o-mini
+
+# OpenRouter API endpoint
+openrouter_api_url: https://openrouter.ai/api/v1/chat/completions
+
+# Data directory for conversation storage
+data_dir: data/conversations

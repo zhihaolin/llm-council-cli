@@ -5,7 +5,6 @@ The ranking parser extracts structured rankings from model evaluation text.
 These tests cover various edge cases and formats that models might produce.
 """
 
-import pytest
 from backend.council import parse_ranking_from_text
 
 

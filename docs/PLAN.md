@@ -263,6 +263,7 @@ Minimum security layer to claim "end-to-end secure."
 | Type Hints | Function signatures throughout |
 | CI/CD | GitHub Actions (lint → test pipeline) |
 | SOLID (SRP/ISP) | Focused modules, clean API exports (v1.6.1) |
+| Config Extraction | YAML config file (`config.yaml`) |
 
 ### Planned
 
@@ -273,7 +274,6 @@ Minimum security layer to claim "end-to-end secure."
 | Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.12 |
 | Retry with Backoff | Exponential backoff for API failures | v1.12 |
 | SOLID (OCP/DIP) | Strategy pattern, dependency injection | Future |
-| Config Extraction | YAML config with validation | — |
 | Contract Tests | Scheduled daily API schema validation | — |
 | Pre-commit Hooks | Ruff as pre-commit hook | — |
 | Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |

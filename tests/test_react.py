@@ -5,10 +5,9 @@ The ReAct pattern allows the chairman to reason, take actions (search),
 observe results, and iterate before synthesizing.
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from typing import List, Dict, Any
+from unittest.mock import AsyncMock, patch
 
+import pytest
 
 # =============================================================================
 # Test Data
@@ -96,8 +95,6 @@ class TestReactLoop:
     async def test_direct_synthesize_yields_correct_events(self):
         """When chairman synthesizes immediately, should yield thought then synthesis."""
         from backend.council import synthesize_with_react
-
-        mock_response = {"content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
 
         with patch("backend.council.react.query_model_streaming") as mock_stream:
             # Mock streaming to yield the full response
@@ -210,7 +207,7 @@ class TestReactIntegration:
     @pytest.mark.asyncio
     async def test_react_with_ranking_mode(self):
         """ReAct should work with Stage 1/2 results (ranking mode)."""
-        from backend.council import synthesize_with_react, build_react_context_ranking
+        from backend.council import build_react_context_ranking
 
         stage1_results = [
             {"model": "gpt", "response": "Python is best"},
@@ -228,7 +225,7 @@ class TestReactIntegration:
     @pytest.mark.asyncio
     async def test_react_with_debate_mode(self):
         """ReAct should work with debate rounds."""
-        from backend.council import synthesize_with_react, build_react_context_debate
+        from backend.council import build_react_context_debate
 
         rounds = [
             {

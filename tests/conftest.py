@@ -5,10 +5,10 @@ This module provides mock responses and fixtures for testing the council
 without making actual API calls.
 """
 
-import pytest
-from typing import Dict, Any, List
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import pytest
 
 # =============================================================================
 # Sample Model Responses
@@ -108,25 +108,25 @@ Response B is third."""
 # =============================================================================
 
 @pytest.fixture
-def sample_models() -> List[str]:
+def sample_models() -> list[str]:
     """Return sample model identifiers."""
     return SAMPLE_MODELS.copy()
 
 
 @pytest.fixture
-def sample_initial_responses() -> List[Dict[str, Any]]:
+def sample_initial_responses() -> list[dict[str, Any]]:
     """Return sample initial responses from models."""
     return [r.copy() for r in SAMPLE_INITIAL_RESPONSES]
 
 
 @pytest.fixture
-def sample_critique_responses() -> List[Dict[str, Any]]:
+def sample_critique_responses() -> list[dict[str, Any]]:
     """Return sample critique responses."""
     return [r.copy() for r in SAMPLE_CRITIQUE_RESPONSES]
 
 
 @pytest.fixture
-def sample_defense_responses() -> List[Dict[str, Any]]:
+def sample_defense_responses() -> list[dict[str, Any]]:
     """Return sample defense responses."""
     return [r.copy() for r in SAMPLE_DEFENSE_RESPONSES]
 
@@ -179,7 +179,7 @@ def mock_council_models():
 # Helper Functions
 # =============================================================================
 
-def make_model_response(content: str, tool_calls_made: List[str] = None) -> Dict[str, Any]:
+def make_model_response(content: str, tool_calls_made: list[str] = None) -> dict[str, Any]:
     """Create a mock model response dict."""
     response = {"content": content}
     if tool_calls_made:
@@ -187,7 +187,7 @@ def make_model_response(content: str, tool_calls_made: List[str] = None) -> Dict
     return response
 
 
-def make_stage1_result(model: str, response: str, searched: bool = False) -> Dict[str, Any]:
+def make_stage1_result(model: str, response: str, searched: bool = False) -> dict[str, Any]:
     """Create a mock Stage 1 result."""
     result = {"model": model, "response": response}
     if searched:

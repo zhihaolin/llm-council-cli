@@ -1,10 +1,12 @@
 """Tests for web search functionality."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
-from backend.search import search_web, format_search_results, SEARCH_TOOL
+
 from backend.council import execute_tool
 from backend.openrouter import query_model_with_tools
+from backend.search import SEARCH_TOOL, format_search_results, search_web
 
 
 class TestSearchTool:

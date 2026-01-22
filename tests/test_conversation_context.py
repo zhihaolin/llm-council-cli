@@ -3,9 +3,9 @@ Tests for building conversation context from stored messages.
 """
 
 from cli.chat import (
+    build_context_prompt,
     extract_conversation_pairs,
     select_context_pairs,
-    build_context_prompt,
 )
 
 

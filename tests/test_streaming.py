@@ -6,18 +6,13 @@ rather than waiting for all models to complete.
 """
 
 import asyncio
+from unittest.mock import patch
+
 import pytest
-from typing import Dict, Any, List
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from tests.conftest import (
     SAMPLE_MODELS,
-    SAMPLE_INITIAL_RESPONSES,
-    SAMPLE_CRITIQUE_RESPONSES,
-    SAMPLE_DEFENSE_RESPONSES,
-    make_model_response,
 )
-
 
 # =============================================================================
 # Test: Streaming round yields model completions as they finish
@@ -275,7 +270,7 @@ async def test_streaming_same_result_as_batch():
         elif "defense" in content.lower() or "Addressing" in content:
             return {"content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"}
         elif "Chairman" in content or "synthesize" in content.lower():
-            return {"content": f"Synthesis from chairman"}
+            return {"content": "Synthesis from chairman"}
         return {"content": f"Initial response from {model}"}
 
     async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
