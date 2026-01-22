@@ -327,7 +327,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 | CLI | Typer, Rich, Textual |
 | LLM Access | OpenRouter API (unified access to GPT, Claude, Gemini, etc.) |
 | Web Search | Tavily API (LLM-optimized search) |
-| Testing | pytest, pytest-asyncio, pytest-cov |
+| Testing | pytest, pytest-asyncio |
 | Storage | JSON files |
 
 ---
