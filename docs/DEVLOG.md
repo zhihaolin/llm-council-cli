@@ -4,6 +4,15 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.6.3: CLI Module Rename
+*January 2026*
+
+Renamed `cli/orchestrators.py` → `cli/runners.py` to avoid confusion with `backend/council/orchestrator.py`. Both files existed after v1.6.1 refactoring and had similar names but different purposes:
+- `backend/council/orchestrator.py` - Stage 1-2-3 flow coordination (backend logic)
+- `cli/runners.py` - CLI presentation wrappers with progress indicators
+
+---
+
 ## v1.6.3: Docker Support
 *January 2026*
 
@@ -103,7 +112,7 @@ Split `cli/main.py` (1,407 lines) into focused modules:
 cli/
 ├── main.py           # Command routing only (~270 lines)
 ├── presenters.py     # All print_* functions (~250 lines)
-├── orchestrators.py  # run_* execution functions (~450 lines)
+├── runners.py        # run_* execution functions (~450 lines) [renamed from orchestrators.py]
 ├── chat_session.py   # Chat REPL logic (~280 lines)
 ├── chat.py           # Command parsing (unchanged)
 └── utils.py          # Constants (~10 lines)

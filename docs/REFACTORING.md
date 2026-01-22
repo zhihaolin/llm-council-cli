@@ -136,7 +136,7 @@ def print_stage1(results): ...
 def print_stage2(results, label_to_model, aggregate): ...
 def print_debate_round(round_data, round_num): ...
 
-# cli/orchestrators.py - ONLY execution flow
+# cli/runners.py - ONLY execution flow (renamed from orchestrators.py)
 async def run_council_with_progress(query): ...
 async def run_debate_with_progress(query, max_rounds): ...
 
@@ -559,7 +559,7 @@ async def test_stage1():
 Deleted frontend/, start.sh, backend/main.py
 
 ### Phase 2: Extract CLI Modules ✅
-Created presenters.py, orchestrators.py, chat_session.py, utils.py (applies SRP)
+Created presenters.py, runners.py (originally orchestrators.py), chat_session.py, utils.py (applies SRP)
 
 ### Phase 3: Split Council Module ✅
 Split 1,722-line council.py into focused modules:
