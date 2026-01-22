@@ -406,6 +406,30 @@ uv run pytest tests/ -v
 ### Manual API Testing
 Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council.
 
+## Docker
+
+### Build
+```bash
+docker build -t llm-council .
+```
+
+### Run
+```bash
+# Simple query
+docker run -e OPENROUTER_API_KEY=your-key llm-council query "What is 2+2?"
+
+# Interactive REPL (needs -it flags)
+docker run -it -e OPENROUTER_API_KEY=your-key -e TAVILY_API_KEY=your-key llm-council chat
+
+# Debate mode
+docker run -e OPENROUTER_API_KEY=your-key llm-council query --debate "Should AI be regulated?"
+```
+
+### Notes
+- Image is self-contained, can run from anywhere
+- `-it` flags required for interactive mode (chat REPL)
+- `TAVILY_API_KEY` optional, enables web search
+
 ## Data Flow Summary
 
 ### Standard Mode (Ranking)

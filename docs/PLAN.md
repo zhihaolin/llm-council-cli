@@ -2,10 +2,10 @@
 
 ## Immediate TODO
 
-- [ ] Install Docker Desktop (`brew install --cask docker`)
-- [ ] Test Docker build: `docker build -t llm-council .`
-- [ ] Test Docker run: `docker run -e OPENROUTER_API_KEY=xxx llm-council query "test"`
-- [ ] Fix any issues found during testing
+- [x] Install Docker Desktop (`brew install --cask docker`)
+- [x] Test Docker build: `docker build -t llm-council .`
+- [x] Test Docker run: `docker run llm-council --help`
+- [x] Fix any issues found during testing (README.md missing in build)
 
 ---
 
