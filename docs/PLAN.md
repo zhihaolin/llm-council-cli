@@ -1,14 +1,5 @@
 # LLM Council - Roadmap
 
-## Immediate TODO
-
-- [x] Install Docker Desktop (`brew install --cask docker`)
-- [x] Test Docker build: `docker build -t llm-council .`
-- [x] Test Docker run: `docker run llm-council --help`
-- [x] Fix any issues found during testing (README.md missing in build)
-
----
-
 ## Current Status
 
 | Version | Feature | Status |
