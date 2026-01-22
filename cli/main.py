@@ -20,7 +20,7 @@ sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
 
 from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
 from cli.chat_session import run_chat_session
-from cli.orchestrators import (
+from cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,

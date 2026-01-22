@@ -254,7 +254,7 @@ llm-council --debate --simple "Question"           # Just final answer
 cli/
 ├── main.py           # Command routing only
 ├── presenters.py     # All print_* display functions
-├── orchestrators.py  # run_* execution with progress
+├── runners.py  # run_* execution with progress
 ├── chat_session.py   # Chat REPL logic
 ├── chat.py           # Command parsing utilities
 └── utils.py          # Constants
@@ -265,7 +265,7 @@ cli/
 - `print_debate_synthesis()` - Green-styled panel for final answer
 - `print_stage1/2/3()` - Standard mode output
 
-**Orchestration (in `cli/orchestrators.py`):**
+**Runners (in `cli/runners.py`):**
 - `run_debate_with_progress()` - Progress spinners for each round
 - `run_debate_parallel()` - Parallel execution with Rich Live display
 - `run_react_synthesis()` - ReAct trace display
@@ -324,7 +324,7 @@ llm-council chat                               # REPL (streaming+debate on by de
 - `run_debate_council_streaming()`: Full debate with model-completion events
 - `run_debate_token_streaming()`: Full debate with token-by-token streaming (sequential)
 
-**`cli/orchestrators.py`**
+**`cli/runners.py`**
 - `run_debate_streaming()`: Renders streaming output with Rich
   - Tracks terminal line wrapping for accurate clearing
   - Uses ANSI escape codes for cursor movement
@@ -535,7 +535,7 @@ async def query_with_model(model: str):
 6. synthesis_start → synthesis_complete → complete
 ```
 
-### CLI Display (`cli/orchestrators.py`)
+### CLI Display (`cli/runners.py`)
 - `run_debate_parallel()` uses Rich `Live` display with a status table
 - Status states: "⠋ thinking..." → "✓ done" / "✗ error"
 - Panels appear as models complete (fastest first)
@@ -597,7 +597,7 @@ Action: synthesize()
 **`backend/council/parsers.py`:**
 - `parse_react_output()` - Extracts Thought/Action from model output using regex
 
-**`cli/orchestrators.py`:**
+**`cli/runners.py`:**
 - `run_react_synthesis()` - Displays ReAct trace with color coding
   - Thought: cyan
   - Action: yellow

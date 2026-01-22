@@ -16,7 +16,7 @@ from cli.chat import (
     format_chat_mode_line,
     parse_chat_command,
 )
-from cli.orchestrators import (
+from cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,

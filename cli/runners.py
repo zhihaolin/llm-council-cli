@@ -1,7 +1,8 @@
 """
-Orchestration functions for council and debate execution.
+CLI runners for council and debate execution.
 
-Contains run_* functions that manage the execution flow with progress indicators.
+Contains run_* functions that wrap backend logic with CLI presentation
+(progress indicators, spinners, Rich panels).
 """
 
 import shutil
