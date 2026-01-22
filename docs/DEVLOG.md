@@ -4,6 +4,32 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.6.3: Config Extraction
+*January 2026*
+
+Moved configuration from hardcoded Python to YAML file.
+
+### Changes
+- Added `config.yaml` in project root for user-editable settings
+- Updated `backend/config.py` to load from YAML (falls back to defaults)
+- Added `pyyaml>=6.0` dependency
+- Removed unused `fastapi` and `uvicorn` dependencies (web UI was removed in v1.6.1)
+
+### Config Structure
+```yaml
+council_models:
+  - openai/gpt-4o-mini
+  - x-ai/grok-3
+  - deepseek/deepseek-chat
+chairman_model: openai/gpt-4o-mini
+openrouter_api_url: https://openrouter.ai/api/v1/chat/completions
+data_dir: data/conversations
+```
+
+API keys remain in `.env` (security best practice).
+
+---
+
 ## Post-v1.6.3: CLI Module Rename
 *January 2026*
 
