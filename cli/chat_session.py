@@ -16,13 +16,6 @@ from cli.chat import (
     format_chat_mode_line,
     parse_chat_command,
 )
-from cli.runners import (
-    run_council_with_progress,
-    run_debate_parallel,
-    run_debate_streaming,
-    run_debate_with_progress,
-    run_react_synthesis,
-)
 from cli.presenters import (
     console,
     print_chat_banner,
@@ -35,6 +28,13 @@ from cli.presenters import (
     print_stage2,
     print_stage3,
     print_user_question_panel,
+)
+from cli.runners import (
+    run_council_with_progress,
+    run_debate_parallel,
+    run_debate_streaming,
+    run_debate_with_progress,
+    run_react_synthesis,
 )
 
 DEFAULT_CONTEXT_TURNS = 6
