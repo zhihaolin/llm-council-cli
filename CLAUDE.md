@@ -45,7 +45,13 @@ These three principles are non-negotiable for this project:
 
 ## Project Overview
 
-LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively answer user questions. The key innovation is anonymized peer review in Stage 2, preventing models from playing favorites.
+LLM Council orchestrates multiple LLMs to collaboratively answer questions through structured deliberation.
+
+**Two modes:**
+- **Ranking mode** (default): 3-stage flow - responses → anonymous peer ranking → chairman synthesis
+- **Debate mode** (`--debate`): Multi-round deliberation - initial → critique → defense → synthesis
+
+Both modes use a chairman model (configurable) to synthesize the final answer.
 
 ## Architecture
 
@@ -259,9 +265,10 @@ llm-council --debate --simple "Question"           # Just final answer
 cli/
 ├── main.py           # Command routing only
 ├── presenters.py     # All print_* display functions
-├── runners.py  # run_* execution with progress
+├── runners.py        # run_* execution with progress
 ├── chat_session.py   # Chat REPL logic
 ├── chat.py           # Command parsing utilities
+├── tui.py            # Textual TUI app
 └── utils.py          # Constants
 ```
 
