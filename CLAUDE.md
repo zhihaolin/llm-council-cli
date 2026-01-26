@@ -395,7 +395,7 @@ def clear_streaming_output():
 
 ## Common Gotchas
 
-1. **Module Import Errors**: Always run backend modules with relative imports from project root
+1. **Module Import Errors**: Always run via `uv run llm-council` (not `python cli/main.py`). The project is packaged (`[tool.uv] package = true`), so both `cli` and `backend` are on the Python path automatically. Backend modules use relative imports internally (e.g., `from .config import ...`)
 2. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
