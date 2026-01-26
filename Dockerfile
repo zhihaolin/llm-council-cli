@@ -8,12 +8,15 @@ WORKDIR /app
 # Copy dependency files first (better layer caching)
 COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies
-RUN uv sync --frozen --no-dev
+# Install dependencies only (not the project itself)
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy source code
 COPY backend/ backend/
 COPY cli/ cli/
+
+# Install the project package
+RUN uv sync --frozen --no-dev
 
 # Set entrypoint
 ENTRYPOINT ["uv", "run", "llm-council"]
