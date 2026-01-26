@@ -9,14 +9,10 @@ Usage:
 """
 
 import asyncio
-import sys
 
 import typer
 from rich.markdown import Markdown
 from rich.table import Table
-
-# Add project root to path for imports
-sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
 
 from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
 from cli.chat_session import run_chat_session

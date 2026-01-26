@@ -3,7 +3,6 @@ LLM Council TUI - Interactive terminal interface using Textual.
 """
 
 import asyncio
-import sys
 
 from textual import work
 from textual.app import App, ComposeResult
@@ -22,7 +21,6 @@ from textual.widgets import (
     TabPane,
 )
 
-sys.path.insert(0, str(__file__).rsplit("/", 2)[0])
 from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
 from backend.council import (
     calculate_aggregate_rankings,
