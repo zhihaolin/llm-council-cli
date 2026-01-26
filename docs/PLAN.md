@@ -281,7 +281,7 @@ Minimum security layer for CLI usage.
 | Linting | Ruff check + format in CI |
 | Type Checking | Pyright in basic mode |
 | Type Hints | Function signatures throughout |
-| CI/CD | GitHub Actions (lint → test pipeline) |
+| CI/CD | GitHub Actions (lint → test → docker pipeline) |
 | SOLID (SRP/ISP) | Focused modules, clean API exports (v1.6.1) |
 | Config Extraction | YAML config file (`config.yaml`) |
 
@@ -354,6 +354,6 @@ tests/
 
 ---
 
-*Last updated: 2026-01-22*
+*Last updated: 2026-01-26*
 
 For implementation details and session notes, see [DEVLOG.md](DEVLOG.md).

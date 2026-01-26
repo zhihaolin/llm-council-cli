@@ -432,8 +432,10 @@ uv run pytest tests/ -v
 ```
 
 ### CI/CD
-- GitHub Actions runs tests on every push to master
+- GitHub Actions runs on every push to master
 - Workflow: `.github/workflows/test.yml`
+- Pipeline: `lint` → `test` → `docker` (build + smoke test)
+- Docker job builds the image and runs `--help` to verify entrypoint and imports
 - Badge in README shows real-time CI status
 
 ### Manual API Testing

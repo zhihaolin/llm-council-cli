@@ -4,6 +4,21 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.6.3: Docker CI Smoke Test & Import Cleanup
+*January 2026*
+
+### Changes
+- Added `docker` job to CI pipeline (`.github/workflows/test.yml`)
+  - Builds Docker image after tests pass
+  - Runs `docker run --rm llm-council --help` as smoke test (verifies entrypoint + imports)
+  - Pipeline is now: `lint` → `test` → `docker`
+- Removed `sys.path.insert` hack from `cli/main.py` and `cli/tui.py`
+  - The project is properly packaged (`[tool.uv] package = true` + hatch build config)
+  - Both `cli` and `backend` are on the Python path automatically when run via `uv run`
+  - Also removed the now-unused `import sys` from both files
+
+---
+
 ## Post-v1.6.3: Config Extraction
 *January 2026*
 

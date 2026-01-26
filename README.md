@@ -344,7 +344,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 | **Linting** | ✅ | Ruff (check + format) in CI |
 | **Type Checking** | ✅ | Pyright in basic mode |
 | **Type Hints** | ✅ | Throughout codebase |
-| **CI/CD** | ✅ | GitHub Actions (lint → test pipeline) |
+| **CI/CD** | ✅ | GitHub Actions (lint → test → docker pipeline) |
 | **SOLID (SRP/ISP)** | ✅ | Focused modules, clean API exports |
 | **Pydantic Models** | 🔜 | Data validation (planned) |
 | **Structured Logging** | 🔜 | JSON logs with correlation IDs (planned) |
