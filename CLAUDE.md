@@ -97,7 +97,7 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 - `query_models_parallel()`: Parallel queries using `asyncio.gather()`
 - `query_model_with_tools()`: Query with tool/function calling support
   - Handles tool call loop: model requests tool → execute → return results → get final response
-  - `max_tool_calls` parameter prevents infinite loops (default: 3)
+  - `max_tool_calls` parameter prevents infinite loops (default: 3; streaming variant defaults to 10)
   - Returns `tool_calls_made` list showing which tools were used
 - Returns dict with 'content' and optional 'reasoning_details'
 - Graceful degradation: returns None on failure, continues with successful responses
@@ -399,7 +399,7 @@ def clear_streaming_output():
 2. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
-6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 10)
+6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
 
 ## Future Enhancement Ideas
 
