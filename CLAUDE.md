@@ -400,6 +400,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
+7. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`backend/council/streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`backend/council/debate.py` uses plain `query_model`)
 
 ## Future Enhancement Ideas
 
