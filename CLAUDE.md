@@ -399,16 +399,24 @@ def clear_streaming_output():
 2. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
-6. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-7. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`backend/council/streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`backend/council/debate.py` uses plain `query_model`)
+5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
+6. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`backend/council/streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`backend/council/debate.py` uses plain `query_model`)
 
-## Future Enhancement Ideas
+## Known Technical Debt
 
-- Configurable council/chairman via CLI flags or config file
-- Export conversations to markdown/PDF
-- Model performance analytics over time
-- Custom ranking criteria (not just accuracy/insight)
-- Support for reasoning models (o1, etc.) with special handling
+Issues identified but not yet on the roadmap. Fix opportunistically or when touching related code.
+
+| Issue | Location | Severity | Notes |
+|-------|----------|----------|-------|
+| Off-by-one in tool call loops | `openrouter.py:198` vs `openrouter.py:372` | Medium | Streaming uses `range(max_tool_calls + 1)`, non-streaming uses `range(max_tool_calls)` — inconsistent |
+| `datetime.utcnow()` deprecated | `storage.py:36` | Low | Deprecated since Python 3.12; use `datetime.now(datetime.UTC)` |
+| Hardcoded title generation model | `orchestrator.py:206` | Medium | `"google/gemini-2.5-flash"` should be configurable; breaks if model retired |
+| Redundant import | `openrouter.py:455` | Trivial | `import asyncio` inside function, already imported at top |
+| Shared HTTP client unused | `openrouter.py:21-52` | Low | `get_shared_client()` defined but never called; each query creates new client |
+
+## Future Enhancements
+
+See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.7+).
 
 ## Testing
 

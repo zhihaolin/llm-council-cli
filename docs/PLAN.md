@@ -269,6 +269,27 @@ Minimum security layer for CLI usage.
 
 ---
 
+## Technical Debt
+
+Issues not tied to a specific version. Fix opportunistically or when touching related code.
+
+| Issue | Location | Severity | Fix Strategy |
+|-------|----------|----------|--------------|
+| Off-by-one in tool call loops | `openrouter.py:198` vs `:372` | Medium | Align both to `range(max_tool_calls)` — the `+1` appears to be a bug |
+| `datetime.utcnow()` deprecated | `storage.py:36` | Low | Replace with `datetime.now(datetime.UTC)` |
+| Hardcoded title gen model | `orchestrator.py:206` | Medium | Add `title_model` to config.yaml; default to cheap/fast model |
+| Redundant import | `openrouter.py:455` | Trivial | Delete the inner `import asyncio` |
+| Shared HTTP client unused | `openrouter.py:21-52` | Low | Either use it in all query functions or delete it (YAGNI) |
+
+**Note:** Several other issues (duplicated `execute_tool`, feature asymmetry, storage inefficiency, logging) are addressed by planned versions:
+- v1.8 Strategy Pattern fixes round duplication and feature asymmetry
+- v1.10 Workflow State Machine replaces JSON storage with SQLite
+- v1.11 Observability adds structured logging
+- v1.12 Tool Registry centralizes `execute_tool`
+- v1.13 Retry & Fallback will use the shared client
+
+---
+
 ## Engineering Practices
 
 ### Implemented ✅
