@@ -18,10 +18,11 @@
 | v1.8 | Strategy Pattern (OCP/DIP) | Planned |
 | v1.9 | Self-Reflection Round | Planned |
 | v1.10 | Workflow State Machine | Planned |
-| v1.11 | Observability | Planned |
-| v1.12 | Tool Registry | Planned |
-| v1.13 | Retry & Fallback Logic | Planned |
-| v1.14 | Security Foundations | Planned |
+| v1.11 | Human-in-the-Loop (HITL) | Planned |
+| v1.12 | Observability | Planned |
+| v1.13 | Tool Registry | Planned |
+| v1.14 | Retry & Fallback Logic | Planned |
+| v1.15 | Security Foundations | Planned |
 
 ---
 
@@ -166,7 +167,66 @@ pending ──→ querying ──→ ranking ──→ synthesizing ──→ co
 - `checkpoint_data` stores serialized round results
 - On resume: load checkpoint, skip completed stages
 
-### v1.11: Observability
+### v1.11: Human-in-the-Loop (HITL)
+
+User control during autonomous execution via optional async callbacks. All three features use callbacks passed from CLI → runners → backend, defaulting to `None` (auto-pilot, fully backward compatible). Absorbs planned v1.17 "Configurable council" (`--models` part).
+
+**Prerequisites:** v1.7-v1.10 completed (v1.8 Strategy Pattern in particular introduces `models` parameter and DI patterns that make threading callbacks cleaner).
+
+**New type definitions** in `backend/council/types.py`:
+```python
+ToolApprovalCallback = Callable[[str, dict[str, Any]], Awaitable[bool]]
+RoundInterventionCallback = Callable[[int, str, list[dict[str, Any]]], Awaitable[str | None]]
+```
+
+#### Feature 1: Tool Call Approval
+
+Before executing `search_web`, prompt user to approve/reject.
+
+- **Gate location:** `openrouter.py:query_model_with_tools()` and `query_model_streaming_with_tools()` — before `result = await tool_executor(...)`
+- **Behavior:** `tool_approval: ToolApprovalCallback | None = None` param. When present, await before execution. If rejected, insert `"Tool call rejected by user."` as tool result.
+- **CLI:** `--approve` flag on `query`; `/approve on|off` in chat REPL
+
+#### Feature 2: Debate Intervention
+
+Between rounds, let user inject their perspective into the next round's prompt.
+
+- **Pause location:** `streaming.py` — after `round_complete` yield, before next round. `debate.py` — after each round completes.
+- **Behavior:** `round_intervention: RoundInterventionCallback | None = None` param. After each round, await callback. If returns a string, prepend to next round's prompt via `inject_human_perspective()` in `prompts.py`. If returns `None`, continue normally.
+- **CLI:** `--intervene` flag on `query`; `/intervene on|off` in chat REPL
+
+#### Feature 3: Model Selection
+
+Let user choose which models participate (absorbs v1.17 "Configurable council").
+
+- **Current state:** `COUNCIL_MODELS` is a module-level constant used directly in `streaming.py` (7 refs) and `debate.py` (1 ref).
+- **Change:** Add `models: list[str] | None = None` parameter to all debate/streaming functions. Default to `COUNCIL_MODELS` when `None`.
+- **CLI:** `--select-models` (interactive picker); `--models "model-a,model-b"` (explicit); `/select` in chat REPL (minimum 2 models enforced)
+
+#### Commit Sequence
+
+| # | Scope | Files |
+|---|-------|-------|
+| 1 | HITL callback type definitions | `backend/council/types.py`, `__init__.py`, `tests/test_hitl_types.py` |
+| 2-3 | `tool_approval` in openrouter | `backend/openrouter.py`, `tests/test_tool_approval.py` |
+| 4 | Thread `tool_approval` through streaming/debate | `backend/council/streaming.py`, `backend/council/debate.py` |
+| 5 | `inject_human_perspective` prompt | `backend/council/prompts.py`, `tests/test_hitl_intervention.py` |
+| 6-7 | Thread `round_intervention` into streaming/debate | `backend/council/streaming.py`, `backend/council/debate.py` |
+| 8-9 | `models` parameter in debate/streaming | `backend/council/debate.py`, `backend/council/streaming.py`, `tests/test_model_selection.py` |
+| 10-11 | CLI prompt functions + callback wiring | `cli/runners.py` |
+| 12 | Chat commands (`/approve`, `/intervene`, `/select`) | `cli/chat.py`, `cli/chat_session.py`, `cli/presenters.py` |
+| 13 | CLI flags (`--approve`, `--intervene`, `--select-models`, `--models`) | `cli/main.py` |
+
+#### Risks
+
+| Risk | Mitigation |
+|------|------------|
+| `console.input()` blocks event loop | Prompts fire between async operations, not during token streaming |
+| Chat `/select` vs existing `models` command | `/select` in chat, `models` stays as top-level Typer command |
+| Rejected tool calls confuse LLM | Return "rejected by user" as tool result — LLM answers from knowledge |
+| < 2 models selected | Enforce minimum 2 in selection prompt |
+
+### v1.12: Observability
 
 Structured logging and tracing for production visibility.
 
@@ -182,7 +242,7 @@ Structured logging and tracing for production visibility.
 - Correlation ID generated per request, flows through all logs
 - Spans: `council.query` → `council.round.{n}` → `council.model.{name}`
 
-### v1.12: Tool Registry
+### v1.13: Tool Registry
 
 Pluggable tools with registration protocol for extensibility.
 
@@ -209,7 +269,7 @@ async def read_file(path: str) -> str:
 - `ENABLED_TOOLS` config to control which tools models can use
 - Sandboxed execution for `execute_code` (subprocess with timeout)
 
-### v1.13: Retry & Fallback Logic
+### v1.14: Retry & Fallback Logic
 
 Graceful handling of API failures with automatic recovery.
 
@@ -239,7 +299,7 @@ Graceful handling of API failures with automatic recovery.
 - `ModelRateLimitError` - Hit rate limits, backoff required
 - `CouncilQuorumError` - Too few models responded
 
-### v1.14: Security Foundations
+### v1.15: Security Foundations
 
 Minimum security layer for CLI usage.
 
@@ -257,13 +317,12 @@ Minimum security layer for CLI usage.
 
 ---
 
-### v1.15+: Future
+### v1.16+: Future
 
 | Version | Feature |
 |---------|---------|
-| v1.15 | Cost tracking & token counting |
-| v1.16 | Export conversations (MD/JSON/PDF) |
-| v1.17 | Configurable council (`--models`, `--preset`) |
+| v1.16 | Cost tracking & token counting |
+| v1.17 | Export conversations (MD/JSON/PDF) |
 | v1.18 | Image input (multimodal) |
 | v1.19 | Local models (Ollama) |
 
@@ -284,9 +343,9 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 **Note:** Several other issues (duplicated `execute_tool`, feature asymmetry, storage inefficiency, logging) are addressed by planned versions:
 - v1.8 Strategy Pattern fixes round duplication and feature asymmetry
 - v1.10 Workflow State Machine replaces JSON storage with SQLite
-- v1.11 Observability adds structured logging
-- v1.12 Tool Registry centralizes `execute_tool`
-- v1.13 Retry & Fallback will use the shared client
+- v1.12 Observability adds structured logging
+- v1.13 Tool Registry centralizes `execute_tool`
+- v1.14 Retry & Fallback will use the shared client
 
 ---
 
@@ -311,10 +370,10 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 | Practice | Details | Roadmap |
 |----------|---------|---------|
 | SOLID (OCP/DIP) | Strategy pattern, dependency injection | v1.8 |
-| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.10, v1.13 |
-| Structured Logging | JSON logs with correlation IDs | v1.11 |
-| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.13 |
-| Retry with Backoff | Exponential backoff for API failures | v1.13 |
+| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.10, v1.14 |
+| Structured Logging | JSON logs with correlation IDs | v1.12 |
+| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.14 |
+| Retry with Backoff | Exponential backoff for API failures | v1.14 |
 | Contract Tests | Scheduled daily API schema validation | — |
 | Pre-commit Hooks | Ruff as pre-commit hook | — |
 | Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |
@@ -375,6 +434,6 @@ tests/
 
 ---
 
-*Last updated: 2026-01-26*
+*Last updated: 2026-02-10*
 
 For implementation details and session notes, see [DEVLOG.md](DEVLOG.md).
