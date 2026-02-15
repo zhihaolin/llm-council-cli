@@ -90,7 +90,7 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 **`config.yaml`** (project root)
 - User-editable configuration file
 - Settings: `council_models`, `chairman_model`, `openrouter_api_url`, `data_dir`
-- Optional - defaults are built into `config.py`
+- Optional - defaults are built into `settings.py`
 
 **`adapters/openrouter_client.py`**
 - `query_model()`: Single async model query

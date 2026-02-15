@@ -96,7 +96,7 @@ llm_council/engine/
 Each module has **one reason to change**:
 - `parsers.py` changes when parsing logic changes
 - `prompts.py` changes when prompt templates change
-- `streaming.py` changes when streaming behavior changes
+- `debate_streaming.py` changes when streaming behavior changes
 
 ---
 

@@ -4,6 +4,53 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.6.3: Package Reorganization
+*February 2026*
+
+### Changes
+- Reorganized two top-level packages (`backend/` + `cli/`) into single `llm_council/` package
+- Renamed subpackage `council/` → `engine/` to avoid `llm_council.council` redundancy
+- Module renames for clarity:
+  - `config.py` → `settings.py` (avoids confusion with `config.yaml`)
+  - `orchestrator.py` → `ranking.py` (parallel with `debate.py`)
+  - `streaming.py` → `debate_streaming.py` (clarifies scope)
+  - `chat.py` → `chat_commands.py` (more descriptive)
+  - `utils.py` → `constants.py` (matches contents)
+- Introduced `adapters/` subpackage for external service clients (`openrouter_client.py`, `tavily_search.py`, `json_storage.py`)
+- Fixed duplicated constants in `chat_session.py` (now imports from `constants.py`)
+- Cleaned stale build artifacts (`llm_council.egg-info/`), added `.ruff_cache/` to `.gitignore`
+
+### Final Structure
+```
+llm_council/
+├── settings.py
+├── adapters/
+│   ├── openrouter_client.py
+│   ├── tavily_search.py
+│   └── json_storage.py
+├── engine/
+│   ├── ranking.py
+│   ├── debate.py
+│   ├── debate_streaming.py
+│   ├── react.py
+│   ├── prompts.py
+│   ├── parsers.py
+│   └── aggregation.py
+└── cli/
+    ├── main.py
+    ├── runners.py
+    ├── presenters.py
+    ├── chat_session.py
+    ├── chat_commands.py
+    ├── tui.py
+    └── constants.py
+```
+
+### Note on Historical Entries
+Entries below this point reference the pre-reorganization paths (`backend/`, `cli/`, `backend/council/`). These are historically accurate for when those changes were made.
+
+---
+
 ## Post-v1.6.3: Docker CI Smoke Test & Import Cleanup
 *January 2026*
 
