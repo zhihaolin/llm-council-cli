@@ -7,7 +7,7 @@ streaming), and the debate orchestrator.
 
 import asyncio
 from collections.abc import AsyncGenerator, Callable
-from typing import Any
+from typing import Any, Protocol
 
 from ..adapters.openrouter_client import (
     query_model,
@@ -25,6 +25,26 @@ from .prompts import (
     format_responses_for_critique,
     get_date_context,
 )
+
+
+class ExecuteRound(Protocol):
+    """Protocol for debate round execution strategies.
+
+    Implementations must be async generators that yield event dicts and
+    end with a ``{"type": "round_complete", "responses": [...]}`` event.
+
+    Two built-in strategies:
+        - ``debate_round_parallel``: runs all models concurrently
+        - ``debate_round_streaming``: runs models sequentially with token streaming
+    """
+
+    def __call__(
+        self,
+        *,
+        round_type: str,
+        user_query: str,
+        context: dict[str, Any],
+    ) -> AsyncGenerator[dict[str, Any], None]: ...
 
 
 async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
@@ -176,7 +196,7 @@ async def synthesize_debate(
 
 async def run_debate(
     user_query: str,
-    execute_round: Callable,
+    execute_round: ExecuteRound,
     cycles: int = 1,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
