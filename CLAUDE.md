@@ -429,7 +429,7 @@ tests/
 ├── test_conversation_context.py # 5 tests - conversation context handling
 ├── test_debate.py               # 15 tests - debate mode
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
-├── test_react.py                # 11 tests - ReAct chairman parsing & loop
+├── test_react.py                # 12 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling
 ├── test_streaming.py            # 10 tests - streaming & parallel mode
 └── integration/                 # CLI tests (planned)
