@@ -255,7 +255,7 @@ def build_model_panel(
     if searched:
         indicators.append("searched")
     if indicators:
-        title += " [dim]" + " ".join(f"[{i}]" for i in indicators) + "[/dim]"
+        title += " [dim]" + " ".join(f"\\[{i}]" for i in indicators) + "[/dim]"
     return Panel(
         Markdown(content) if content.strip() else Text("(empty)", style="dim"),
         title=title,
