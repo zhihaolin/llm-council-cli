@@ -249,9 +249,14 @@ llm-council --debate --simple "Question"           # Just final answer
 
 **Orchestrator and execution strategies** (also in `debate.py`):
 
+**`ExecuteRound`** (Protocol)
+- Formal protocol for debate round execution strategies
+- `__call__(*, round_type, user_query, context) -> AsyncGenerator[dict, None]`
+- Built-in strategies: `debate_round_parallel`, `debate_round_streaming`
+
 **`run_debate(user_query, execute_round, cycles)`**
 - Single orchestrator defining debate round sequence once
-- Delegates execution to `execute_round` callback (strategy pattern)
+- Delegates execution to `execute_round: ExecuteRound` callback (strategy pattern)
 - `cycles=1` (default) produces 3 interaction rounds (initial + 1 critique-defense cycle)
 - `cycles=N` produces 2N+1 interaction rounds (initial + N critique-defense cycles). Always ends on defense.
 - Yields: `round_start` → (pass-through events from executor) → `round_complete` → ... → `debate_complete`
@@ -413,7 +418,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Round Sequence**: The round sequence (initial → N×(critique → defense)) is defined once in `run_debate()`. The `cycles` parameter controls how many critique-defense cycles occur (default 1). Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. Synthesis is handled by each CLI runner after debate completes. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
+6. **Debate Round Sequence**: The round sequence (initial → N×(critique → defense)) is defined once in `run_debate()`. The `cycles` parameter controls how many critique-defense cycles occur (default 1). Execution is delegated to an `ExecuteRound` protocol implementation (`debate_round_parallel()` or `debate_round_streaming()`). Synthesis is handled by each CLI runner after debate completes. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
 
 ## Known Technical Debt
 

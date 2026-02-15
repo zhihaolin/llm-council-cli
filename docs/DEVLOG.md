@@ -4,6 +4,23 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Add `ExecuteRound` Protocol
+*February 2026*
+
+### Overview
+Added an explicit `typing.Protocol` for the `execute_round` parameter of `run_debate()`. The strategy pattern previously used a bare `Callable` type — the contract between the orchestrator and its two strategies (`debate_round_parallel`, `debate_round_streaming`) was purely duck-typed. The protocol makes the expected signature visible to readers, IDEs, and type checkers (pyright).
+
+### Changes
+- `llm_council/engine/debate.py`: Added `ExecuteRound` protocol class with keyword-only `__call__` signature. Changed `run_debate(execute_round: Callable)` to `run_debate(execute_round: ExecuteRound)`.
+- `llm_council/engine/__init__.py`: Exported `ExecuteRound` in imports, `__all__`, and module docstring.
+- `CLAUDE.md`: Documented `ExecuteRound` protocol in debate functions section and common gotchas.
+
+### Results
+- 0 pyright errors (both built-in strategies conform to the protocol)
+- All tests pass, ruff clean
+
+---
+
 ## Post-v1.9: Fix `max_rounds` semantics and streaming error/complete conflict
 *February 2026*
 
