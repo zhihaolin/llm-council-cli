@@ -1,6 +1,10 @@
 # SOLID Refactoring Guide
 
-This document captures educational examples of SOLID principle violations found in this codebase and how to fix them. Use it as a reference for understanding SOLID in practice.
+This document captures a mix of historical SOLID principle violations from earlier versions of this repo and illustrative examples of how to fix them. Use it as a reference for understanding SOLID in practice.
+
+Notes:
+- Some file paths in **Bad Example** blocks are historical (`backend/...`) and intentionally refer to pre-refactor code.
+- Some code blocks are simplified pseudocode; file paths in comments may be illustrative rather than literal.
 
 ---
 
@@ -162,7 +166,7 @@ def query(...):
 ### Bad Example: Adding a new round type requires modifying existing code
 
 ```python
-# llm_council/engine.py - VIOLATION: must modify to extend
+# (pseudocode) llm_council/engine/_monolith_example.py - VIOLATION: must modify to extend
 
 async def debate_round_streaming(round_type, query, context):
     if round_type == "initial":
@@ -187,7 +191,7 @@ async def debate_round_streaming(round_type, query, context):
 ### Good Example: Strategy pattern for round types
 
 ```python
-# llm_council/engine/rounds.py - OPEN FOR EXTENSION
+# (proposed) llm_council/engine/rounds.py - OPEN FOR EXTENSION
 
 from abc import ABC, abstractmethod
 
@@ -271,7 +275,7 @@ async def debate_round_streaming(round_type: str, query: str, context: dict):
 ### Bad Example: Inconsistent return types
 
 ```python
-# llm_council/engine.py - VIOLATION: inconsistent returns
+# (pseudocode) llm_council/engine/_monolith_example.py - VIOLATION: inconsistent returns
 
 async def stage1_collect_responses(query) -> List[Dict]:
     """Returns list of response dicts."""
@@ -292,7 +296,7 @@ async def stage3_synthesize_final(query, stage1, stage2) -> Dict:
 ### Good Example: Consistent interface with result objects
 
 ```python
-# llm_council/engine/types.py - CONSISTENT INTERFACE
+# (proposed) llm_council/engine/types.py - CONSISTENT INTERFACE
 
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
@@ -437,7 +441,7 @@ from llm_council.engine.debate_streaming import run_debate_token_streaming
 ### Bad Example: Hardcoded dependencies
 
 ```python
-# llm_council/engine.py - VIOLATION: hardcoded config
+# (pseudocode) llm_council/engine/_monolith_example.py - VIOLATION: hardcoded config
 
 from .settings import COUNCIL_MODELS, CHAIRMAN_MODEL  # Concrete dependency
 

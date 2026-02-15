@@ -14,7 +14,7 @@ Repo engineering practices and preferences.
 - CI gate is pytest passing.
 - Run locally:
   - `uv run pytest tests/ -v`
-  - `uv run pytest tests/ --cov=backend --cov-report=term-missing` (as needed)
+  - `uv run pytest tests/ --cov=llm_council --cov-report=term-missing` (as needed)
 - Integration tests in CI must mock OpenRouter/Tavily; live API tests should be scheduled separately.
 
 ## Tooling
@@ -25,7 +25,7 @@ Repo engineering practices and preferences.
 ## Architecture
 - SOLID/DI refactor is planned; do not introduce DI unless requested.
 
-## Known Tech Debt / Follow-ups (as of 2026-02-05)
+## Known Tech Debt / Follow-ups (as of 2026-02-15)
 
 ### Already in the roadmap (`docs/PLAN.md`)
 - v1.8 Strategy pattern: unify round behavior across implementations (streaming vs non-streaming drift).
@@ -37,9 +37,8 @@ Repo engineering practices and preferences.
 ### Not currently in the roadmap (bugs/UX cleanup)
 - CLI `query --debate --stream/--parallel` skips ReAct (and effectively ignores `--simple`/`--final-only` expectations).
 - Textual TUI doesn’t clear prior results; repeated queries accumulate widgets and reuse IDs; placeholder removal swallows exceptions.
-- Duplicate constants (`DEFAULT_CONTEXT_TURNS`, `DEFAULT_DEBATE_ROUNDS`) exist in both `cli/chat_session.py` and `cli/utils.py`.
-- Import-time env coupling: `load_dotenv()` at import; `TAVILY_API_KEY` read once at import time.
-- Type-hint mismatch: `parse_react_output()` returns `None`s but is typed as non-optional.
+- Import-time env coupling: `llm_council/settings.py` calls `load_dotenv()` at import; `llm_council/adapters/tavily_search.py` reads `TAVILY_API_KEY` once at import time.
+- Type-hint mismatch: `llm_council/engine/parsers.py:parse_react_output()` returns `None`s but is typed as non-optional.
 - Storage robustness: `list_conversations()` assumes all JSON files are valid; writes are not atomic.
 
 ### Dependency drift watchlist
