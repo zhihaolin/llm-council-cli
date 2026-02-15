@@ -130,7 +130,7 @@ class TestFormatSearchResults:
 
 
 class TestExecuteTool:
-    """Tests for the execute_tool() function in council.py."""
+    """Tests for the execute_tool() function in ranking.py."""
 
     @pytest.mark.asyncio
     async def test_execute_search_web_tool(self):

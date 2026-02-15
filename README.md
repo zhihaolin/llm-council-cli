@@ -30,10 +30,10 @@ The result? Answers that capture the best insights from each model while filteri
 
 ### Multi-Model Deliberation
 
-Query 5 frontier models in parallel. Each provides an independent response, then anonymously evaluates the others. A chairman model synthesizes the final answer based on the full deliberation.
+Query your council models in parallel. Each provides an independent response, then anonymously evaluates the others. A chairman model synthesizes the final answer based on the full deliberation.
 
 ```
-Stage 1: Independent Responses    →  5 models answer your question
+Stage 1: Independent Responses    →  Council models answer your question
 Stage 2: Anonymous Peer Review    →  Each model ranks the others (blind)
 Stage 3: Chairman Synthesis       →  Best insights combined into final answer
 ```
@@ -372,10 +372,11 @@ uv run pytest tests/ -v
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
 ├── test_chat_commands.py        # Chat REPL command parsing (10 tests)
+├── test_cli_imports.py          # CLI smoke test (1 test)
 ├── test_conversation_context.py # Context extraction (5 tests)
 ├── test_debate.py               # Debate mode (15 tests)
 ├── test_ranking_parser.py       # Ranking extraction (14 tests)
-├── test_react.py                # ReAct chairman (11 tests)
+├── test_react.py                # ReAct chairman (12 tests)
 ├── test_search.py               # Web search & tool calling (17 tests)
 ├── test_streaming.py            # Streaming & parallel (10 tests)
 └── integration/                 # CLI integration tests (planned)
@@ -401,10 +402,11 @@ tests/
 | v1.8 | Strategy Pattern (OCP/DIP) | Planned |
 | v1.9 | Self-Reflection Round | Planned |
 | v1.10 | Workflow State Machine | Planned |
-| v1.11 | Observability (OpenTelemetry) | Planned |
-| v1.12 | Tool Registry (MCP) | Planned |
-| v1.13 | Retry & Fallback Logic | Planned |
-| v1.14 | Security Foundations | Planned |
+| v1.11 | Human-in-the-Loop (HITL) | Planned |
+| v1.12 | Observability (OpenTelemetry) | Planned |
+| v1.13 | Tool Registry (MCP) | Planned |
+| v1.14 | Retry & Fallback Logic | Planned |
+| v1.15 | Security Foundations | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 

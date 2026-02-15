@@ -426,7 +426,7 @@ tests/
 ├── test_conversation_context.py # 5 tests
 ├── test_debate.py               # 15 tests
 ├── test_ranking_parser.py       # 14 tests
-├── test_react.py                # 11 tests
+├── test_react.py                # 12 tests
 ├── test_search.py               # 17 tests
 ├── test_streaming.py            # 10 tests
 └── integration/                 # CLI tests (planned)

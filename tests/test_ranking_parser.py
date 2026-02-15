@@ -1,5 +1,5 @@
 """
-Tests for the ranking parser in council.py.
+Tests for the ranking parser in parsers.py.
 
 The ranking parser extracts structured rankings from model evaluation text.
 These tests cover various edge cases and formats that models might produce.

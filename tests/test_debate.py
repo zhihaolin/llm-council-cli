@@ -1,5 +1,5 @@
 """
-Tests for the debate mode functionality in council.py.
+Tests for the debate mode functionality in debate.py.
 
 These tests verify the multi-round debate logic including critique extraction,
 defense parsing, and debate orchestration.

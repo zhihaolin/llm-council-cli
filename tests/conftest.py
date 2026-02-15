@@ -1,12 +1,11 @@
 """
 Pytest configuration and fixtures for LLM Council tests.
 
-This module provides mock responses and fixtures for testing the council
+This module provides mock responses and fixtures for testing the engine
 without making actual API calls.
 """
 
 from typing import Any
-from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -143,53 +142,3 @@ def sample_ranking_text_no_header() -> str:
     return SAMPLE_RANKING_TEXT_NO_HEADER
 
 
-@pytest.fixture
-def mock_query_model():
-    """
-    Fixture that patches query_model to return controlled responses.
-
-    Usage:
-        def test_something(mock_query_model):
-            mock_query_model.return_value = {"content": "test response"}
-            # ... run test
-    """
-    with patch("llm_council.engine.query_model", new_callable=AsyncMock) as mock:
-        yield mock
-
-
-@pytest.fixture
-def mock_query_model_with_tools():
-    """
-    Fixture that patches query_model_with_tools for Stage 1 testing.
-    """
-    with patch("llm_council.engine.query_model_with_tools", new_callable=AsyncMock) as mock:
-        yield mock
-
-
-@pytest.fixture
-def mock_council_models():
-    """
-    Fixture that patches COUNCIL_MODELS to use a smaller test set.
-    """
-    with patch("llm_council.engine.COUNCIL_MODELS", SAMPLE_MODELS):
-        yield SAMPLE_MODELS
-
-
-# =============================================================================
-# Helper Functions
-# =============================================================================
-
-def make_model_response(content: str, tool_calls_made: list[str] = None) -> dict[str, Any]:
-    """Create a mock model response dict."""
-    response = {"content": content}
-    if tool_calls_made:
-        response["tool_calls_made"] = tool_calls_made
-    return response
-
-
-def make_stage1_result(model: str, response: str, searched: bool = False) -> dict[str, Any]:
-    """Create a mock Stage 1 result."""
-    result = {"model": model, "response": response}
-    if searched:
-        result["tool_calls_made"] = [{"function": "search_web", "query": "test"}]
-    return result
