@@ -15,6 +15,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from llm_council.adapters.openrouter_client import query_model_streaming
 from llm_council.cli.presenters import build_model_panel, console
 from llm_council.engine import (
     calculate_aggregate_rankings,
@@ -25,9 +26,9 @@ from llm_council.engine import (
     synthesize_with_react,
 )
 from llm_council.engine.debate import debate_round_parallel as _debate_round_parallel
+from llm_council.engine.debate import debate_round_streaming as _debate_round_streaming
 from llm_council.engine.debate import run_debate as _run_debate
-from llm_council.engine.debate import run_debate_parallel as _run_debate_parallel
-from llm_council.engine.debate import run_debate_streaming as _run_debate_streaming
+from llm_council.engine.prompts import build_debate_synthesis_prompt
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 
@@ -283,7 +284,8 @@ async def run_debate_streaming(
 
     current_round_type = ""
 
-    async for event in _run_debate_streaming(query, max_rounds, skip_synthesis=skip_synthesis):
+    # Phase 1: Run debate rounds
+    async for event in _run_debate(query, _debate_round_streaming, max_rounds):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -369,36 +371,45 @@ async def run_debate_streaming(
                 }
             )
 
-        elif event_type == "synthesis_start":
-            console.print()
-            console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
-            console.print()
-            current_model = CHAIRMAN_MODEL
-            current_content = ""
-            line_count = 0  # Reset - track_output will count actual lines
-            current_col = 0
-            short_name = current_model.split("/")[-1]
-            header = f"{short_name}: "
-            track_output(header)
-            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+        elif event_type == "error":
+            console.print(f"[red]Error: {event['message']}[/red]")
+            return rounds_data, None
 
-        elif event_type == "synthesis_token":
-            current_content += event["content"]
-            token = event["content"]
-            track_output(token)
-            console.print(f"[grey62]{token}[/grey62]", end="")
-
-        elif event_type == "synthesis_complete":
-            synthesis_data = event["synthesis"]
-            console.print()
-            track_output("\n")
-            clear_streaming_output()
-            console.print(build_model_panel(current_model, current_content, "green"))
-            console.print()
-
-        elif event_type == "complete":
+        elif event_type == "debate_complete":
             rounds_data = event["rounds"]
-            synthesis_data = event["synthesis"]
+
+    # Phase 2: Chairman synthesis with streaming
+    if not skip_synthesis:
+        console.print()
+        console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
+        console.print()
+        current_model = CHAIRMAN_MODEL
+        current_content = ""
+        line_count = 0
+        current_col = 0
+        short_name = current_model.split("/")[-1]
+        header = f"{short_name}: "
+        track_output(header)
+        console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
+        chairman_prompt = build_debate_synthesis_prompt(query, rounds_data, len(rounds_data))
+        messages = [{"role": "user", "content": chairman_prompt}]
+
+        async for event in query_model_streaming(CHAIRMAN_MODEL, messages):
+            if event["type"] == "token":
+                current_content += event["content"]
+                token = event["content"]
+                track_output(token)
+                console.print(f"[grey62]{token}[/grey62]", end="")
+            elif event["type"] == "error":
+                current_content = f"Error: {event['error']}"
+
+        synthesis_data = {"model": CHAIRMAN_MODEL, "response": current_content}
+        console.print()
+        track_output("\n")
+        clear_streaming_output()
+        console.print(build_model_panel(current_model, current_content, "green"))
+        console.print()
 
     return rounds_data, synthesis_data
 
@@ -461,7 +472,8 @@ async def run_debate_parallel(
         )
         console.print()
 
-    async for event in _run_debate_parallel(query, max_rounds, skip_synthesis=skip_synthesis):
+    # Phase 1: Run debate rounds
+    async for event in _run_debate(query, _debate_round_parallel, max_rounds):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -534,37 +546,38 @@ async def run_debate_parallel(
                 }
             )
 
-        elif event_type == "synthesis_start":
-            console.print()
-            console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
-            console.print()
-
-            # Show spinner for chairman
-            model_status.clear()
-            model_status[CHAIRMAN_MODEL] = "querying"
-            live_display = Live(
-                build_status_table(), console=console, refresh_per_second=10, transient=True
-            )
-            live_display.start()
-
-        elif event_type == "synthesis_complete":
-            synthesis_data = event["synthesis"]
-
-            # Stop live display (transient=True clears it)
+        elif event_type == "error":
             if live_display:
                 live_display.stop()
                 live_display = None
+            console.print(f"[red]Error: {event['message']}[/red]")
+            return rounds_data, None
 
-            content = synthesis_data.get("response", "")
-            console.print(build_model_panel(CHAIRMAN_MODEL, content, "green"))
-            console.print()
-
-        elif event_type == "complete":
-            # Ensure live display is stopped
-            if live_display:
-                live_display.stop()
-                live_display = None
+        elif event_type == "debate_complete":
             rounds_data = event.get("rounds", rounds_data)
-            synthesis_data = event.get("synthesis", synthesis_data)
+
+    # Phase 2: Chairman synthesis
+    if not skip_synthesis:
+        console.print()
+        console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
+        console.print()
+
+        # Show spinner for chairman
+        model_status.clear()
+        model_status[CHAIRMAN_MODEL] = "querying"
+        live_display = Live(
+            build_status_table(), console=console, refresh_per_second=10, transient=True
+        )
+        live_display.start()
+
+        synthesis_data = await synthesize_debate(query, rounds_data, len(rounds_data))
+
+        if live_display:
+            live_display.stop()
+            live_display = None
+
+        content = synthesis_data.get("response", "")
+        console.print(build_model_panel(CHAIRMAN_MODEL, content, "green"))
+        console.print()
 
     return rounds_data, synthesis_data

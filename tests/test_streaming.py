@@ -203,10 +203,10 @@ async def test_round_complete_contains_all_responses():
 @pytest.mark.asyncio
 async def test_debate_streaming_event_order():
     """
-    Verify that run_debate_parallel yields events
-    in the correct order: round_start -> model_completes -> round_complete.
+    Verify that run_debate with debate_round_parallel yields events
+    in the correct order: round_start -> model events -> round_complete -> debate_complete.
     """
-    from llm_council.engine import run_debate_parallel
+    from llm_council.engine.debate import debate_round_parallel, run_debate
 
     async def mock_query(model, messages, *args, **kwargs):
         return {"content": f"Response from {model}"}
@@ -218,30 +218,30 @@ async def test_debate_streaming_event_order():
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
             with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
                 events = []
-                async for event in run_debate_parallel(
+                async for event in run_debate(
                     user_query="Test question",
+                    execute_round=debate_round_parallel,
                     max_rounds=2,
                 ):
                     events.append(event)
 
-    # Verify event sequence for debate with 2 rounds (= 3 actual rounds + synthesis)
-    # Expected sequence:
-    # round_start(1) -> model_complete(s) -> round_complete(1)
+    # Expected sequence (no synthesis — that's now the CLI's responsibility):
+    # round_start(1) -> model_start(s) -> model_complete(s) -> round_complete(1)
     # round_start(2) -> model_complete(s) -> round_complete(2)
     # round_start(3) -> model_complete(s) -> round_complete(3)
-    # synthesis_start -> synthesis_complete -> complete
+    # debate_complete
 
     event_types = [e["type"] for e in events]
 
     # Should have 3 round_start events
     assert event_types.count("round_start") == 3
 
-    # Should have synthesis events
-    assert "synthesis_start" in event_types
-    assert "synthesis_complete" in event_types
+    # No synthesis events (synthesis is now a CLI concern)
+    assert "synthesis_start" not in event_types
+    assert "synthesis_complete" not in event_types
 
-    # Should end with complete event
-    assert event_types[-1] == "complete"
+    # Should end with debate_complete event
+    assert event_types[-1] == "debate_complete"
 
     # Verify round numbers in round_start events
     round_starts = [e for e in events if e["type"] == "round_start"]
@@ -259,16 +259,12 @@ async def test_debate_streaming_event_order():
 
 
 @pytest.mark.asyncio
-async def test_streaming_same_result_as_batch():
+async def test_run_debate_produces_correct_rounds():
     """
-    Verify that run_debate with debate_round_parallel produces the same
-    rounds as run_debate_parallel (which delegates to run_debate internally).
+    Verify that run_debate with debate_round_parallel produces correct rounds
+    with expected round types and response counts.
     """
-    from llm_council.engine.debate import (
-        debate_round_parallel,
-        run_debate,
-        run_debate_parallel,
-    )
+    from llm_council.engine.debate import debate_round_parallel, run_debate
 
     async def mock_query(model, messages, *args, **kwargs):
         # Return deterministic responses based on message content
@@ -279,8 +275,6 @@ async def test_streaming_same_result_as_batch():
             return {
                 "content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"
             }
-        elif "Chairman" in content or "synthesize" in content.lower():
-            return {"content": "Synthesis from chairman"}
         return {"content": f"Initial response from {model}"}
 
     async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
@@ -291,40 +285,32 @@ async def test_streaming_same_result_as_batch():
             }
         return {"content": f"Initial response from {model}"}
 
-    # Run via run_debate directly (batch-like: no synthesis)
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
             with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                batch_rounds = None
+                rounds = None
                 async for event in run_debate(
                     "Test question",
                     execute_round=debate_round_parallel,
                     max_rounds=2,
                 ):
                     if event["type"] == "debate_complete":
-                        batch_rounds = event["rounds"]
+                        rounds = event["rounds"]
 
-    # Run via run_debate_parallel (which delegates to run_debate internally)
-    with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
-        with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                with patch("llm_council.engine.debate.CHAIRMAN_MODEL", SAMPLE_MODELS[0]):
-                    stream_result = None
-                    async for event in run_debate_parallel(
-                        "Test question",
-                        max_rounds=2,
-                    ):
-                        if event["type"] == "complete":
-                            stream_result = event
+    # Should have 3 rounds
+    assert len(rounds) == 3
 
-    # Both should have same number of rounds
-    assert len(stream_result["rounds"]) == len(batch_rounds)
+    # Verify round types and numbers
+    assert rounds[0]["round_number"] == 1
+    assert rounds[0]["round_type"] == "initial"
+    assert rounds[1]["round_number"] == 2
+    assert rounds[1]["round_type"] == "critique"
+    assert rounds[2]["round_number"] == 3
+    assert rounds[2]["round_type"] == "defense"
 
-    # Same round types and numbers
-    for batch_round, stream_round in zip(batch_rounds, stream_result["rounds"]):
-        assert batch_round["round_number"] == stream_round["round_number"]
-        assert batch_round["round_type"] == stream_round["round_type"]
-        assert len(batch_round["responses"]) == len(stream_round["responses"])
+    # Each round should have responses from all models
+    for rnd in rounds:
+        assert len(rnd["responses"]) == len(SAMPLE_MODELS)
 
 
 # =============================================================================
