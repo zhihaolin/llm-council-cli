@@ -4,6 +4,20 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Remove Textual TUI
+*February 2026*
+
+### Overview
+Removed the Textual-based TUI (`tui.py`) and the `interactive` CLI command. The chat REPL (`llm-council chat`) fully supersedes it — it supports debate mode, streaming, parallel execution, ReAct, and conversation history, none of which the TUI had.
+
+### Changes
+- Deleted `llm_council/cli/tui.py` (~410 lines)
+- Removed `interactive` command from `main.py`
+- Removed `textual>=0.50.0` from `pyproject.toml` dependencies
+- Updated README.md and CLAUDE.md to remove TUI references
+
+---
+
 ## Post-v1.9: Remove engine wrappers, inline synthesis in CLI runners
 *February 2026*
 

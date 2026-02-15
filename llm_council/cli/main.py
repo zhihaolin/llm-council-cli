@@ -245,25 +245,6 @@ def models():
     console.print()
 
 
-@app.command()
-def interactive(
-    question: str | None = typer.Argument(
-        None,
-        help="Optional initial question to ask",
-    ),
-):
-    """
-    Launch interactive TUI mode.
-
-    Examples:
-        llm-council interactive
-        llm-council interactive "Start with this question"
-    """
-    from llm_council.cli.tui import run_tui
-
-    run_tui(query=question)
-
-
 def main():
     """Entry point for the CLI."""
     app()

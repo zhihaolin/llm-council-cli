@@ -132,7 +132,6 @@ Slash commands:
 - **CLI mode** — Full 3-stage output with progress indicators
 - **Simple mode** — Just the final answer, pipe-friendly
 - **Chat mode** — Interactive REPL with conversation history
-- **Interactive TUI** — Terminal UI with keyboard navigation
 
 ---
 
@@ -277,9 +276,6 @@ uv run llm-council models
 # Interactive chat with history
 uv run llm-council chat
 uv run llm-council chat --new  # Start fresh conversation
-
-# Interactive TUI
-uv run llm-council interactive
 ```
 
 ### Flags
@@ -326,7 +322,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 | Component | Technology |
 |-----------|------------|
 | Backend | Python 3.10+, async httpx |
-| CLI | Typer, Rich, Textual |
+| CLI | Typer, Rich |
 | LLM Access | OpenRouter API (unified access to GPT, Claude, Gemini, etc.) |
 | Web Search | Tavily API (LLM-optimized search) |
 | Testing | pytest, pytest-asyncio |
@@ -388,7 +384,7 @@ tests/
 
 | Version | Feature | Status |
 |---------|---------|--------|
-| v1.0 | CLI + TUI | ✅ Complete |
+| v1.0 | CLI | ✅ Complete |
 | v1.1 | Autonomous Web Search | ✅ Complete |
 | v1.2 | Multi-Turn Debate Mode | ✅ Complete |
 | v1.3 | Interactive Chat with History | ✅ Complete |
@@ -417,7 +413,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/
 This project builds upon the original [LLM Council](https://github.com/karpathy/llm-council) concept by **[Andrej Karpathy](https://github.com/karpathy)**. The core idea of using multiple LLMs with peer review comes from his work.
 
 This fork extends the original with:
-- Full CLI/TUI interface
+- Full CLI interface
 - Interactive chat with conversation history
 - Autonomous web search via tool calling
 - Multi-turn debate mode

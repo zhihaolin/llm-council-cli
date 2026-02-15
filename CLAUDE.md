@@ -303,7 +303,6 @@ llm_council/cli/
 ├── runners.py        # run_* execution with progress
 ├── chat_session.py   # Chat REPL logic
 ├── chat_commands.py  # Command parsing utilities
-├── tui.py            # Textual TUI app
 └── constants.py      # Constants
 ```
 
