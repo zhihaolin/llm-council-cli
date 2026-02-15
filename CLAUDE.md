@@ -126,8 +126,10 @@ Key functions (all exported from `llm_council.engine`):
 - `stage2_collect_rankings()`: Anonymizes responses and collects peer rankings
 - `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
 - `run_full_council()`: Orchestrates the complete 3-stage flow
+- `RoundConfig`: Frozen dataclass capturing per-round-type configuration (uses_tools, build_prompt, has_revised_answer)
+- `build_round_config()`: Factory producing RoundConfig for a given round type
 - `run_debate()`: Single orchestrator defining debate round sequence, delegates to executor callback
-- `debate_round_parallel()`: Execute-round strategy — parallel with per-model events
+- `debate_round_parallel()`: Execute-round strategy — parallel with per-model events (default)
 - `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
 - `synthesize_with_react()`: ReAct reasoning loop for chairman
 - `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section
@@ -183,7 +185,7 @@ Models receive a `search_web` tool definition and autonomously decide when to us
 - Questions about current events, prices, weather → model calls search
 - General knowledge questions → model answers directly
 
-**Rounds with search enabled** (consistent across batch, parallel, and token-streaming modes):
+**Rounds with search enabled** (consistent across parallel and streaming modes):
 - **Round 1 (Initial):** Models can search to gather facts for their initial response
 - **Round 3 (Defense):** Models can search to find evidence supporting their defense
 
@@ -233,19 +235,19 @@ llm-council --debate --simple "Question"           # Just final answer
 
 ### Debate Functions (in `llm_council/engine/debate.py`)
 
-**Per-model query functions** (used by both parallel and streaming executors):
+**`RoundConfig`** (frozen dataclass)
+- Captures per-round-type configuration so execution strategies don't duplicate dispatch logic
+- Fields:
+  - `uses_tools: bool` — Whether the model should have access to web search tools
+  - `build_prompt: Callable[[str], str]` — `(model) -> prompt_string` for this round
+  - `has_revised_answer: bool` — Whether the response should be parsed for a revised answer
 
-**`query_initial(model, user_query)`** — Round 1 for a single model
-- Uses `query_model_with_tools()` (web search enabled)
-- Returns `{"model": ..., "response": ..., "tool_calls_made": ...}` or `None`
-
-**`query_critique(model, user_query, initial_responses)`** — Round 2 for a single model
-- Uses `query_model()` (no tools — critiques evaluate existing responses)
-- Returns `{"model": ..., "response": ...}` or `None`
-
-**`query_defense(model, user_query, initial_responses, critique_responses)`** — Round 3 for a single model
-- Uses `query_model_with_tools()` (web search enabled for evidence gathering)
-- Returns `{"model": ..., "response": ..., "revised_answer": ..., "tool_calls_made": ...}` or `None`
+**`build_round_config(round_type, user_query, context) -> RoundConfig`**
+- Single point of dispatch replacing duplicated if/elif chains in both execution strategies
+- `round_type="initial"`: `uses_tools=True`, `has_revised_answer=False`, prompt includes date context
+- `round_type="critique"`: `uses_tools=False`, `has_revised_answer=False`, prompt includes all responses
+- `round_type="defense"`: `uses_tools=True`, `has_revised_answer=True`, prompt includes original + critiques
+- Raises `ValueError` for unknown round types
 
 **Orchestrator and execution strategies** (also in `debate.py`):
 
@@ -307,7 +309,7 @@ llm_council/cli/
 ├── main.py           # Command routing only
 ├── presenters.py     # All print_* display functions
 ├── runners.py        # run_* execution with progress
-├── chat_session.py   # Chat REPL logic
+├── chat_session.py   # ChatState + command dispatch + REPL loop
 ├── chat_commands.py  # Command parsing utilities
 └── constants.py      # Constants
 ```
@@ -318,10 +320,16 @@ llm_council/cli/
 - `print_stage1/2/3()` - Standard mode output
 
 **Runners (in `llm_council/cli/runners.py`):**
-- `run_debate_with_progress()` - Consumes `run_debate` events with progress spinners
-- `run_debate_parallel()` - Calls `run_debate()` + inline synthesis with Rich Live display
+- `run_debate_parallel()` - Calls `run_debate()` + inline synthesis with Rich Live display (default debate mode)
 - `run_debate_streaming()` - Calls `run_debate()` + inline streaming synthesis with line wrap tracking
 - `run_react_synthesis()` - ReAct trace display
+
+**Chat session (in `llm_council/cli/chat_session.py`):**
+- `ChatState` dataclass — holds all mutable REPL state (debate/stream/react toggles, conversation, title)
+- `COMMAND_HANDLERS` dispatch dict — maps command names to `cmd_*(state, argument) -> bool` handlers
+- `cmd_exit`, `cmd_help`, `cmd_history`, `cmd_use`, `cmd_new`, `cmd_debate`, `cmd_rounds`, `cmd_stream`, `cmd_react`, `cmd_mode` — individual command handlers
+- `_print_mode(state)`, `_print_banner(state, resumed)` — helpers to reduce repeated argument passing
+- `run_chat_session()` — main REPL loop, dispatches to handlers via dict lookup
 
 ### API Costs
 | Mode | API Calls (5 models) |
@@ -418,7 +426,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Round Sequence**: The round sequence (initial → N×(critique → defense)) is defined once in `run_debate()`. The `cycles` parameter controls how many critique-defense cycles occur (default 1). Execution is delegated to an `ExecuteRound` protocol implementation (`debate_round_parallel()` or `debate_round_streaming()`). Synthesis is handled by each CLI runner after debate completes. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
+6. **Debate Round Sequence**: The round sequence (initial → N×(critique → defense)) is defined once in `run_debate()`. The `cycles` parameter controls how many critique-defense cycles occur (default 1). Execution is delegated to an `ExecuteRound` protocol implementation (`debate_round_parallel()` or `debate_round_streaming()`). Synthesis is handled by each CLI runner after debate completes. Per-round-type dispatch (prompts, tools, parsing) is centralized in `build_round_config()` — execution strategies consume the resulting `RoundConfig` without their own if/elif chains
 
 ## Known Technical Debt
 
@@ -438,14 +446,14 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (93 tests)
+### Test Suite (92 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
 ├── test_chat_commands.py        # 10 tests - chat REPL command parsing
 ├── test_cli_imports.py          # 1 test - CLI module imports
 ├── test_conversation_context.py # 5 tests - conversation context handling
-├── test_debate.py               # 16 tests - debate mode
+├── test_debate.py               # 15 tests - debate mode + RoundConfig
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
 ├── test_react.py                # 12 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling
@@ -544,42 +552,25 @@ CLI: Display rounds with color-coded headers + synthesis
 
 The entire flow is async/parallel where possible to minimize latency.
 
-## Parallel Execution Mode
+## Parallel Execution Mode (Default)
 
 ### Overview
-The `--parallel` flag runs all models concurrently within each round, showing live progress spinners. This dramatically reduces total time (max(model times) instead of sum).
+Parallel mode is the default debate execution mode. It runs all models concurrently within each round, showing live progress spinners. This dramatically reduces total time (max(model times) instead of sum). Use `--stream` for sequential token-by-token streaming instead.
 
 ### CLI Usage
 ```bash
-llm-council query --debate --parallel "Question"   # Parallel with spinners
+llm-council query --debate "Question"              # Parallel (default) with spinners
 llm-council query --debate --stream "Question"     # Sequential with token streaming
 ```
 
 ### Implementation
-
-**Shared HTTP Client (`llm_council/adapters/openrouter_client.py`):**
-```python
-_shared_client: Optional[httpx.AsyncClient] = None
-_client_lock = asyncio.Lock()
-
-async def get_shared_client() -> httpx.AsyncClient:
-    """Get or create a shared httpx.AsyncClient for connection reuse."""
-    global _shared_client
-    async with _client_lock:
-        if _shared_client is None or _shared_client.is_closed:
-            _shared_client = httpx.AsyncClient(
-                timeout=DEFAULT_TIMEOUT,
-                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-            )
-        return _shared_client
-```
 
 **Per-model Timeout (`llm_council/engine/debate.py`):**
 ```python
 async def query_with_model(model: str):
     try:
         result = await asyncio.wait_for(
-            query_funcs[model](model),
+            _query_model(model),
             timeout=model_timeout  # Default: 120s
         )
         return model, result, None
@@ -667,7 +658,7 @@ Action: synthesize()
   - Thought: cyan
   - Action: yellow
   - Observation: dim
-- Works with parallel, streaming, and batch modes
+- Works with both parallel and streaming modes
 
 ### Key Design Decisions
 

@@ -4,6 +4,57 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Command pattern for chat REPL
+*February 2026*
+
+### Overview
+Replaced ~155-line if/elif chain in `run_chat_session()` with a `ChatState` dataclass, 10 `cmd_*` handler functions, and a `COMMAND_HANDLERS` dispatch dict.
+
+### Changes
+- `llm_council/cli/chat_session.py`: Added `ChatState` dataclass (replaces 7 loose locals), `_print_mode()` / `_print_banner()` helpers (eliminate repeated argument passing), 10 `cmd_*` handler functions (each returns `bool` — True=continue, False=exit), `COMMAND_HANDLERS` dispatch dict. Main loop reduced to 3-line dispatch.
+
+### Results
+- 92 tests pass, ruff clean
+- No behavior changes — pure refactor
+
+---
+
+## Post-v1.9: Extract `RoundConfig` dataclass
+*February 2026*
+
+### Overview
+Both execution strategies (`debate_round_parallel`, `debate_round_streaming`) duplicated if/elif dispatch on `round_type` to determine prompt construction, tool availability, and response parsing. Extracted into a `RoundConfig` frozen dataclass + `build_round_config()` factory.
+
+### Changes
+- `llm_council/engine/debate.py`: Added `RoundConfig(uses_tools, build_prompt, has_revised_answer)` dataclass and `build_round_config()` factory. Both strategies now call `build_round_config()` once and use the config throughout. Removed `query_initial()`, `query_critique()`, `query_defense()` — their logic is inlined into `build_round_config()` and the execution strategies.
+- `llm_council/engine/__init__.py`: Replaced `query_initial/query_critique/query_defense` exports with `RoundConfig/build_round_config`.
+- `tests/test_debate.py`: Replaced 8 `TestQuery*` tests with 7 `TestBuildRoundConfig` tests (synchronous, no mocking needed).
+
+### Results
+- 92 tests pass, ruff clean
+- Net reduction: ~158 lines (150 insertions, 308 deletions)
+
+---
+
+## Post-v1.9: Remove batch mode, make parallel default
+*February 2026*
+
+### Overview
+Removed `run_debate_with_progress()` (batch mode) — it was strictly dominated by `run_debate_parallel()` which shows live per-model spinners. With batch gone, parallel becomes the default non-streaming debate mode, eliminating the `--parallel` flag and `/parallel` chat command.
+
+### Changes
+- `llm_council/cli/runners.py`: Deleted `run_debate_with_progress()` (~75 lines)
+- `llm_council/cli/main.py`: Removed `--parallel` CLI option, simplified debate dispatch to `if stream: streaming else: parallel`
+- `llm_council/cli/chat_session.py`: Removed `parallel_enabled` variable, `/parallel` command handler, and mutual exclusion logic
+- `llm_council/cli/chat_commands.py`: Removed `"parallel"` from `CHAT_COMMANDS`, removed `parallel_enabled` param from `format_chat_mode_line`, `format_prompt_mode`, `build_chat_prompt`
+- `llm_council/cli/presenters.py`: Removed `parallel_enabled` param from `print_chat_banner`, `/parallel` from help text, `parallel` param from `print_query_header`
+
+### Results
+- 92 tests pass, ruff clean
+- Net reduction: ~153 lines (21 insertions, 174 deletions)
+
+---
+
 ## Post-v1.9: Add `ExecuteRound` Protocol
 *February 2026*
 
