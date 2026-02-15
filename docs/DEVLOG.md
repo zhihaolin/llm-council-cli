@@ -4,6 +4,25 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Remove engine wrappers, inline synthesis in CLI runners
+*February 2026*
+
+### Overview
+Removed `run_debate_parallel()` and `run_debate_streaming()` from `debate.py`. These violated SRP: each wired `run_debate()` to an executor AND performed chairman synthesis. The `skip_synthesis` parameter was the tell — it disabled half the function. CLI runners now call `run_debate()` directly and handle synthesis inline based on their presentation needs.
+
+### Changes
+- Deleted `run_debate_parallel()` and `run_debate_streaming()` from `debate.py` (~120 lines)
+- Removed from `__init__.py` imports and `__all__`
+- `runners.py`: Updated imports, rewrote `run_debate_streaming()` and `run_debate_parallel()` to two-phase (debate + inline synthesis)
+- `test_streaming.py`: Rewrote 2 tests to use `run_debate` + `debate_round_parallel` directly
+
+### Results
+- Net reduction: ~125 lines
+- 91 tests pass, ruff clean
+- All three CLI runners now follow the same pattern: call `run_debate()` directly, then handle synthesis at the CLI layer
+
+---
+
 ## Post-v1.9: Merge debate.py and debate_async.py
 *February 2026*
 

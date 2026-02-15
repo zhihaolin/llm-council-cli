@@ -129,8 +129,6 @@ Key functions (all exported from `llm_council.engine`):
 - `run_debate()`: Single orchestrator defining debate round sequence, delegates to executor callback
 - `debate_round_parallel()`: Execute-round strategy — parallel with per-model events
 - `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
-- `run_debate_parallel()`: Full debate flow using parallel executor + synthesis
-- `run_debate_streaming()`: Full debate flow using streaming executor + synthesis
 - `synthesize_with_react()`: ReAct reasoning loop for chairman
 - `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section
 - `calculate_aggregate_rankings()`: Computes average rank position
@@ -316,8 +314,8 @@ llm_council/cli/
 
 **Runners (in `llm_council/cli/runners.py`):**
 - `run_debate_with_progress()` - Consumes `run_debate` events with progress spinners
-- `run_debate_parallel()` - Parallel execution with Rich Live display
-- `run_debate_streaming()` - Token streaming with line wrap tracking
+- `run_debate_parallel()` - Calls `run_debate()` + inline synthesis with Rich Live display
+- `run_debate_streaming()` - Calls `run_debate()` + inline streaming synthesis with line wrap tracking
 - `run_react_synthesis()` - ReAct trace display
 
 ### API Costs
@@ -373,14 +371,14 @@ llm-council chat                               # REPL (streaming+debate on by de
 - `run_debate()`: Single orchestrator — defines round sequence once, delegates to executor callback
 - `debate_round_parallel()`: Execute-round strategy — parallel with per-model events
 - `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
-- `run_debate_parallel()`: Full debate using `run_debate(debate_round_parallel)` + synthesis
-- `run_debate_streaming()`: Full debate using `run_debate(debate_round_streaming)` + synthesis
 
 **`llm_council/cli/runners.py`**
-- `run_debate_streaming()`: Renders streaming output with Rich
+- `run_debate_streaming()`: Calls `run_debate()` directly, then streams chairman synthesis inline
   - Tracks terminal line wrapping for accurate clearing
   - Uses ANSI escape codes for cursor movement
   - Shows dimmed text while streaming, then replaces with markdown panel
+- `run_debate_parallel()`: Calls `run_debate()` directly, then calls `synthesize_debate()` inline
+  - Uses Rich `Live` display with animated spinner status table
 
 ### Key Implementation Details
 
@@ -415,7 +413,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Round Sequence**: The round sequence (initial → critique → defense → extra rounds) is defined once in `run_debate()`. Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
+6. **Debate Round Sequence**: The round sequence (initial → critique → defense → extra rounds) is defined once in `run_debate()`. Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. Synthesis is handled by each CLI runner after debate completes. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
 
 ## Known Technical Debt
 
@@ -584,18 +582,21 @@ async def query_with_model(model: str):
         return model, None, f"Timeout after {model_timeout}s"
 ```
 
-**Event Flow:**
+**Event Flow (from `run_debate`):**
 ```
 1. round_start event
 2. model_start events for all models (CLI shows spinners)
 3. model_complete/model_error events as each finishes
 4. round_complete event with all responses
 5. Repeat for each round
-6. synthesis_start → synthesis_complete → complete
+6. debate_complete
 ```
 
+Synthesis is handled by the CLI runner after `debate_complete`.
+
 ### CLI Display (`llm_council/cli/runners.py`)
-- `run_debate_parallel()` uses Rich `Live` display with a status table
+- `run_debate_parallel()` calls `run_debate()` directly, then `synthesize_debate()` with spinner
+- Uses Rich `Live` display with a status table
 - Status states: "⠋ thinking..." → "✓ done" / "✗ error"
 - Panels appear as models complete (fastest first)
 
