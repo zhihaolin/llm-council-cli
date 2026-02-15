@@ -10,14 +10,14 @@ Public API:
     - Debate: ExecuteRound, RoundConfig, build_round_config,
               run_debate, debate_round_parallel, debate_round_streaming
     - Reflection: synthesize_with_reflection, parse_reflection_output
-    - ReAct: synthesize_with_react, build_react_context_ranking, build_react_context_debate
+    - Council ReAct: council_react_loop, build_react_context_ranking,
+                     build_react_context_debate
     - Parsing: parse_ranking_from_text, parse_revised_answer, extract_critiques_for_model,
                parse_react_output
     - Aggregation: calculate_aggregate_rankings
     - Utilities: execute_tool, get_date_context
 """
 
-# Orchestrator - Stage 1-2-3 flow
 # Aggregation
 from .aggregation import calculate_aggregate_rankings
 
@@ -44,7 +44,6 @@ from .parsers import (
 from .prompts import (
     build_react_context_debate,
     build_react_context_ranking,
-    build_react_prompt,
     get_date_context,
 )
 from .ranking import (
@@ -55,8 +54,8 @@ from .ranking import (
     stage2_collect_rankings,
 )
 
-# ReAct chairman (kept for council member ReAct loop, wired in later commits)
-from .react import synthesize_with_react
+# Council member ReAct loop
+from .react import council_react_loop
 
 # Reflection chairman
 from .reflection import synthesize_with_reflection
@@ -75,8 +74,8 @@ __all__ = [
     "debate_round_parallel",
     "debate_round_streaming",
     "run_debate",
-    # ReAct
-    "synthesize_with_react",
+    # Council ReAct
+    "council_react_loop",
     # Reflection
     "synthesize_with_reflection",
     "parse_reflection_output",
@@ -91,5 +90,4 @@ __all__ = [
     "get_date_context",
     "build_react_context_ranking",
     "build_react_context_debate",
-    "build_react_prompt",
 ]

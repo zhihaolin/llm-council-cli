@@ -4,6 +4,34 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Chairman Reflection + Council Member ReAct
+*February 2026*
+
+### Overview
+Swapped synthesis and reasoning roles: chairman now uses **Reflection** (deep analysis, no tools — always on), council members now use **ReAct** (visible Thought→Action→Observation reasoning + web search — controlled by `--no-react`/`/react on|off`).
+
+Previously the chairman used ReAct, which steered it toward web searching rather than analyzing debate content. Council members used opaque native function calling.
+
+### Architecture
+
+| | Chairman | Council |
+|---|---|---|
+| **react ON** (default) | Reflection | ReAct loop (Thought → search_web → respond) |
+| **react OFF** (`--no-react`) | Reflection | Native function calling |
+
+### Key changes
+- **New**: `synthesize_with_reflection()` (engine/reflection.py), `council_react_loop()` (engine/react.py), `parse_reflection_output()`, `build_reflection_prompt()`, `wrap_prompt_with_react()`
+- **Removed**: `synthesize_with_react()`, `build_react_prompt()`, `run_react_synthesis()`, `synthesize_debate()`, `stage3_synthesize_final()`
+- **Modified**: `RoundConfig` gains `uses_react` field; `build_round_config()` gains `react_enabled` param; both execution strategies dispatch to `council_react_loop()` when `uses_react=True`; `stage1_collect_responses()` gains `react_enabled` param
+- **CLI**: `run_reflection_synthesis()` replaces both `run_react_synthesis()` and inline synthesis; `skip_synthesis` param removed from all runners
+- **Streaming**: New event types `thought`, `action`, `observation` for council ReAct traces displayed in debate streaming mode
+
+### Results
+- 107 tests across 10 test files, ruff clean
+- Both ranking and debate modes use Reflection for chairman, ReAct for council
+
+---
+
 ## Post-v1.9: Command pattern for chat REPL
 *February 2026*
 

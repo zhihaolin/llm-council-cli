@@ -272,38 +272,6 @@ After your analysis, provide your final answer under a `## Synthesis` header.
 Begin your analysis:"""
 
 
-def build_react_prompt(context: str) -> str:
-    """
-    Build the ReAct system prompt for the chairman.
-
-    Args:
-        context: The formatted context (from ranking or debate mode)
-
-    Returns:
-        Complete prompt with ReAct instructions
-    """
-    return f"""{get_date_context()}You are the Chairman of an LLM Council using ReAct (Reasoning + Acting) to synthesize a final answer.
-
-You have access to the following tool:
-- search_web(query): Search the web to verify facts or get current information
-
-When you have enough information, call synthesize() to produce your final answer.
-
-IMPORTANT FORMAT - You MUST respond in this exact format:
-
-Thought: <your reasoning about what you know and what you need>
-Action: <either search_web("query") or synthesize()>
-
-If you call search_web, you will receive an Observation with the results, then continue reasoning.
-If you call synthesize(), write your final comprehensive answer after it.
-
-Maximum 3 reasoning steps allowed. If unsure, synthesize with available information.
-
-{context}
-
-Begin your reasoning:"""
-
-
 def build_react_context_ranking(
     user_query: str, stage1_results: list[dict[str, Any]], stage2_results: list[dict[str, Any]]
 ) -> str:

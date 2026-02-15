@@ -21,75 +21,12 @@ from llm_council.engine import (
     calculate_aggregate_rankings,
     stage1_collect_responses,
     stage2_collect_rankings,
-    synthesize_with_react,
     synthesize_with_reflection,
 )
 from llm_council.engine.debate import debate_round_parallel as _debate_round_parallel
 from llm_council.engine.debate import debate_round_streaming as _debate_round_streaming
 from llm_council.engine.debate import run_debate as _run_debate
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
-
-
-async def run_react_synthesis(
-    user_query: str, context: str, header: str = "CHAIRMAN'S REASONING"
-) -> dict:
-    """
-    Run ReAct synthesis with streaming display.
-
-    Shows the reasoning trace (thought/action/observation) without streaming,
-    then streams the final synthesis content.
-
-    Args:
-        user_query: Original user question
-        context: Formatted context from ranking or debate mode
-        header: Header text to display
-
-    Returns:
-        Dict with 'model' and 'response' keys
-    """
-    console.print(f"\n[bold cyan]━━━ {header} ━━━[/bold cyan]\n")
-
-    synthesis_result = None
-    in_synthesis_streaming = False
-
-    async for event in synthesize_with_react(user_query, context):
-        event_type = event["type"]
-
-        if event_type == "token":
-            # Only stream tokens during synthesis phase (after empty synthesize())
-            if in_synthesis_streaming:
-                token = event["content"]
-                sys.stdout.write(f"\033[2m{token}\033[0m")
-                sys.stdout.flush()
-
-        elif event_type == "thought":
-            thought = event["content"]
-            console.print(f"[cyan]Thought:[/cyan] {thought}\n")
-
-        elif event_type == "action":
-            tool = event["tool"]
-            args = event.get("args")
-            if tool == "search_web":
-                console.print(f'[yellow]Action:[/yellow] search_web("{args}")\n')
-            elif tool == "synthesize":
-                console.print("[yellow]Action:[/yellow] synthesize()\n")
-                # Next tokens will be synthesis content
-                in_synthesis_streaming = True
-
-        elif event_type == "observation":
-            observation = event["content"]
-            # Truncate long observations
-            if len(observation) > 500:
-                observation = observation[:500] + "..."
-            console.print(f"[dim]Observation: {observation}[/dim]\n")
-
-        elif event_type == "synthesis":
-            if in_synthesis_streaming:
-                # Add newline after streaming
-                console.print()
-            synthesis_result = {"model": event["model"], "response": event["response"]}
-
-    return synthesis_result
 
 
 async def run_reflection_synthesis(user_query: str, context: str) -> dict:

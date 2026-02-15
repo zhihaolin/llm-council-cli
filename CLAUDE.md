@@ -112,10 +112,11 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 
 ```
 llm_council/engine/
-├── __init__.py             # Public API exports (backward compatible)
-├── ranking.py              # Stage 1-2-3 flow
+├── __init__.py             # Public API exports
+├── ranking.py              # Stage 1-2 flow (synthesis via Reflection)
 ├── debate.py               # Debate orchestration + async execution strategies
-├── react.py                # ReAct chairman logic
+├── reflection.py           # Chairman Reflection synthesis (always on)
+├── react.py                # Council member ReAct loop
 ├── prompts.py              # All prompt templates
 ├── parsers.py              # Regex/text parsing utilities
 └── aggregation.py          # Ranking calculations
@@ -124,14 +125,14 @@ llm_council/engine/
 Key functions (all exported from `llm_council.engine`):
 - `stage1_collect_responses()`: Parallel queries to all council models with tool support
 - `stage2_collect_rankings()`: Anonymizes responses and collects peer rankings
-- `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
-- `run_full_council()`: Orchestrates the complete 3-stage flow
-- `RoundConfig`: Frozen dataclass capturing per-round-type configuration (uses_tools, build_prompt, has_revised_answer)
-- `build_round_config()`: Factory producing RoundConfig for a given round type
+- `run_full_council()`: Orchestrates Stages 1-2 (synthesis handled separately via Reflection)
+- `RoundConfig`: Frozen dataclass capturing per-round-type configuration (uses_tools, build_prompt, has_revised_answer, uses_react)
+- `build_round_config()`: Factory producing RoundConfig for a given round type (accepts `react_enabled`)
 - `run_debate()`: Single orchestrator defining debate round sequence, delegates to executor callback
 - `debate_round_parallel()`: Execute-round strategy — parallel with per-model events (default)
 - `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
-- `synthesize_with_react()`: ReAct reasoning loop for chairman
+- `synthesize_with_reflection()`: Reflection synthesis loop for chairman (always on)
+- `council_react_loop()`: Per-model text-based ReAct loop for council members
 - `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section
 - `calculate_aggregate_rankings()`: Computes average rank position
 
@@ -241,12 +242,13 @@ llm-council --debate --simple "Question"           # Just final answer
   - `uses_tools: bool` — Whether the model should have access to web search tools
   - `build_prompt: Callable[[str], str]` — `(model) -> prompt_string` for this round
   - `has_revised_answer: bool` — Whether the response should be parsed for a revised answer
+  - `uses_react: bool` — Whether council members use text-based ReAct reasoning (default False)
 
-**`build_round_config(round_type, user_query, context) -> RoundConfig`**
+**`build_round_config(round_type, user_query, context, react_enabled=False) -> RoundConfig`**
 - Single point of dispatch replacing duplicated if/elif chains in both execution strategies
-- `round_type="initial"`: `uses_tools=True`, `has_revised_answer=False`, prompt includes date context
-- `round_type="critique"`: `uses_tools=False`, `has_revised_answer=False`, prompt includes all responses
-- `round_type="defense"`: `uses_tools=True`, `has_revised_answer=True`, prompt includes original + critiques
+- `round_type="initial"`: `uses_tools=True`, `has_revised_answer=False`, prompt includes date context. When `react_enabled`: wraps prompt with ReAct instructions, sets `uses_react=True`
+- `round_type="critique"`: `uses_tools=False`, `has_revised_answer=False`, prompt includes all responses. Never uses ReAct.
+- `round_type="defense"`: `uses_tools=True`, `has_revised_answer=True`, prompt includes original + critiques. When `react_enabled`: wraps prompt, sets `uses_react=True`
 - Raises `ValueError` for unknown round types
 
 **Orchestrator and execution strategies** (also in `debate.py`):
@@ -320,9 +322,10 @@ llm_council/cli/
 - `print_stage1/2/3()` - Standard mode output
 
 **Runners (in `llm_council/cli/runners.py`):**
-- `run_debate_parallel()` - Calls `run_debate()` + inline synthesis with Rich Live display (default debate mode)
-- `run_debate_streaming()` - Calls `run_debate()` + inline streaming synthesis with line wrap tracking
-- `run_react_synthesis()` - ReAct trace display
+- `run_debate_parallel()` - Calls `run_debate()` with Rich Live display (default debate mode)
+- `run_debate_streaming()` - Calls `run_debate()` with token streaming and line wrap tracking
+- `run_reflection_synthesis()` - Chairman Reflection with streaming display
+- `run_council_with_progress()` - Stages 1-2 with progress spinners
 
 **Chat session (in `llm_council/cli/chat_session.py`):**
 - `ChatState` dataclass — holds all mutable REPL state (debate/stream/react toggles, conversation, title)
@@ -337,6 +340,8 @@ llm_council/cli/
 | Standard (ranking) | 11 calls |
 | Debate (1 cycle) | 16 calls |
 | Debate (2 cycles) | 26 calls |
+
+With Council ReAct enabled (default), each model may make up to 3 additional search calls per tool-enabled round (initial, defense), adding variable Tavily API usage.
 
 ### Error Handling
 - Model fails during round: continue with remaining models
@@ -390,8 +395,8 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Tracks terminal line wrapping for accurate clearing
   - Uses ANSI escape codes for cursor movement
   - Shows dimmed text while streaming, then replaces with markdown panel
-- `run_debate_parallel()`: Calls `run_debate()` directly, then calls `synthesize_debate()` inline
-  - Uses Rich `Live` display with animated spinner status table
+- `run_debate_parallel()`: Calls `run_debate()` directly with Rich Live display
+  - Uses animated spinner status table showing per-model progress
 
 ### Key Implementation Details
 
@@ -446,18 +451,19 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (92 tests)
+### Test Suite (107 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
 ├── test_chat_commands.py        # 10 tests - chat REPL command parsing
 ├── test_cli_imports.py          # 1 test - CLI module imports
 ├── test_conversation_context.py # 5 tests - conversation context handling
-├── test_debate.py               # 15 tests - debate mode + RoundConfig
+├── test_debate.py               # 24 tests - debate mode + RoundConfig + ReAct
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
-├── test_react.py                # 12 tests - ReAct chairman parsing & loop
-├── test_search.py               # 17 tests - web search & tool calling
-├── test_streaming.py            # 15 tests - streaming, parallel, orchestrator
+├── test_react.py                # 12 tests - ReAct parsing & council loop
+├── test_reflection.py           # 6 tests - chairman Reflection parsing & loop
+├── test_search.py               # 18 tests - web search & tool calling
+├── test_streaming.py            # 17 tests - streaming, parallel, orchestrator
 └── integration/                 # CLI tests (planned)
 ```
 
@@ -588,83 +594,76 @@ async def query_with_model(model: str):
 6. debate_complete
 ```
 
-Synthesis is handled by the CLI runner after `debate_complete`.
+Synthesis is handled separately via `run_reflection_synthesis()` after `debate_complete`.
 
 ### CLI Display (`llm_council/cli/runners.py`)
-- `run_debate_parallel()` calls `run_debate()` directly, then `synthesize_debate()` with spinner
+- `run_debate_parallel()` calls `run_debate()` directly with spinner status table
 - Uses Rich `Live` display with a status table
 - Status states: "⠋ thinking..." → "✓ done" / "✗ error"
 - Panels appear as models complete (fastest first)
 
-## ReAct Chairman
+## Chairman Reflection
 
 ### Overview
-The chairman uses the ReAct (Reasoning + Acting) pattern to synthesize final answers. This allows fact verification before synthesis.
+The chairman always uses **Reflection** to synthesize final answers. This is a single streaming call where the chairman deeply analyses the council's responses before producing a final synthesis under a `## Synthesis` header. No tools are available — the focus is on reasoning about existing content.
+
+### Implementation
+
+**`llm_council/engine/reflection.py`:**
+- `synthesize_with_reflection()` - Async generator implementing the Reflection loop
+  - Yields: `token`, `reflection`, `synthesis` events
+  - Single streaming call (no iteration)
+  - Parses output at `## Synthesis` header via `parse_reflection_output()`
+
+**`llm_council/engine/prompts.py`:**
+- `build_reflection_prompt()` - Instructs chairman to analyse agreement, disagreement, factual claims, quality differences, then produce `## Synthesis`
+- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
+- `build_react_context_debate()` - Formats debate rounds for chairman
+
+**`llm_council/cli/runners.py`:**
+- `run_reflection_synthesis()` - Streams tokens dimmed, shows analysis panel + synthesis panel
+
+## Council Member ReAct
+
+### Overview
+Council members use text-based **ReAct** (Reasoning + Acting) for visible reasoning about when and why to search. Controlled by `--no-react` / `/react on|off`.
 
 **Pattern:** Thought → Action → Observation → Repeat (max 3 iterations)
 
 **Available tools:**
-- `search_web(query)` - Verify facts or get current information
-- `synthesize()` - Produce final answer (terminal action)
+- `search_web(query)` - Search the web for current information
+- `respond()` - Produce final response (terminal action)
 
 ### CLI Usage
 ```bash
-llm-council query --debate "Question"         # ReAct enabled by default
-llm-council query --debate --no-react "Q"     # Disable ReAct
+llm-council query --debate "Question"           # Council ReAct enabled by default
+llm-council query --debate --no-react "Q"       # Disable council ReAct (use native function calling)
 ```
 
 ### Chat REPL Commands
-- `/react on` - Enable ReAct reasoning
-- `/react off` - Disable ReAct reasoning
+- `/react on` - Enable council ReAct reasoning
+- `/react off` - Disable council ReAct reasoning
 - `/mode` - Show current mode (includes `[react]` indicator)
-
-### Example Output
-```
-━━━ CHAIRMAN'S REASONING ━━━
-
-Thought: The responses disagree on the current Bitcoin price. I should verify.
-
-Action: search_web("bitcoin price today")
-
-Observation: Bitcoin is currently trading at $67,234...
-
-Thought: Now I can synthesize with verified data.
-
-Action: synthesize()
-
-━━━ CHAIRMAN'S SYNTHESIS ━━━
-
-[Final answer panel]
-```
 
 ### Implementation
 
 **`llm_council/engine/react.py`:**
-- `synthesize_with_react()` - Async generator implementing the ReAct loop
-  - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events
+- `council_react_loop()` - Per-model async generator implementing the ReAct loop
+  - Yields: `token`, `thought`, `action`, `observation`, `done` events
   - Max 3 iterations to prevent infinite loops
-  - If model says `synthesize()` without content, asks for synthesis directly
+  - Tracks `tool_calls_made` for display
 
 **`llm_council/engine/prompts.py`:**
-- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
-- `build_react_context_debate()` - Formats debate rounds for chairman
-- `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
+- `wrap_prompt_with_react()` - Wraps any round prompt with ReAct instructions
 
 **`llm_council/engine/parsers.py`:**
-- `parse_react_output()` - Extracts Thought/Action from model output using regex
-
-**`llm_council/cli/runners.py`:**
-- `run_react_synthesis()` - Displays ReAct trace with color coding
-  - Thought: cyan
-  - Action: yellow
-  - Observation: dim
-- Works with both parallel and streaming modes
+- `parse_react_output()` - Extracts Thought/Action; recognizes `respond()` and `synthesize()` as terminal actions
 
 ### Key Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Default state | Enabled | Most questions benefit from potential fact verification |
+| Default state | Enabled | Models benefit from visible reasoning about search decisions |
 | Max iterations | 3 | Prevents infinite search loops |
-| Streaming | Trace only | Token streaming for Thought/Action would be noisy |
-| Empty synthesize() | Re-prompt | Model sometimes forgets to provide answer after action |
+| Tool-enabled rounds | Initial, Defense | Critique round has no tools (evaluates existing responses) |
+| Parallel mode | Traces suppressed | Too noisy with concurrent models; streaming shows them |
