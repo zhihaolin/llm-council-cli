@@ -20,14 +20,14 @@ from llm_council.engine import (
     calculate_aggregate_rankings,
     debate_round_critique,
     debate_round_defense,
-    run_debate_council_streaming,
-    run_debate_token_streaming,
     stage1_collect_responses,
     stage2_collect_rankings,
     stage3_synthesize_final,
     synthesize_debate,
     synthesize_with_react,
 )
+from llm_council.engine.debate_async import run_debate_parallel as _run_debate_parallel
+from llm_council.engine.debate_async import run_debate_streaming as _run_debate_streaming
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 
@@ -317,7 +317,7 @@ async def run_debate_streaming(
 
     current_round_type = ""
 
-    async for event in run_debate_token_streaming(query, max_rounds, skip_synthesis=skip_synthesis):
+    async for event in _run_debate_streaming(query, max_rounds, skip_synthesis=skip_synthesis):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -495,7 +495,7 @@ async def run_debate_parallel(
         )
         console.print()
 
-    async for event in run_debate_council_streaming(
+    async for event in _run_debate_parallel(
         query, max_rounds, skip_synthesis=skip_synthesis
     ):
         event_type = event["type"]

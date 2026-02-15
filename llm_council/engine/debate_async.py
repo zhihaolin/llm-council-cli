@@ -1,5 +1,5 @@
 """
-Streaming event generators for council deliberation.
+Async execution strategies for council deliberation.
 
 Contains async generators that yield events as models complete or stream tokens.
 """
@@ -45,7 +45,7 @@ async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return f"Unknown tool: {tool_name}"
 
 
-async def debate_round_streaming(
+async def debate_round_parallel(
     round_type: str,
     user_query: str,
     context: dict[str, Any],
@@ -135,7 +135,7 @@ async def debate_round_streaming(
     yield {"type": "round_complete", "responses": responses}
 
 
-async def run_debate_council_streaming(
+async def run_debate_parallel(
     user_query: str, max_rounds: int = 2, skip_synthesis: bool = False
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
@@ -161,7 +161,7 @@ async def run_debate_council_streaming(
     yield {"type": "round_start", "round_number": 1, "round_type": "initial"}
 
     initial_responses = []
-    async for event in debate_round_streaming(
+    async for event in debate_round_parallel(
         round_type="initial",
         user_query=user_query,
         context={},
@@ -196,7 +196,7 @@ async def run_debate_council_streaming(
     yield {"type": "round_start", "round_number": 2, "round_type": "critique"}
 
     critique_responses = []
-    async for event in debate_round_streaming(
+    async for event in debate_round_parallel(
         round_type="critique",
         user_query=user_query,
         context={"initial_responses": initial_responses},
@@ -219,7 +219,7 @@ async def run_debate_council_streaming(
     yield {"type": "round_start", "round_number": 3, "round_type": "defense"}
 
     defense_responses = []
-    async for event in debate_round_streaming(
+    async for event in debate_round_parallel(
         round_type="defense",
         user_query=user_query,
         context={
@@ -250,7 +250,7 @@ async def run_debate_council_streaming(
             yield {"type": "round_start", "round_number": round_num, "round_type": "critique"}
 
             critique_responses = []
-            async for event in debate_round_streaming(
+            async for event in debate_round_parallel(
                 round_type="critique",
                 user_query=user_query,
                 context={"initial_responses": current_responses},
@@ -277,7 +277,7 @@ async def run_debate_council_streaming(
             yield {"type": "round_start", "round_number": round_num, "round_type": "defense"}
 
             defense_responses = []
-            async for event in debate_round_streaming(
+            async for event in debate_round_parallel(
                 round_type="defense",
                 user_query=user_query,
                 context={
@@ -326,7 +326,7 @@ async def run_debate_council_streaming(
     yield {"type": "complete", "rounds": rounds, "synthesis": synthesis}
 
 
-async def run_debate_token_streaming(
+async def run_debate_streaming(
     user_query: str, max_rounds: int = 2, skip_synthesis: bool = False
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
