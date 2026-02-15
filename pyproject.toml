@@ -66,3 +66,8 @@ reportOptionalMemberAccess = "warning"
 reportArgumentType = "warning"
 reportReturnType = "warning"
 reportAttributeAccessIssue = "warning"
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.0.0",
+]
