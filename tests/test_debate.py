@@ -44,10 +44,7 @@ Gemini should provide more references.""",
             },
         ]
 
-        result = extract_critiques_for_model(
-            "google/gemini-3-pro-preview",
-            critique_responses
-        )
+        result = extract_critiques_for_model("google/gemini-3-pro-preview", critique_responses)
 
         # Should contain critiques from both GPT and Claude about Gemini
         assert "gpt-5.2" in result.lower() or "openai" in result.lower()
@@ -82,10 +79,7 @@ Valid critique here.""",
             },
         ]
 
-        result = extract_critiques_for_model(
-            "google/gemini-3-pro-preview",
-            critique_responses
-        )
+        result = extract_critiques_for_model("google/gemini-3-pro-preview", critique_responses)
 
         assert "no specific critiques" in result.lower()
 
@@ -99,10 +93,7 @@ Uppercase model name should still match.""",
             },
         ]
 
-        result = extract_critiques_for_model(
-            "google/gemini-3-pro-preview",
-            critique_responses
-        )
+        result = extract_critiques_for_model("google/gemini-3-pro-preview", critique_responses)
 
         assert "uppercase model name" in result.lower()
 
@@ -116,10 +107,7 @@ Claude's response needs improvement.""",
             },
         ]
 
-        result = extract_critiques_for_model(
-            "anthropic/claude-sonnet-4.5",
-            critique_responses
-        )
+        result = extract_critiques_for_model("anthropic/claude-sonnet-4.5", critique_responses)
 
         assert "needs improvement" in result.lower()
 
@@ -185,8 +173,7 @@ class TestDebateRoundCritique:
             mock_query.return_value = {"content": "## Critique of model\nTest critique."}
 
             result = await debate_round_critique(
-                "What is the best programming language?",
-                sample_initial_responses
+                "What is the best programming language?", sample_initial_responses
             )
 
             # Should have called query_model for each model
@@ -208,10 +195,7 @@ class TestDebateRoundCritique:
             return {"content": "Valid critique"}
 
         with patch("llm_council.engine.debate.query_model", side_effect=mock_query):
-            result = await debate_round_critique(
-                "Test question",
-                sample_initial_responses
-            )
+            result = await debate_round_critique("Test question", sample_initial_responses)
 
             # Should still have results from successful models
             assert len(result) == len(sample_initial_responses) - 1
@@ -222,9 +206,7 @@ class TestDebateRoundDefense:
 
     @pytest.mark.asyncio
     async def test_defense_round_includes_revised_answer(
-        self,
-        sample_initial_responses,
-        sample_critique_responses
+        self, sample_initial_responses, sample_critique_responses
     ):
         """Test that defense round extracts revised answers."""
         defense_content = """## Addressing Critiques
@@ -233,13 +215,13 @@ Valid points were raised.
 ## Revised Response
 This is my improved answer."""
 
-        with patch("llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch(
+            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
+        ) as mock_query:
             mock_query.return_value = {"content": defense_content}
 
             result = await debate_round_defense(
-                "Test question",
-                sample_initial_responses,
-                sample_critique_responses
+                "Test question", sample_initial_responses, sample_critique_responses
             )
 
             # Each result should have a revised_answer field
@@ -249,18 +231,16 @@ This is my improved answer."""
 
     @pytest.mark.asyncio
     async def test_defense_round_passes_critiques_to_model(
-        self,
-        sample_initial_responses,
-        sample_critique_responses
+        self, sample_initial_responses, sample_critique_responses
     ):
         """Test that each model receives critiques directed at them."""
-        with patch("llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch(
+            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
+        ) as mock_query:
             mock_query.return_value = {"content": "## Revised Response\nTest"}
 
             await debate_round_defense(
-                "Test question",
-                sample_initial_responses,
-                sample_critique_responses
+                "Test question", sample_initial_responses, sample_critique_responses
             )
 
             # Verify that prompts contain critique information
@@ -278,9 +258,7 @@ class TestDebateDataStructures:
         round_data = {
             "round_number": 1,
             "round_type": "initial",
-            "responses": [
-                {"model": "test/model", "response": "Test response"}
-            ]
+            "responses": [{"model": "test/model", "response": "Test response"}],
         }
 
         assert "round_number" in round_data
@@ -293,7 +271,7 @@ class TestDebateDataStructures:
         defense_response = {
             "model": "test/model",
             "response": "Full response text",
-            "revised_answer": "Extracted revised answer"
+            "revised_answer": "Extracted revised answer",
         }
 
         assert "model" in defense_response
@@ -350,16 +328,10 @@ class TestQueryInitial:
 class TestQueryCritique:
     """Tests for the query_critique per-round function."""
 
-    async def test_query_critique_returns_response_no_tools(
-        self, sample_initial_responses
-    ):
+    async def test_query_critique_returns_response_no_tools(self, sample_initial_responses):
         """query_critique should call query_model (no tools) and return result dict."""
-        with patch(
-            "llm_council.engine.debate.query_model", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = {
-                "content": "## Critique of model\nTest critique."
-            }
+        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
+            mock_query.return_value = {"content": "## Critique of model\nTest critique."}
 
             result = await query_critique(
                 "openai/gpt-5.2",
@@ -373,13 +345,9 @@ class TestQueryCritique:
             assert "tool_calls_made" not in result
             mock_query.assert_called_once()
 
-    async def test_query_critique_returns_none_on_failure(
-        self, sample_initial_responses
-    ):
+    async def test_query_critique_returns_none_on_failure(self, sample_initial_responses):
         """query_critique should return None when the model fails."""
-        with patch(
-            "llm_council.engine.debate.query_model", new_callable=AsyncMock
-        ) as mock_query:
+        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = None
 
             result = await query_critique(

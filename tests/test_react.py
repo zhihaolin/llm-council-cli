@@ -42,6 +42,7 @@ I'm not sure what to do next."""
 # Parsing Tests
 # =============================================================================
 
+
 class TestParseReactOutput:
     """Tests for parsing Thought/Action from model output."""
 
@@ -88,6 +89,7 @@ class TestParseReactOutput:
 # ReAct Loop Tests
 # =============================================================================
 
+
 class TestReactLoop:
     """Tests for the ReAct synthesis loop."""
 
@@ -130,12 +132,23 @@ class TestReactLoop:
                 # Second call: after search, chairman synthesizes
                 yield {"type": "done", "content": REACT_RESPONSE_AFTER_SEARCH}
 
-        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("llm_council.engine.react.search_web", new_callable=AsyncMock) as mock_search:
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            side_effect=lambda *args, **kwargs: mock_generator(),
+        ):
+            with patch(
+                "llm_council.engine.react.search_web", new_callable=AsyncMock
+            ) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Bitcoin is at $67,234",
-                    "results": [{"title": "Bitcoin Price", "content": "Bitcoin is at $67,234", "url": "https://example.com"}]
+                    "results": [
+                        {
+                            "title": "Bitcoin Price",
+                            "content": "Bitcoin is at $67,234",
+                            "url": "https://example.com",
+                        }
+                    ],
                 }
 
                 events = []
@@ -157,16 +170,25 @@ class TestReactLoop:
         async def mock_generator():
             yield {"type": "done", "content": REACT_RESPONSE_WITH_SEARCH}
 
-        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("llm_council.engine.react.search_web", new_callable=AsyncMock) as mock_search:
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            side_effect=lambda *args, **kwargs: mock_generator(),
+        ):
+            with patch(
+                "llm_council.engine.react.search_web", new_callable=AsyncMock
+            ) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Test result",
-                    "results": [{"title": "Test", "content": "Test result", "url": "https://example.com"}]
+                    "results": [
+                        {"title": "Test", "content": "Test result", "url": "https://example.com"}
+                    ],
                 }
 
                 events = []
-                async for event in synthesize_with_react("test query", "test context", max_iterations=2):
+                async for event in synthesize_with_react(
+                    "test query", "test context", max_iterations=2
+                ):
                     events.append(event)
 
         # Should have forced synthesis after max iterations
@@ -188,7 +210,10 @@ class TestReactLoop:
             else:
                 yield {"type": "done", "content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
 
-        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            side_effect=lambda *args, **kwargs: mock_generator(),
+        ):
             events = []
             async for event in synthesize_with_react("test query", "test context"):
                 events.append(event)
@@ -200,6 +225,7 @@ class TestReactLoop:
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestReactIntegration:
     """Integration tests for ReAct with full council flow."""
@@ -231,7 +257,7 @@ class TestReactIntegration:
             {
                 "round_number": 1,
                 "round_type": "initial",
-                "responses": [{"model": "gpt", "response": "Initial answer"}]
+                "responses": [{"model": "gpt", "response": "Initial answer"}],
             }
         ]
 
@@ -244,6 +270,7 @@ class TestReactIntegration:
 # =============================================================================
 # Streaming Tests
 # =============================================================================
+
 
 class TestReactStreaming:
     """Tests for ReAct trace streaming."""
@@ -284,12 +311,19 @@ class TestReactStreaming:
             else:
                 yield {"type": "done", "content": REACT_RESPONSE_AFTER_SEARCH}
 
-        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("llm_council.engine.react.search_web", new_callable=AsyncMock) as mock_search:
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            side_effect=lambda *args, **kwargs: mock_generator(),
+        ):
+            with patch(
+                "llm_council.engine.react.search_web", new_callable=AsyncMock
+            ) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Bitcoin is at $67,234",
-                    "results": [{"title": "Price", "content": "$67,234", "url": "https://example.com"}]
+                    "results": [
+                        {"title": "Price", "content": "$67,234", "url": "https://example.com"}
+                    ],
                 }
 
                 events = []

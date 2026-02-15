@@ -182,9 +182,18 @@ class TestCalculateAggregateRankings:
         from llm_council.engine import calculate_aggregate_rankings
 
         stage2_results = [
-            {"model": "m1", "ranking": "FINAL RANKING:\n1. Response A\n2. Response B\n3. Response C"},
-            {"model": "m2", "ranking": "FINAL RANKING:\n1. Response A\n2. Response C\n3. Response B"},
-            {"model": "m3", "ranking": "FINAL RANKING:\n1. Response A\n2. Response B\n3. Response C"},
+            {
+                "model": "m1",
+                "ranking": "FINAL RANKING:\n1. Response A\n2. Response B\n3. Response C",
+            },
+            {
+                "model": "m2",
+                "ranking": "FINAL RANKING:\n1. Response A\n2. Response C\n3. Response B",
+            },
+            {
+                "model": "m3",
+                "ranking": "FINAL RANKING:\n1. Response A\n2. Response B\n3. Response C",
+            },
         ]
         label_to_model = {
             "Response A": "winner",

@@ -28,6 +28,7 @@ DEBATE_COUNCIL_MODELS = "llm_council.engine.debate.COUNCIL_MODELS"
 # Test: Streaming round yields model completions as they finish
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_debate_round_parallel_yields_as_completed():
     """
@@ -80,6 +81,7 @@ async def test_debate_round_parallel_yields_as_completed():
 # Test: Each event identifies source model correctly
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_streaming_preserves_model_identity():
     """
@@ -119,6 +121,7 @@ async def test_streaming_preserves_model_identity():
 # =============================================================================
 # Test: Continues if individual model fails
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_streaming_handles_model_failure():
@@ -164,6 +167,7 @@ async def test_streaming_handles_model_failure():
 # Test: Round complete event has all successful responses
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_round_complete_contains_all_responses():
     """
@@ -203,6 +207,7 @@ async def test_round_complete_contains_all_responses():
 # =============================================================================
 # Test: Full debate yields correct event sequence
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_debate_streaming_event_order():
@@ -263,6 +268,7 @@ async def test_debate_streaming_event_order():
 # Test: Streaming produces same final result as batch mode
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_streaming_same_result_as_batch():
     """
@@ -277,7 +283,9 @@ async def test_streaming_same_result_as_batch():
         if "critique" in content.lower() or "Critique" in content:
             return {"content": f"Critique from {model}"}
         elif "defense" in content.lower() or "Addressing" in content:
-            return {"content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"}
+            return {
+                "content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"
+            }
         elif "Chairman" in content or "synthesize" in content.lower():
             return {"content": "Synthesis from chairman"}
         return {"content": f"Initial response from {model}"}
@@ -285,7 +293,9 @@ async def test_streaming_same_result_as_batch():
     async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
         content = str(messages)
         if "defense" in content.lower() or "Addressing" in content:
-            return {"content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"}
+            return {
+                "content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"
+            }
         return {"content": f"Initial response from {model}"}
 
     # Run batch mode (debate module)
@@ -304,7 +314,9 @@ async def test_streaming_same_result_as_batch():
             with patch(ASYNC_QUERY_MODEL, side_effect=mock_query):
                 with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
                     with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                        with patch("llm_council.engine.debate_async.CHAIRMAN_MODEL", SAMPLE_MODELS[0]):
+                        with patch(
+                            "llm_council.engine.debate_async.CHAIRMAN_MODEL", SAMPLE_MODELS[0]
+                        ):
                             stream_result = None
                             async for event in run_debate_parallel(
                                 "Test question",
@@ -327,6 +339,7 @@ async def test_streaming_same_result_as_batch():
 # Test: Critique round streaming
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_critique_round_streaming():
     """
@@ -337,10 +350,7 @@ async def test_critique_round_streaming():
     async def mock_query(model, messages, *args, **kwargs):
         return {"content": f"## Critique of other model\nCritique from {model}"}
 
-    initial_responses = [
-        {"model": m, "response": f"Initial from {m}"}
-        for m in SAMPLE_MODELS
-    ]
+    initial_responses = [{"model": m, "response": f"Initial from {m}"} for m in SAMPLE_MODELS]
 
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
@@ -361,6 +371,7 @@ async def test_critique_round_streaming():
 # Test: Defense round streaming
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_defense_round_streaming():
     """
@@ -373,13 +384,9 @@ async def test_defense_round_streaming():
             "content": f"## Addressing Critiques\nDefense\n\n## Revised Response\nRevised from {model}"
         }
 
-    initial_responses = [
-        {"model": m, "response": f"Initial from {m}"}
-        for m in SAMPLE_MODELS
-    ]
+    initial_responses = [{"model": m, "response": f"Initial from {m}"} for m in SAMPLE_MODELS]
     critique_responses = [
-        {"model": m, "response": f"## Critique of other\nCritique from {m}"}
-        for m in SAMPLE_MODELS
+        {"model": m, "response": f"## Critique of other\nCritique from {m}"} for m in SAMPLE_MODELS
     ]
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
@@ -407,6 +414,7 @@ async def test_defense_round_streaming():
 # =============================================================================
 # Test: model_start events emitted for all models
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_streaming_emits_model_start_events():
@@ -438,13 +446,15 @@ async def test_streaming_emits_model_start_events():
     start_indices = [i for i, e in enumerate(events) if e["type"] == "model_start"]
     complete_indices = [i for i, e in enumerate(events) if e["type"] == "model_complete"]
 
-    assert max(start_indices) < min(complete_indices), \
+    assert max(start_indices) < min(complete_indices), (
         "All model_start events should come before any model_complete"
+    )
 
 
 # =============================================================================
 # Test: Per-model timeout functionality
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_streaming_handles_model_timeout():
@@ -481,3 +491,111 @@ async def test_streaming_handles_model_timeout():
     # Other models should complete successfully
     model_completes = [e for e in events if e["type"] == "model_complete"]
     assert len(model_completes) == len(SAMPLE_MODELS) - 1
+
+
+# =============================================================================
+# Test: run_debate orchestrator event sequence
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_run_debate_event_sequence():
+    """
+    Verify that run_debate with debate_round_parallel yields correct event
+    sequence: round_start → model events → round_complete × 3 → debate_complete.
+    """
+    from llm_council.engine.debate_async import debate_round_parallel, run_debate
+
+    async def mock_query(model, messages, *args, **kwargs):
+        return {"content": f"Response from {model}"}
+
+    async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
+        return {"content": f"Response from {model}"}
+
+    with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
+        with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
+            with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
+                with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                    events = []
+                    async for event in run_debate(
+                        user_query="Test question",
+                        execute_round=debate_round_parallel,
+                        max_rounds=2,
+                    ):
+                        events.append(event)
+
+    event_types = [e["type"] for e in events]
+
+    # Should have 3 round_start events
+    assert event_types.count("round_start") == 3
+
+    # Should have 3 round_complete events
+    assert event_types.count("round_complete") == 3
+
+    # Should end with debate_complete event
+    assert event_types[-1] == "debate_complete"
+
+    # Verify round numbers in round_start events
+    round_starts = [e for e in events if e["type"] == "round_start"]
+    assert [r["round_number"] for r in round_starts] == [1, 2, 3]
+
+    # Verify round types
+    assert round_starts[0]["round_type"] == "initial"
+    assert round_starts[1]["round_type"] == "critique"
+    assert round_starts[2]["round_type"] == "defense"
+
+    # Verify round_complete events carry augmented data
+    round_completes = [e for e in events if e["type"] == "round_complete"]
+    for rc in round_completes:
+        assert "round_number" in rc
+        assert "round_type" in rc
+        assert "responses" in rc
+
+    # Verify debate_complete has rounds data
+    debate_complete = events[-1]
+    assert debate_complete["type"] == "debate_complete"
+    assert len(debate_complete["rounds"]) == 3
+
+
+# =============================================================================
+# Test: run_debate error on insufficient models
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_run_debate_error_on_insufficient_models():
+    """
+    Verify that run_debate yields error event when <2 models respond.
+    """
+    from llm_council.engine.debate_async import debate_round_parallel, run_debate
+
+    async def mock_query(model, messages, *args, **kwargs):
+        # Only one model succeeds
+        if model == SAMPLE_MODELS[0]:
+            return {"content": f"Response from {model}"}
+        return None
+
+    async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
+        if model == SAMPLE_MODELS[0]:
+            return {"content": f"Response from {model}"}
+        return None
+
+    with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
+        with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
+            with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
+                with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                    events = []
+                    async for event in run_debate(
+                        user_query="Test question",
+                        execute_round=debate_round_parallel,
+                        max_rounds=2,
+                    ):
+                        events.append(event)
+
+    event_types = [e["type"] for e in events]
+
+    # Should have an error event
+    assert "error" in event_types
+
+    # Should only have 1 round_start (initial) before error
+    assert event_types.count("round_start") == 1

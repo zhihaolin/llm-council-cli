@@ -45,6 +45,105 @@ async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return f"Unknown tool: {tool_name}"
 
 
+async def run_debate(
+    user_query: str,
+    execute_round: Callable,
+    max_rounds: int = 2,
+) -> AsyncGenerator[dict[str, Any], None]:
+    """
+    Single orchestrator that defines the debate round sequence once.
+
+    Delegates execution to the given `execute_round` callback, which must match
+    the execute-round protocol: an async generator that yields events and must
+    yield a final ``{"type": "round_complete", "responses": [...]}`` event.
+
+    Args:
+        user_query: The user's question
+        execute_round: Async generator matching the execute-round protocol
+        max_rounds: Number of debate rounds (2 = initial + critique + defense)
+
+    Yields:
+        {'type': 'round_start', 'round_number': int, 'round_type': str}
+        (pass-through events from execute_round)
+        {'type': 'round_complete', 'round_number': int, 'round_type': str, 'responses': List}
+        {'type': 'error', 'message': str}
+        {'type': 'debate_complete', 'rounds': List}
+    """
+    rounds = []
+
+    # Build the round sequence: initial, critique, defense, then alternating
+    round_sequence = [
+        (1, "initial"),
+        (2, "critique"),
+        (3, "defense"),
+    ]
+    # Additional rounds if max_rounds > 2
+    round_num = 4
+    while round_num <= max_rounds + 1:
+        if round_num % 2 == 0:
+            round_sequence.append((round_num, "critique"))
+        else:
+            round_sequence.append((round_num, "defense"))
+        round_num += 1
+
+    initial_responses = []
+    critique_responses = []
+    current_responses = []
+
+    for rnd_num, rnd_type in round_sequence:
+        yield {"type": "round_start", "round_number": rnd_num, "round_type": rnd_type}
+
+        # Build context for this round
+        if rnd_type == "initial":
+            context = {}
+        elif rnd_type == "critique":
+            context = {"initial_responses": current_responses or initial_responses}
+        elif rnd_type == "defense":
+            context = {
+                "initial_responses": current_responses or initial_responses,
+                "critique_responses": critique_responses,
+            }
+        else:
+            context = {}
+
+        # Delegate to executor and pass through events
+        responses = []
+        async for event in execute_round(
+            round_type=rnd_type,
+            user_query=user_query,
+            context=context,
+        ):
+            if event["type"] == "round_complete":
+                responses = event["responses"]
+                # Augment with round metadata
+                yield {
+                    "type": "round_complete",
+                    "round_number": rnd_num,
+                    "round_type": rnd_type,
+                    "responses": responses,
+                }
+            else:
+                yield event
+
+        # Track state for subsequent rounds
+        rounds.append({"round_number": rnd_num, "round_type": rnd_type, "responses": responses})
+
+        if rnd_type == "initial":
+            initial_responses = responses
+            if len(initial_responses) < 2:
+                yield {
+                    "type": "error",
+                    "message": "Not enough models responded to conduct a debate. Need at least 2 models.",
+                }
+                return
+        elif rnd_type == "critique":
+            critique_responses = responses
+        elif rnd_type == "defense":
+            current_responses = responses
+
+    yield {"type": "debate_complete", "rounds": rounds}
+
+
 async def debate_round_parallel(
     round_type: str,
     user_query: str,

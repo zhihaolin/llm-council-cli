@@ -106,6 +106,7 @@ Response B is third."""
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def sample_models() -> list[str]:
     """Return sample model identifiers."""
@@ -140,5 +141,3 @@ def sample_ranking_text() -> str:
 def sample_ranking_text_no_header() -> str:
     """Return sample ranking text without proper header."""
     return SAMPLE_RANKING_TEXT_NO_HEADER
-
-

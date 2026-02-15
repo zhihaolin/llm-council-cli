@@ -37,6 +37,7 @@ from .debate import (
 # Async execution strategies
 from .debate_async import (
     debate_round_parallel,
+    run_debate,
     run_debate_parallel,
     run_debate_streaming,
 )
@@ -87,6 +88,7 @@ __all__ = [
     "run_debate_council",
     # Async execution strategies
     "debate_round_parallel",
+    "run_debate",
     "run_debate_parallel",
     "run_debate_streaming",
     # ReAct

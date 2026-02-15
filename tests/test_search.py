@@ -44,7 +44,7 @@ class TestSearchWeb:
             "results": [
                 {"title": "Result 1", "url": "https://example.com/1", "content": "Content 1"},
                 {"title": "Result 2", "url": "https://example.com/2", "content": "Content 2"},
-            ]
+            ],
         }
 
         with patch("llm_council.adapters.tavily_search.TAVILY_API_KEY", "test-key"):
@@ -89,7 +89,7 @@ class TestFormatSearchResults:
             "answer": "Quick answer here",
             "results": [
                 {"title": "Title 1", "url": "https://example.com", "content": "Content here"}
-            ]
+            ],
         }
         formatted = format_search_results(response)
 
@@ -137,7 +137,7 @@ class TestExecuteTool:
         """Executes search_web tool and returns formatted results."""
         mock_search_result = {
             "answer": "Test",
-            "results": [{"title": "T", "url": "U", "content": "C"}]
+            "results": [{"title": "T", "url": "U", "content": "C"}],
         }
 
         with patch("llm_council.engine.ranking.search_web", new_callable=AsyncMock) as mock_search:
@@ -161,13 +161,7 @@ class TestQueryModelWithTools:
     @pytest.mark.asyncio
     async def test_no_tool_calls(self):
         """Returns content directly when model doesn't request tools."""
-        mock_api_response = {
-            "choices": [{
-                "message": {
-                    "content": "Direct answer without tools"
-                }
-            }]
-        }
+        mock_api_response = {"choices": [{"message": {"content": "Direct answer without tools"}}]}
 
         with patch("httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
@@ -182,7 +176,7 @@ class TestQueryModelWithTools:
                 model="test/model",
                 messages=[{"role": "user", "content": "question"}],
                 tools=[SEARCH_TOOL],
-                tool_executor=AsyncMock()
+                tool_executor=AsyncMock(),
             )
 
             assert result["content"] == "Direct answer without tools"
@@ -193,26 +187,26 @@ class TestQueryModelWithTools:
         """Executes tool and returns final response."""
         # First response: model requests tool
         tool_call_response = {
-            "choices": [{
-                "message": {
-                    "tool_calls": [{
-                        "id": "call_123",
-                        "function": {
-                            "name": "search_web",
-                            "arguments": '{"query": "current weather"}'
-                        }
-                    }]
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "function": {
+                                    "name": "search_web",
+                                    "arguments": '{"query": "current weather"}',
+                                },
+                            }
+                        ]
+                    }
                 }
-            }]
+            ]
         }
 
         # Second response: model provides final answer
         final_response = {
-            "choices": [{
-                "message": {
-                    "content": "Based on the search, the weather is sunny."
-                }
-            }]
+            "choices": [{"message": {"content": "Based on the search, the weather is sunny."}}]
         }
 
         with patch("httpx.AsyncClient") as mock_client:
@@ -234,7 +228,7 @@ class TestQueryModelWithTools:
                 model="test/model",
                 messages=[{"role": "user", "content": "what's the weather?"}],
                 tools=[SEARCH_TOOL],
-                tool_executor=mock_executor
+                tool_executor=mock_executor,
             )
 
             assert result["content"] == "Based on the search, the weather is sunny."
@@ -247,17 +241,21 @@ class TestQueryModelWithTools:
         """Returns message when max tool calls is exceeded."""
         # Response that always requests another tool call
         tool_call_response = {
-            "choices": [{
-                "message": {
-                    "tool_calls": [{
-                        "id": "call_123",
-                        "function": {
-                            "name": "search_web",
-                            "arguments": '{"query": "search"}'
-                        }
-                    }]
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "function": {
+                                    "name": "search_web",
+                                    "arguments": '{"query": "search"}',
+                                },
+                            }
+                        ]
+                    }
                 }
-            }]
+            ]
         }
 
         with patch("httpx.AsyncClient") as mock_client:
@@ -274,7 +272,7 @@ class TestQueryModelWithTools:
                 messages=[{"role": "user", "content": "question"}],
                 tools=[SEARCH_TOOL],
                 tool_executor=AsyncMock(return_value="result"),
-                max_tool_calls=3
+                max_tool_calls=3,
             )
 
             assert "Max tool calls reached" in result["content"]
@@ -284,25 +282,25 @@ class TestQueryModelWithTools:
     async def test_tool_execution_error(self):
         """Handles tool execution errors gracefully."""
         tool_call_response = {
-            "choices": [{
-                "message": {
-                    "tool_calls": [{
-                        "id": "call_123",
-                        "function": {
-                            "name": "search_web",
-                            "arguments": '{"query": "test"}'
-                        }
-                    }]
+            "choices": [
+                {
+                    "message": {
+                        "tool_calls": [
+                            {
+                                "id": "call_123",
+                                "function": {
+                                    "name": "search_web",
+                                    "arguments": '{"query": "test"}',
+                                },
+                            }
+                        ]
+                    }
                 }
-            }]
+            ]
         }
 
         final_response = {
-            "choices": [{
-                "message": {
-                    "content": "I couldn't search but here's my answer."
-                }
-            }]
+            "choices": [{"message": {"content": "I couldn't search but here's my answer."}}]
         }
 
         with patch("httpx.AsyncClient") as mock_client:
@@ -325,7 +323,7 @@ class TestQueryModelWithTools:
                 model="test/model",
                 messages=[{"role": "user", "content": "question"}],
                 tools=[SEARCH_TOOL],
-                tool_executor=mock_executor
+                tool_executor=mock_executor,
             )
 
             # Should still complete with the tool error captured
@@ -343,10 +341,14 @@ class TestStage1ToolIntegration:
 
         mock_response = {
             "content": "Here's what I found after searching...",
-            "tool_calls_made": [{"tool": "search_web", "args": {"query": "test"}, "result_preview": "..."}]
+            "tool_calls_made": [
+                {"tool": "search_web", "args": {"query": "test"}, "result_preview": "..."}
+            ],
         }
 
-        with patch("llm_council.engine.ranking.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch(
+            "llm_council.engine.ranking.query_model_with_tools", new_callable=AsyncMock
+        ) as mock_query:
             mock_query.return_value = mock_response
             with patch("llm_council.engine.ranking.COUNCIL_MODELS", ["test/model"]):
                 results = await stage1_collect_responses("What is the current price of BTC?")
@@ -360,12 +362,11 @@ class TestStage1ToolIntegration:
         """Stage 1 omits tool_calls_made when no tools are used."""
         from llm_council.engine import stage1_collect_responses
 
-        mock_response = {
-            "content": "I know this without searching.",
-            "tool_calls_made": []
-        }
+        mock_response = {"content": "I know this without searching.", "tool_calls_made": []}
 
-        with patch("llm_council.engine.ranking.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch(
+            "llm_council.engine.ranking.query_model_with_tools", new_callable=AsyncMock
+        ) as mock_query:
             mock_query.return_value = mock_response
             with patch("llm_council.engine.ranking.COUNCIL_MODELS", ["test/model"]):
                 results = await stage1_collect_responses("What is 2+2?")
