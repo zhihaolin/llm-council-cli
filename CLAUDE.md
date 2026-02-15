@@ -182,11 +182,11 @@ Models receive a `search_web` tool definition and autonomously decide when to us
 - Questions about current events, prices, weather → model calls search
 - General knowledge questions → model answers directly
 
-**Rounds with search enabled:**
+**Rounds with search enabled** (consistent across batch, parallel, and token-streaming modes):
 - **Round 1 (Initial):** Models can search to gather facts for their initial response
 - **Round 3 (Defense):** Models can search to find evidence supporting their defense
 
-Round 2 (Critique) does not have search - models critique existing responses without introducing new facts.
+Round 2 (Critique) does not have search — models critique existing responses without introducing new facts.
 
 ### Tool Calling Flow
 ```
@@ -231,6 +231,24 @@ llm-council --debate --simple "Question"           # Just final answer
 | Default rounds | 2 | Sufficient for most questions |
 
 ### Debate Functions (in `llm_council/engine/debate.py`)
+
+**Shared per-round query functions** (used by both batch and streaming orchestrators):
+
+**`query_initial(model, user_query)`** — Round 1 for a single model
+- Uses `query_model_with_tools()` (web search enabled)
+- Returns `{"model": ..., "response": ..., "tool_calls_made": ...}` or `None`
+
+**`query_critique(model, user_query, initial_responses)`** — Round 2 for a single model
+- Uses `query_model()` (no tools — critiques evaluate existing responses)
+- Returns `{"model": ..., "response": ...}` or `None`
+
+**`query_defense(model, user_query, initial_responses, critique_responses)`** — Round 3 for a single model
+- Uses `query_model_with_tools()` (web search enabled for evidence gathering)
+- Returns `{"model": ..., "response": ..., "revised_answer": ..., "tool_calls_made": ...}` or `None`
+
+**Orchestration functions** (call per-round functions with `asyncio.gather()`):
+
+**`debate_round_initial(user_query)`** → queries all council models via `query_initial`
 
 **`debate_round_critique(query, initial_responses)`**
 - Each model receives all responses and critiques the others
@@ -400,7 +418,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`llm_council/engine/debate_streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`llm_council/engine/debate.py` uses plain `query_model`)
+6. **Debate Round Functions**: Shared `query_initial()`, `query_critique()`, `query_defense()` in `debate.py` are the single source of truth for per-round query logic. Both batch and streaming orchestrators delegate to these functions
 
 ## Known Technical Debt
 
@@ -416,18 +434,18 @@ Issues identified but not yet on the roadmap. Fix opportunistically or when touc
 
 ## Future Enhancements
 
-See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.7+).
+See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.8+).
 
 ## Testing
 
-### Test Suite (84 tests)
+### Test Suite (92 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
 ├── test_chat_commands.py        # 10 tests - chat REPL command parsing
 ├── test_cli_imports.py          # 1 test - CLI module imports
 ├── test_conversation_context.py # 5 tests - conversation context handling
-├── test_debate.py               # 15 tests - debate mode
+├── test_debate.py               # 23 tests - debate mode
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
 ├── test_react.py                # 12 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling

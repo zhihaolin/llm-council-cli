@@ -14,7 +14,7 @@
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
-| v1.7 | File/Document Upload | Planned |
+| v1.7 | Unify Debate Logic | ✅ Complete |
 | v1.8 | Strategy Pattern (OCP/DIP) | Planned |
 | v1.9 | Self-Reflection Round | Planned |
 | v1.10 | Workflow State Machine | Planned |
@@ -79,28 +79,15 @@
 - Works with parallel and streaming modes
 - Color-coded trace display (Thought=cyan, Action=yellow, Observation=dim)
 
+### v1.7: Unify Debate Logic
+- Extracted shared per-round query functions: `query_initial()`, `query_critique()`, `query_defense()`
+- Both batch (`debate.py`) and streaming (`debate_streaming.py`) orchestrators delegate to shared functions
+- Fixed Round 3 (defense) tool asymmetry: batch mode now uses `query_model_with_tools()` (previously only streaming had tools)
+- Consistent web search availability in Rounds 1 and 3 across all modes
+
 ---
 
 ## Next Up
-
-### v1.7: File/Document Upload
-
-Attach files for the council to review.
-
-```bash
-llm-council query --file ./code.py "Review this code"
-llm-council query --file ./report.pdf "Summarize the key findings"
-llm-council query --file ./data.csv --file ./schema.json "Validate this data"
-```
-
-**Supported formats:**
-- Text: `.txt`, `.md`, `.py`, `.js`, `.json`, `.yaml`, `.csv`
-- Documents: `.pdf` (via `pypdf`), `.docx` (via `python-docx`)
-
-**Implementation:**
-- File content prepended to user query
-- Large files truncated with warning
-- Multiple `--file` flags supported
 
 ### v1.8: Strategy Pattern (OCP/DIP)
 
@@ -357,7 +344,7 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 84 tests |
+| Test Suite | pytest + pytest-asyncio, 92 tests |
 | Linting | Ruff check + format in CI |
 | Type Checking | Pyright in basic mode |
 | Type Hints | Function signatures throughout |
@@ -424,7 +411,7 @@ tests/
 ├── test_chat_commands.py        # 10 tests
 ├── test_cli_imports.py          # 1 test
 ├── test_conversation_context.py # 5 tests
-├── test_debate.py               # 15 tests
+├── test_debate.py               # 23 tests
 ├── test_ranking_parser.py       # 14 tests
 ├── test_react.py                # 12 tests
 ├── test_search.py               # 17 tests
