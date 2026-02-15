@@ -599,3 +599,60 @@ async def test_run_debate_error_on_insufficient_models():
 
     # Should only have 1 round_start (initial) before error
     assert event_types.count("round_start") == 1
+
+
+# =============================================================================
+# Test: debate_round_streaming yields token events
+# =============================================================================
+
+ASYNC_QUERY_MODEL_STREAMING = "llm_council.engine.debate_async.query_model_streaming"
+ASYNC_QUERY_MODEL_STREAMING_WITH_TOOLS = (
+    "llm_council.engine.debate_async.query_model_streaming_with_tools"
+)
+
+
+@pytest.mark.asyncio
+async def test_debate_round_streaming_yields_tokens():
+    """
+    Verify that debate_round_streaming yields token events, model_start/complete,
+    and round_complete matching the execute-round protocol.
+    """
+    from llm_council.engine.debate_async import debate_round_streaming
+
+    async def mock_streaming_with_tools(model, messages, tools, tool_executor, **kwargs):
+        """Mock streaming with tools - yields token events then done."""
+        yield {"type": "token", "content": "Hello "}
+        yield {"type": "token", "content": "world"}
+        yield {"type": "done", "content": "Hello world", "tool_calls_made": []}
+
+    with patch(ASYNC_QUERY_MODEL_STREAMING_WITH_TOOLS, side_effect=mock_streaming_with_tools):
+        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_streaming(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
+
+    # Should have model_start for each model
+    model_starts = [e for e in events if e["type"] == "model_start"]
+    assert len(model_starts) == len(SAMPLE_MODELS)
+
+    # Should have token events
+    token_events = [e for e in events if e["type"] == "token"]
+    assert len(token_events) > 0
+
+    # Each token event should identify the model
+    for te in token_events:
+        assert "model" in te
+        assert te["model"] in SAMPLE_MODELS
+
+    # Should have model_complete for each model
+    model_completes = [e for e in events if e["type"] == "model_complete"]
+    assert len(model_completes) == len(SAMPLE_MODELS)
+
+    # Should end with round_complete
+    round_completes = [e for e in events if e["type"] == "round_complete"]
+    assert len(round_completes) == 1
+    assert len(round_completes[0]["responses"]) == len(SAMPLE_MODELS)

@@ -232,6 +232,130 @@ async def debate_round_parallel(
     yield {"type": "round_complete", "responses": responses}
 
 
+async def debate_round_streaming(
+    round_type: str,
+    user_query: str,
+    context: dict[str, Any],
+) -> AsyncGenerator[dict[str, Any], None]:
+    """
+    Execute a single debate round with token-level streaming (sequential).
+
+    Processes models one at a time, yielding token events as they stream.
+    Matches the execute-round protocol: yields events and a final
+    ``{"type": "round_complete", "responses": [...]}`` event.
+
+    Args:
+        round_type: One of "initial", "critique", or "defense"
+        user_query: The user's question
+        context: Context dict containing:
+            - For critique: {"initial_responses": [...]}
+            - For defense: {"initial_responses": [...], "critique_responses": [...]}
+
+    Yields:
+        {'type': 'model_start', 'model': str}
+        {'type': 'token', 'model': str, 'content': str}
+        {'type': 'tool_call', 'model': str, 'tool': str, 'args': dict}
+        {'type': 'tool_result', 'model': str, 'tool': str, 'result': str}
+        {'type': 'model_complete', 'model': str, 'response': Dict}
+        {'type': 'model_error', 'model': str, 'error': str}
+        {'type': 'round_complete', 'responses': List}
+    """
+    query_with_date = get_date_context() + user_query
+    tools = [SEARCH_TOOL]
+    responses = []
+
+    # Build per-model prompt and determine tool availability
+    initial_responses = context.get("initial_responses", [])
+    critique_responses = context.get("critique_responses", [])
+
+    if round_type == "initial":
+        with_tools = True
+
+        def build_prompt(_model: str) -> str:
+            return query_with_date
+
+    elif round_type == "critique":
+        with_tools = False
+        responses_text = format_responses_for_critique(initial_responses)
+
+        def build_prompt(model: str) -> str:
+            return build_critique_prompt(user_query, responses_text, model)
+
+    elif round_type == "defense":
+        with_tools = True
+        model_to_response = {r["model"]: r["response"] for r in initial_responses}
+
+        def build_prompt(model: str) -> str:
+            original = model_to_response.get(model, "")
+            critiques = extract_critiques_for_model(model, critique_responses)
+            return build_defense_prompt(user_query, original, critiques)
+
+    else:
+        raise ValueError(f"Unknown round type: {round_type}")
+
+    for model in COUNCIL_MODELS:
+        yield {"type": "model_start", "model": model}
+
+        prompt = build_prompt(model)
+        messages = [{"role": "user", "content": prompt}]
+        full_content = ""
+        tool_calls_made = []
+
+        try:
+            if with_tools:
+                async for event in query_model_streaming_with_tools(
+                    model=model,
+                    messages=messages,
+                    tools=tools,
+                    tool_executor=execute_tool,
+                ):
+                    if event["type"] == "token":
+                        full_content += event["content"]
+                        yield {"type": "token", "model": model, "content": event["content"]}
+                    elif event["type"] == "tool_call":
+                        yield {
+                            "type": "tool_call",
+                            "model": model,
+                            "tool": event["tool"],
+                            "args": event["args"],
+                        }
+                    elif event["type"] == "tool_result":
+                        yield {
+                            "type": "tool_result",
+                            "model": model,
+                            "tool": event["tool"],
+                            "result": event["result"],
+                        }
+                    elif event["type"] == "done":
+                        full_content = event.get("content", full_content)
+                        tool_calls_made = event.get("tool_calls_made", [])
+                    elif event["type"] == "error":
+                        yield {"type": "model_error", "model": model, "error": event["error"]}
+                        break
+            else:
+                async for event in query_model_streaming(model, messages):
+                    if event["type"] == "token":
+                        full_content += event["content"]
+                        yield {"type": "token", "model": model, "content": event["content"]}
+                    elif event["type"] == "error":
+                        yield {"type": "model_error", "model": model, "error": event["error"]}
+                        break
+
+            if full_content:
+                result = {"model": model, "response": full_content}
+                if round_type == "defense":
+                    result["revised_answer"] = parse_revised_answer(full_content)
+                if tool_calls_made:
+                    result["tool_calls_made"] = tool_calls_made
+                responses.append(result)
+                yield {"type": "model_complete", "model": model, "response": result}
+
+        except Exception as e:
+            yield {"type": "model_error", "model": model, "error": str(e)}
+
+    yield {"type": "round_complete", "responses": responses}
+
+
 async def run_debate_parallel(
     user_query: str, max_rounds: int = 2, skip_synthesis: bool = False
 ) -> AsyncGenerator[dict[str, Any], None]:
