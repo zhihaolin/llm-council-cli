@@ -334,3 +334,180 @@ class TestReactStreaming:
         obs_events = [e for e in events if e["type"] == "observation"]
         assert len(obs_events) == 1
         assert "$67,234" in obs_events[0]["content"]
+
+
+# =============================================================================
+# parse_react_output: respond() action
+# =============================================================================
+
+
+class TestParseRespondAction:
+    """Tests for respond() as a terminal action."""
+
+    def test_respond_recognized(self):
+        """Should recognize respond() as a terminal action."""
+        from llm_council.engine import parse_react_output
+
+        text = """Thought: I know the answer from the question context.
+
+Action: respond()
+
+Python is the best language for beginners."""
+        thought, action, action_args = parse_react_output(text)
+        assert action == "respond"
+        assert action_args is None
+        assert "know the answer" in thought
+
+    def test_respond_and_synthesize_both_terminal(self):
+        """Both respond() and synthesize() should be recognized."""
+        from llm_council.engine import parse_react_output
+
+        text1 = "Thought: X\nAction: respond()"
+        text2 = "Thought: X\nAction: synthesize()"
+        _, action1, _ = parse_react_output(text1)
+        _, action2, _ = parse_react_output(text2)
+        assert action1 == "respond"
+        assert action2 == "synthesize"
+
+
+# =============================================================================
+# Council ReAct Loop Tests
+# =============================================================================
+
+
+COUNCIL_REACT_DIRECT_RESPOND = """Thought: I can answer this directly from my training data.
+
+Action: respond()
+
+Python is the best programming language for beginners due to its readable syntax."""
+
+COUNCIL_REACT_SEARCH_THEN_RESPOND = """Thought: I need to check the current Bitcoin price.
+
+Action: search_web("bitcoin price today")"""
+
+COUNCIL_REACT_AFTER_SEARCH = """Thought: Now I have the data I need.
+
+Action: respond()
+
+Bitcoin is currently trading at $67,234."""
+
+
+class TestCouncilReactLoop:
+    """Tests for council_react_loop."""
+
+    @pytest.mark.asyncio
+    async def test_direct_respond(self):
+        """Model responds directly without searching."""
+        from llm_council.engine.react import council_react_loop
+
+        async def mock_generator():
+            yield {"type": "done", "content": COUNCIL_REACT_DIRECT_RESPOND}
+
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            return_value=mock_generator(),
+        ):
+            events = []
+            async for event in council_react_loop("test/model", "test prompt"):
+                events.append(event)
+
+        event_types = [e["type"] for e in events]
+        assert "thought" in event_types
+        assert "done" in event_types
+
+        done = next(e for e in events if e["type"] == "done")
+        assert "Python is the best" in done["content"]
+        assert done["tool_calls_made"] == []
+
+    @pytest.mark.asyncio
+    async def test_search_then_respond(self):
+        """Model searches, then responds."""
+        from llm_council.engine.react import council_react_loop
+
+        call_count = 0
+
+        async def mock_generator():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                yield {"type": "done", "content": COUNCIL_REACT_SEARCH_THEN_RESPOND}
+            else:
+                yield {"type": "done", "content": COUNCIL_REACT_AFTER_SEARCH}
+
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            side_effect=lambda *args, **kwargs: mock_generator(),
+        ):
+            with patch(
+                "llm_council.engine.react.search_web", new_callable=AsyncMock
+            ) as mock_search:
+                mock_search.return_value = {
+                    "answer": "Bitcoin is at $67,234",
+                    "results": [
+                        {"title": "Price", "content": "$67,234", "url": "https://example.com"}
+                    ],
+                }
+
+                events = []
+                async for event in council_react_loop("test/model", "test prompt"):
+                    events.append(event)
+
+        event_types = [e["type"] for e in events]
+        assert "thought" in event_types
+        assert "action" in event_types
+        assert "observation" in event_types
+        assert "done" in event_types
+
+        done = next(e for e in events if e["type"] == "done")
+        assert "$67,234" in done["content"]
+        assert len(done["tool_calls_made"]) == 1
+        assert done["tool_calls_made"][0]["tool"] == "search_web"
+
+    @pytest.mark.asyncio
+    async def test_max_iterations(self):
+        """Should stop after max_iterations and yield done with accumulated content."""
+        from llm_council.engine.react import council_react_loop
+
+        async def mock_generator():
+            yield {"type": "done", "content": COUNCIL_REACT_SEARCH_THEN_RESPOND}
+
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            side_effect=lambda *args, **kwargs: mock_generator(),
+        ):
+            with patch(
+                "llm_council.engine.react.search_web", new_callable=AsyncMock
+            ) as mock_search:
+                mock_search.return_value = {
+                    "answer": "Test",
+                    "results": [{"title": "T", "content": "C", "url": "U"}],
+                }
+
+                events = []
+                async for event in council_react_loop(
+                    "test/model", "test prompt", max_iterations=2
+                ):
+                    events.append(event)
+
+        # Should have a done event
+        done_events = [e for e in events if e["type"] == "done"]
+        assert len(done_events) == 1
+
+    @pytest.mark.asyncio
+    async def test_error_handling(self):
+        """Should yield done with error on streaming error."""
+        from llm_council.engine.react import council_react_loop
+
+        async def mock_generator():
+            yield {"type": "error", "error": "Connection failed"}
+
+        with patch(
+            "llm_council.engine.react.query_model_streaming",
+            return_value=mock_generator(),
+        ):
+            events = []
+            async for event in council_react_loop("test/model", "test prompt"):
+                events.append(event)
+
+        done = next(e for e in events if e["type"] == "done")
+        assert "Error" in done["content"]

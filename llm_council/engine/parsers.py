@@ -135,7 +135,7 @@ def parse_react_output(text: str) -> tuple[str, str, str]:
     Returns:
         Tuple of (thought, action_name, action_args)
         - action_name is None if no valid action found
-        - action_args is None for synthesize()
+        - action_args is None for synthesize()/respond()
     """
     thought = None
     action = None
@@ -148,6 +148,9 @@ def parse_react_output(text: str) -> tuple[str, str, str]:
     if thought_match:
         thought = thought_match.group(1).strip()
 
+    # Terminal actions (no args): synthesize() and respond()
+    _TERMINAL_ACTIONS = {"synthesize", "respond"}
+
     # Extract Action section
     action_match = re.search(r"Action:\s*(\w+)\s*\(([^)]*)\)", text, re.IGNORECASE)
     if action_match:
@@ -158,13 +161,15 @@ def parse_react_output(text: str) -> tuple[str, str, str]:
         if action_name == "search_web":
             action = "search_web"
             action_args = args
-        elif action_name == "synthesize":
-            action = "synthesize"
+        elif action_name in _TERMINAL_ACTIONS:
+            action = action_name
             action_args = None
     else:
-        # Check for synthesize() without args
-        if re.search(r"Action:\s*synthesize\s*\(\s*\)", text, re.IGNORECASE):
-            action = "synthesize"
-            action_args = None
+        # Check for terminal actions without args
+        for terminal in _TERMINAL_ACTIONS:
+            if re.search(rf"Action:\s*{terminal}\s*\(\s*\)", text, re.IGNORECASE):
+                action = terminal
+                action_args = None
+                break
 
     return thought, action, action_args

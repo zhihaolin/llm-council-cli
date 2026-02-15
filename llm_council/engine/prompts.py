@@ -390,3 +390,41 @@ def format_responses_for_critique(initial_responses: list[dict[str, Any]]) -> st
     return "\n\n".join(
         [f"**{result['model']}:**\n{result['response']}" for result in initial_responses]
     )
+
+
+def wrap_prompt_with_react(prompt: str) -> str:
+    """
+    Wrap an existing round prompt with ReAct instructions.
+
+    Council members use text-based ReAct for visible reasoning about
+    when and why to search, then produce their response.
+
+    Args:
+        prompt: The original round prompt (initial or defense)
+
+    Returns:
+        The prompt augmented with ReAct instructions
+    """
+    return f"""{prompt}
+
+---
+
+You have access to a web search tool. Use ReAct (Reasoning + Acting) to decide whether you need to search before answering.
+
+Available tool:
+- search_web("query"): Search the web for current information
+
+Terminal action:
+- respond(): Produce your final response
+
+FORMAT — You MUST respond in this exact format:
+
+Thought: <your reasoning about what you know and what you need to look up>
+Action: <either search_web("query") or respond()>
+
+If you call search_web, you will receive an Observation with the results, then continue reasoning.
+If you call respond(), write your full response immediately after it.
+
+Maximum 3 reasoning steps. If unsure, respond with what you know.
+
+Begin:"""
