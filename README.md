@@ -65,7 +65,7 @@ llm-council "What is the current price of Bitcoin?"
 # Models automatically search for real-time data
 ```
 
-The CLI shows which models used search with a subtle `• searched` indicator.
+The CLI shows which models used search with a `[searched]` indicator on each panel. When ReAct reasoning is enabled (default), panels also show `[reasoned]`.
 
 **Search-enabled rounds in debate mode:**
 - Round 1 (Initial): Models search to gather facts for their position
@@ -78,17 +78,17 @@ The CLI shows which models used search with a subtle `• searched` indicator.
 The chairman deeply analyzes all model responses before synthesizing. It identifies areas of agreement, disagreement, and factual claims that warrant scrutiny—then produces a well-reasoned final answer.
 
 ```
-━━━ CHAIRMAN'S ANALYSIS ━━━
+━━━ CHAIRMAN'S REFLECTION ━━━
 
-┌─ Analysis • gemini-2.5-pro ─────────────────────────┐
-│ Areas of agreement: All models agree that...         │
-│ Areas of disagreement: GPT claims X while Claude...  │
-│ Factual claims to verify: The price cited by...      │
-└──────────────────────────────────────────────────────┘
+┌─ Reflection • gemini-2.5-pro ────────────────────────┐
+│ Areas of agreement: All models agree that...          │
+│ Areas of disagreement: GPT claims X while Claude...   │
+│ Factual claims to verify: The price cited by...       │
+└───────────────────────────────────────────────────────┘
 
-┌─ Final Answer • gemini-2.5-pro ─────────────────────┐
-│ [Synthesized answer]                                 │
-└──────────────────────────────────────────────────────┘
+┌─ Final Answer • gemini-2.5-pro ──────────────────────┐
+│ [Synthesized answer]                                  │
+└───────────────────────────────────────────────────────┘
 ```
 
 ### Council ReAct
@@ -119,21 +119,15 @@ uv run llm-council chat
 │ ID: abc12345                               │
 │ Mode: Debate (2 rounds) [stream] [react]   │
 └────────────────────────────────────────────┘
-Commands: /help, /history, /use <id>, /new, /debate, /stream, /react, /rounds, /mode, /exit
+/new /history /use <id>  |  /debate /rounds /stream /react  |  /mode /help /exit
 
-debate(2)> What is the capital of France?
+council> What is the capital of France?
 ```
 
 Slash commands:
-- `/history` — List saved conversations
-- `/use <id>` — Switch to a conversation by ID prefix
-- `/new` — Start a new conversation
-- `/debate on|off` — Toggle debate mode
-- `/stream on|off` — Toggle streaming mode
-- `/react on|off` — Toggle council ReAct reasoning (default: on)
-- `/rounds N` — Set debate rounds
-- `/mode` — Show current mode
-- `/exit` — Exit chat
+- **Session:** `/new`, `/history`, `/use <id>`
+- **Config:** `/debate on|off`, `/rounds N`, `/stream on|off`, `/react on|off`
+- **Info:** `/mode`, `/help`, `/exit`
 
 ### Rich Terminal Interface
 
@@ -343,7 +337,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 107 tests |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 108 tests |
 | **Linting** | ✅ | Ruff (check + format) in CI |
 | **Type Checking** | ✅ | Pyright in basic mode |
 | **Type Hints** | ✅ | Throughout codebase |
@@ -374,7 +368,7 @@ uv run pytest tests/ -v
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
-├── test_chat_commands.py        # Chat REPL command parsing (10 tests)
+├── test_chat_commands.py        # Chat REPL + model panel indicators (11 tests)
 ├── test_cli_imports.py          # CLI smoke test (1 test)
 ├── test_conversation_context.py # Context extraction (5 tests)
 ├── test_debate.py               # Debate mode + RoundConfig + ReAct (24 tests)
