@@ -153,7 +153,7 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
 
 
 async def run_debate_with_progress(
-    query: str, max_rounds: int = 2, skip_synthesis: bool = False
+    query: str, cycles: int = 1, skip_synthesis: bool = False
 ) -> tuple:
     """Run the debate council with progress indicators.
 
@@ -180,7 +180,7 @@ async def run_debate_with_progress(
         console=console,
         transient=True,
     ) as progress:
-        async for event in _run_debate(query, _debate_round_parallel, max_rounds):
+        async for event in _run_debate(query, _debate_round_parallel, cycles):
             if event["type"] == "round_start":
                 rnd_num = event["round_number"]
                 rnd_type = event["round_type"]
@@ -229,9 +229,7 @@ async def run_debate_with_progress(
     return rounds, synthesis
 
 
-async def run_debate_streaming(
-    query: str, max_rounds: int = 2, skip_synthesis: bool = False
-) -> tuple:
+async def run_debate_streaming(query: str, cycles: int = 1, skip_synthesis: bool = False) -> tuple:
     """
     Run debate with token-by-token streaming.
 
@@ -239,7 +237,7 @@ async def run_debate_streaming(
 
     Args:
         query: The user's question
-        max_rounds: Number of debate rounds
+        cycles: Number of critique-defense cycles
         skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
 
     Returns:
@@ -285,7 +283,7 @@ async def run_debate_streaming(
     current_round_type = ""
 
     # Phase 1: Run debate rounds
-    async for event in _run_debate(query, _debate_round_streaming, max_rounds):
+    async for event in _run_debate(query, _debate_round_streaming, cycles):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -414,9 +412,7 @@ async def run_debate_streaming(
     return rounds_data, synthesis_data
 
 
-async def run_debate_parallel(
-    query: str, max_rounds: int = 2, skip_synthesis: bool = False
-) -> tuple:
+async def run_debate_parallel(query: str, cycles: int = 1, skip_synthesis: bool = False) -> tuple:
     """
     Run debate with parallel execution and progress spinners.
 
@@ -425,7 +421,7 @@ async def run_debate_parallel(
 
     Args:
         query: The user's question
-        max_rounds: Number of debate rounds
+        cycles: Number of critique-defense cycles
         skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
     """
     rounds_data = []
@@ -473,7 +469,7 @@ async def run_debate_parallel(
         console.print()
 
     # Phase 1: Run debate rounds
-    async for event in _run_debate(query, _debate_round_parallel, max_rounds):
+    async for event in _run_debate(query, _debate_round_parallel, cycles):
         event_type = event["type"]
 
         if event_type == "round_start":

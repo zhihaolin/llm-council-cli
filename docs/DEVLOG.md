@@ -4,6 +4,38 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Fix `max_rounds` semantics and streaming error/complete conflict
+*February 2026*
+
+### Overview
+Fixed two bugs in `debate.py`:
+
+1. **`max_rounds` off-by-one could produce dangling critiques.** The old `while round_num <= max_rounds + 1` loop added rounds one-at-a-time, so odd values > 2 would end on a critique with no defense. Renamed `max_rounds` → `cycles` where `--rounds N` = N complete critique-defense cycles after the initial round. Always ends on defense.
+
+2. **Streaming could emit `model_error` then `model_complete` for the same model.** In `debate_round_streaming`, if tokens streamed and then an error arrived, the `break` exited the inner loop but `full_content` was non-empty, causing `model_complete` to fire after `model_error`. Added `had_error` flag to guard against this.
+
+### Changes
+- `llm_council/engine/debate.py`: Renamed `max_rounds` → `cycles`, replaced round-building with explicit cycle loop. Added `had_error` flag in streaming.
+- `llm_council/cli/runners.py`: Renamed `max_rounds` → `cycles` in 3 runner signatures and `_run_debate()` calls.
+- `llm_council/cli/main.py`: `--rounds` default `2` → `1`, updated help text.
+- `llm_council/cli/constants.py`: `DEFAULT_DEBATE_ROUNDS` `2` → `1`.
+- `tests/test_streaming.py`: Renamed `max_rounds` → `cycles` at 4 call sites. Added `test_multiple_cycles_produces_correct_rounds` and `test_streaming_error_prevents_model_complete`.
+- `CLAUDE.md`: Updated `max_rounds` references to `cycles`.
+
+### Semantics Change
+| `--rounds` | Old behavior | New behavior |
+|---|---|---|
+| 1 | 2 interaction rounds (initial + critique) — dangling critique! | 3 interaction rounds (initial + critique + defense) |
+| 2 (old default) | 3 interaction rounds (initial + critique + defense) | 5 interaction rounds (initial + 2×critique-defense) |
+| New default | `--rounds 2` | `--rounds 1` — same output as old default |
+
+### Results
+- 93 tests pass, ruff clean
+- No dangling critiques possible regardless of `--rounds` value
+- No spurious `model_complete` events after streaming errors
+
+---
+
 ## Post-v1.9: Remove Textual TUI
 *February 2026*
 

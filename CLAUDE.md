@@ -217,8 +217,8 @@ Debate mode replaces the standard ranking flow with multi-round deliberation whe
 
 ### CLI Usage
 ```bash
-llm-council --debate "Question"                    # 2 rounds (default)
-llm-council --debate --rounds 3 "Complex question" # 3 rounds
+llm-council --debate "Question"                    # 1 cycle (default: initial + critique + defense)
+llm-council --debate --rounds 2 "Complex question" # 2 cycles (initial + 2×critique-defense)
 llm-council --debate --simple "Question"           # Just final answer
 ```
 
@@ -229,7 +229,7 @@ llm-council --debate --simple "Question"           # Just final answer
 | Attribution | Named (not anonymous) | Need to track who said what across rounds |
 | Critique scope | All-to-all | Each model critiques all others |
 | Defense format | Structured sections | Easy to parse revised answers |
-| Default rounds | 2 | Sufficient for most questions |
+| Default cycles | 1 | 1 cycle = initial + critique + defense; sufficient for most questions |
 
 ### Debate Functions (in `llm_council/engine/debate.py`)
 
@@ -249,10 +249,11 @@ llm-council --debate --simple "Question"           # Just final answer
 
 **Orchestrator and execution strategies** (also in `debate.py`):
 
-**`run_debate(user_query, execute_round, max_rounds)`**
+**`run_debate(user_query, execute_round, cycles)`**
 - Single orchestrator defining debate round sequence once
 - Delegates execution to `execute_round` callback (strategy pattern)
-- `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
+- `cycles=1` (default) produces 3 interaction rounds (initial + 1 critique-defense cycle)
+- `cycles=N` produces 2N+1 interaction rounds (initial + N critique-defense cycles). Always ends on defense.
 - Yields: `round_start` → (pass-through events from executor) → `round_complete` → ... → `debate_complete`
 - Does NOT handle synthesis (each mode does it differently)
 
@@ -321,8 +322,8 @@ llm_council/cli/
 | Mode | API Calls (5 models) |
 |------|---------------------|
 | Standard (ranking) | 11 calls |
-| Debate (2 rounds) | 16 calls |
-| Debate (3 rounds) | 21 calls |
+| Debate (1 cycle) | 16 calls |
+| Debate (2 cycles) | 26 calls |
 
 ### Error Handling
 - Model fails during round: continue with remaining models
@@ -412,7 +413,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Round Sequence**: The round sequence (initial → critique → defense → extra rounds) is defined once in `run_debate()`. Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. Synthesis is handled by each CLI runner after debate completes. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
+6. **Debate Round Sequence**: The round sequence (initial → N×(critique → defense)) is defined once in `run_debate()`. The `cycles` parameter controls how many critique-defense cycles occur (default 1). Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. Synthesis is handled by each CLI runner after debate completes. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
 
 ## Known Technical Debt
 
@@ -432,7 +433,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (91 tests)
+### Test Suite (93 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
@@ -443,7 +444,7 @@ tests/
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
 ├── test_react.py                # 12 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling
-├── test_streaming.py            # 13 tests - streaming, parallel, orchestrator
+├── test_streaming.py            # 15 tests - streaming, parallel, orchestrator
 └── integration/                 # CLI tests (planned)
 ```
 
@@ -527,7 +528,7 @@ Round 3: Each model defends/revises (parallel)
     ↓
 [defense responses with revised_answer extracted]
     ↓
-(Optional: additional critique/defense rounds if --rounds > 2)
+(Optional: additional critique/defense cycles if --rounds > 1)
     ↓
 Chairman synthesis with full debate transcript
     ↓

@@ -88,10 +88,10 @@ def query(
         help="Enable debate mode (models critique and defend positions)",
     ),
     rounds: int = typer.Option(
-        2,
+        1,
         "--rounds",
         "-r",
-        help="Number of debate rounds (default: 2 = initial + critique + defense)",
+        help="Number of critique-defense cycles (default: 1 = initial + critique + defense)",
     ),
     stream: bool = typer.Option(
         False,

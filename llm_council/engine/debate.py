@@ -177,7 +177,7 @@ async def synthesize_debate(
 async def run_debate(
     user_query: str,
     execute_round: Callable,
-    max_rounds: int = 2,
+    cycles: int = 1,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Single orchestrator that defines the debate round sequence once.
@@ -189,7 +189,9 @@ async def run_debate(
     Args:
         user_query: The user's question
         execute_round: Async generator matching the execute-round protocol
-        max_rounds: Number of debate rounds (2 = initial + critique + defense)
+        cycles: Number of critique-defense cycles after the initial round.
+            cycles=1 (default) produces 3 interaction rounds: initial → critique → defense.
+            cycles=2 produces 5 interaction rounds: initial → 2×(critique → defense).
 
     Yields:
         {'type': 'round_start', 'round_number': int, 'round_type': str}
@@ -200,19 +202,14 @@ async def run_debate(
     """
     rounds = []
 
-    # Build the round sequence: initial, critique, defense, then alternating
-    round_sequence = [
-        (1, "initial"),
-        (2, "critique"),
-        (3, "defense"),
-    ]
-    # Additional rounds if max_rounds > 2
-    round_num = 4
-    while round_num <= max_rounds + 1:
-        if round_num % 2 == 0:
-            round_sequence.append((round_num, "critique"))
-        else:
-            round_sequence.append((round_num, "defense"))
+    # Build the round sequence: initial, then N critique-defense cycles.
+    # Always ends on defense — no dangling critiques.
+    round_sequence = [(1, "initial")]
+    round_num = 2
+    for _ in range(cycles):
+        round_sequence.append((round_num, "critique"))
+        round_num += 1
+        round_sequence.append((round_num, "defense"))
         round_num += 1
 
     initial_responses = []
@@ -437,6 +434,7 @@ async def debate_round_streaming(
         messages = [{"role": "user", "content": prompt}]
         full_content = ""
         tool_calls_made = []
+        had_error = False
 
         try:
             if with_tools:
@@ -468,6 +466,7 @@ async def debate_round_streaming(
                         tool_calls_made = event.get("tool_calls_made", [])
                     elif event["type"] == "error":
                         yield {"type": "model_error", "model": model, "error": event["error"]}
+                        had_error = True
                         break
             else:
                 async for event in query_model_streaming(model, messages):
@@ -476,9 +475,10 @@ async def debate_round_streaming(
                         yield {"type": "token", "model": model, "content": event["content"]}
                     elif event["type"] == "error":
                         yield {"type": "model_error", "model": model, "error": event["error"]}
+                        had_error = True
                         break
 
-            if full_content:
+            if full_content and not had_error:
                 result = {"model": model, "response": full_content}
                 if round_type == "defense":
                     result["revised_answer"] = parse_revised_answer(full_content)

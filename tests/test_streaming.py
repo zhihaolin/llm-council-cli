@@ -221,7 +221,7 @@ async def test_debate_streaming_event_order():
                 async for event in run_debate(
                     user_query="Test question",
                     execute_round=debate_round_parallel,
-                    max_rounds=2,
+                    cycles=1,
                 ):
                     events.append(event)
 
@@ -292,7 +292,7 @@ async def test_run_debate_produces_correct_rounds():
                 async for event in run_debate(
                     "Test question",
                     execute_round=debate_round_parallel,
-                    max_rounds=2,
+                    cycles=1,
                 ):
                     if event["type"] == "debate_complete":
                         rounds = event["rounds"]
@@ -493,7 +493,7 @@ async def test_run_debate_event_sequence():
                 async for event in run_debate(
                     user_query="Test question",
                     execute_round=debate_round_parallel,
-                    max_rounds=2,
+                    cycles=1,
                 ):
                     events.append(event)
 
@@ -560,7 +560,7 @@ async def test_run_debate_error_on_insufficient_models():
                 async for event in run_debate(
                     user_query="Test question",
                     execute_round=debate_round_parallel,
-                    max_rounds=2,
+                    cycles=1,
                 ):
                     events.append(event)
 
@@ -628,3 +628,95 @@ async def test_debate_round_streaming_yields_tokens():
     round_completes = [e for e in events if e["type"] == "round_complete"]
     assert len(round_completes) == 1
     assert len(round_completes[0]["responses"]) == len(SAMPLE_MODELS)
+
+
+# =============================================================================
+# Test: Multiple cycles produce correct round sequence
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_multiple_cycles_produces_correct_rounds():
+    """
+    Verify that cycles=2 produces 5 interaction rounds:
+    initial, critique, defense, critique, defense.
+    """
+    from llm_council.engine.debate import debate_round_parallel, run_debate
+
+    async def mock_query(model, messages, *args, **kwargs):
+        return {"content": f"Response from {model}"}
+
+    async def mock_query_tools(model, messages, tools, tool_executor, *args, **kwargs):
+        return {"content": f"Response from {model}"}
+
+    with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
+        with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
+            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                events = []
+                async for event in run_debate(
+                    user_query="Test question",
+                    execute_round=debate_round_parallel,
+                    cycles=2,
+                ):
+                    events.append(event)
+
+    round_starts = [e for e in events if e["type"] == "round_start"]
+    assert len(round_starts) == 5
+
+    # Verify round numbers and types
+    assert [r["round_number"] for r in round_starts] == [1, 2, 3, 4, 5]
+    assert round_starts[0]["round_type"] == "initial"
+    assert round_starts[1]["round_type"] == "critique"
+    assert round_starts[2]["round_type"] == "defense"
+    assert round_starts[3]["round_type"] == "critique"
+    assert round_starts[4]["round_type"] == "defense"
+
+    # Should end with debate_complete
+    assert events[-1]["type"] == "debate_complete"
+    assert len(events[-1]["rounds"]) == 5
+
+
+# =============================================================================
+# Test: Streaming error prevents model_complete
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_streaming_error_prevents_model_complete():
+    """
+    Verify that if tokens stream and then an error arrives,
+    model_error is emitted but model_complete is NOT.
+    """
+    from llm_council.engine.debate import debate_round_streaming
+
+    async def mock_streaming_with_tools(model, messages, tools, tool_executor, **kwargs):
+        """Mock streaming that yields tokens then an error."""
+        yield {"type": "token", "content": "Partial "}
+        yield {"type": "token", "content": "content"}
+        yield {"type": "error", "error": "Connection lost"}
+
+    with patch(DEBATE_QUERY_MODEL_STREAMING_WITH_TOOLS, side_effect=mock_streaming_with_tools):
+        with patch(DEBATE_COUNCIL_MODELS, [SAMPLE_MODELS[0]]):
+            events = []
+            async for event in debate_round_streaming(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
+
+    event_types = [e["type"] for e in events]
+
+    # Should have token events
+    assert event_types.count("token") == 2
+
+    # Should have model_error
+    assert "model_error" in event_types
+
+    # Should NOT have model_complete (the bug fix)
+    assert "model_complete" not in event_types
+
+    # round_complete should have empty responses (the errored model is excluded)
+    round_completes = [e for e in events if e["type"] == "round_complete"]
+    assert len(round_completes) == 1
+    assert len(round_completes[0]["responses"]) == 0
