@@ -348,6 +348,40 @@ async def run_debate_streaming(query: str, cycles: int = 1, react_enabled: bool 
             track_output(header)
             console.print(f"[grey62]{short_name}:[/grey62] ", end="")
 
+        elif event_type == "thought":
+            # ReAct thought — clear streaming, show thought, restart streaming
+            console.print()
+            track_output("\n")
+            clear_streaming_output()
+            short_name = current_model.split("/")[-1]
+            console.print(f"  [cyan]{short_name} thought:[/cyan] {event['content']}")
+            # Restart streaming header
+            header = f"{short_name}: "
+            track_output(header)
+            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
+        elif event_type == "action" and event.get("tool") == "search_web":
+            # ReAct search action — clear streaming, show search
+            console.print()
+            track_output("\n")
+            clear_streaming_output()
+            short_name = current_model.split("/")[-1]
+            console.print(f'  [yellow]{short_name} search:[/yellow] "{event.get("args", "")}"')
+            line_count = 0
+            current_col = 0
+
+        elif event_type == "observation":
+            # ReAct observation — show truncated results, restart streaming
+            observation = event["content"]
+            if len(observation) > 300:
+                observation = observation[:300] + "..."
+            console.print(f"  [dim]{observation}[/dim]")
+            # Restart streaming header for remaining tokens
+            short_name = current_model.split("/")[-1]
+            header = f"{short_name}: "
+            track_output(header)
+            console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
         elif event_type == "model_complete":
             # Clear streaming output
             console.print()  # End the streaming line
