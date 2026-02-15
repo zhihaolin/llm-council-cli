@@ -16,7 +16,9 @@ from .prompts import (
     build_ranking_prompt,
     build_title_prompt,
     get_date_context,
+    wrap_prompt_with_react,
 )
+from .react import council_react_loop
 
 
 async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
@@ -38,7 +40,9 @@ async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return f"Unknown tool: {tool_name}"
 
 
-async def stage1_collect_responses(user_query: str) -> list[dict[str, Any]]:
+async def stage1_collect_responses(
+    user_query: str, react_enabled: bool = False
+) -> list[dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
@@ -46,11 +50,38 @@ async def stage1_collect_responses(user_query: str) -> list[dict[str, Any]]:
 
     Args:
         user_query: The user's question
+        react_enabled: Whether council members use text-based ReAct reasoning
+            instead of native function calling
 
     Returns:
         List of dicts with 'model', 'response', and optionally 'tool_calls_made' keys
     """
     query_with_date = get_date_context() + user_query
+
+    if react_enabled:
+        prompt = wrap_prompt_with_react(query_with_date)
+
+        async def query_single_model_react(model: str) -> tuple:
+            content = ""
+            tool_calls_made = []
+            async for event in council_react_loop(model, prompt):
+                if event["type"] == "done":
+                    content = event["content"]
+                    tool_calls_made = event.get("tool_calls_made", [])
+            return model, content, tool_calls_made
+
+        tasks = [query_single_model_react(model) for model in COUNCIL_MODELS]
+        results = await asyncio.gather(*tasks)
+
+        stage1_results = []
+        for model, content, tool_calls_made in results:
+            if content:
+                result = {"model": model, "response": content}
+                if tool_calls_made:
+                    result["tool_calls_made"] = tool_calls_made
+                stage1_results.append(result)
+        return stage1_results
+
     messages = [{"role": "user", "content": query_with_date}]
     tools = [SEARCH_TOOL]
 
@@ -124,18 +155,19 @@ async def stage2_collect_rankings(
     return stage2_results, label_to_model
 
 
-async def run_full_council(user_query: str) -> tuple[list, list, dict]:
+async def run_full_council(user_query: str, react_enabled: bool = False) -> tuple[list, list, dict]:
     """
     Run Stages 1-2 of the council process (synthesis handled separately via Reflection).
 
     Args:
         user_query: The user's question
+        react_enabled: Whether council members use text-based ReAct reasoning
 
     Returns:
         Tuple of (stage1_results, stage2_results, metadata)
     """
     # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query)
+    stage1_results = await stage1_collect_responses(user_query, react_enabled=react_enabled)
 
     # If no models responded successfully, return error
     if not stage1_results:

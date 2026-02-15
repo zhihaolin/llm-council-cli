@@ -373,3 +373,25 @@ class TestStage1ToolIntegration:
 
                 assert len(results) == 1
                 assert "tool_calls_made" not in results[0]
+
+    @pytest.mark.asyncio
+    async def test_stage1_with_react_uses_react_loop(self):
+        """Stage 1 with react_enabled uses council_react_loop instead of native tools."""
+        from llm_council.engine import stage1_collect_responses
+
+        async def mock_react_loop(model, prompt, max_iterations=3):
+            yield {"type": "thought", "content": "Let me think."}
+            yield {"type": "action", "tool": "respond", "args": None}
+            yield {
+                "type": "done",
+                "content": f"ReAct answer from {model}",
+                "tool_calls_made": [],
+            }
+
+        with patch("llm_council.engine.ranking.council_react_loop", side_effect=mock_react_loop):
+            with patch("llm_council.engine.ranking.COUNCIL_MODELS", ["test/model"]):
+                results = await stage1_collect_responses("What is AI?", react_enabled=True)
+
+                assert len(results) == 1
+                assert results[0]["model"] == "test/model"
+                assert "ReAct answer from test/model" in results[0]["response"]

@@ -154,7 +154,9 @@ def query(
 
     else:
         # Run standard council mode (Stages 1-2 only — synthesis always via Reflection)
-        stage1, stage2, metadata = asyncio.run(run_council_with_progress(question))
+        stage1, stage2, metadata = asyncio.run(
+            run_council_with_progress(question, react_enabled=use_react)
+        )
 
         if stage1 is None:
             raise typer.Exit(1)

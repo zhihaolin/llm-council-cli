@@ -313,7 +313,9 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 storage.update_conversation_title(state.conversation_id, state.title)
         else:
             # Standard ranking mode (synthesis always via Reflection)
-            stage1, stage2, metadata = await run_council_with_progress(full_query)
+            stage1, stage2, metadata = await run_council_with_progress(
+                full_query, react_enabled=state.react_enabled
+            )
 
             if stage1 is None:
                 console.print("[chat.error]Error: All models failed to respond.[/chat.error]")

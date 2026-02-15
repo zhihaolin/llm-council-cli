@@ -188,13 +188,14 @@ async def run_reflection_synthesis(user_query: str, context: str) -> dict:
     return synthesis_result
 
 
-async def run_council_with_progress(query: str) -> tuple:
+async def run_council_with_progress(query: str, react_enabled: bool = False) -> tuple:
     """Run the council with progress indicators (Stages 1-2 only).
 
     Synthesis is always handled separately via Reflection.
 
     Args:
         query: The user's question
+        react_enabled: Whether council members use text-based ReAct reasoning
 
     Returns:
         Tuple of (stage1_results, stage2_results, metadata)
@@ -209,7 +210,7 @@ async def run_council_with_progress(query: str) -> tuple:
         task1 = progress.add_task(
             f"[cyan]Stage 1: Querying {len(COUNCIL_MODELS)} models...", total=None
         )
-        stage1_results = await stage1_collect_responses(query)
+        stage1_results = await stage1_collect_responses(query, react_enabled=react_enabled)
         progress.remove_task(task1)
 
         if not stage1_results:
