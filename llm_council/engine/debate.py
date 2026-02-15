@@ -39,6 +39,108 @@ async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return f"Unknown tool: {tool_name}"
 
 
+async def query_initial(model: str, user_query: str) -> dict | None:
+    """
+    Query a single model for its initial response (Round 1).
+
+    Uses query_model_with_tools so the model can search the web if needed.
+
+    Args:
+        model: The model identifier
+        user_query: The user's question
+
+    Returns:
+        Dict with 'model', 'response', and optionally 'tool_calls_made', or None on failure
+    """
+    query_with_date = get_date_context() + user_query
+    messages = [{"role": "user", "content": query_with_date}]
+    tools = [SEARCH_TOOL]
+
+    response = await query_model_with_tools(
+        model=model, messages=messages, tools=tools, tool_executor=execute_tool
+    )
+    if response is None:
+        return None
+
+    result = {"model": model, "response": response.get("content", "")}
+    if response.get("tool_calls_made"):
+        result["tool_calls_made"] = response["tool_calls_made"]
+    return result
+
+
+async def query_critique(
+    model: str, user_query: str, initial_responses: list[dict[str, Any]]
+) -> dict | None:
+    """
+    Query a single model for its critique of other models (Round 2).
+
+    Uses query_model (no tools) — critiques evaluate existing responses.
+
+    Args:
+        model: The model identifier
+        user_query: The original user query
+        initial_responses: Results from round 1
+
+    Returns:
+        Dict with 'model' and 'response', or None on failure
+    """
+    responses_text = format_responses_for_critique(initial_responses)
+    critique_prompt = build_critique_prompt(user_query, responses_text, model)
+    messages = [{"role": "user", "content": critique_prompt}]
+
+    response = await query_model(model, messages)
+    if response is None:
+        return None
+
+    return {"model": model, "response": response.get("content", "")}
+
+
+async def query_defense(
+    model: str,
+    user_query: str,
+    initial_responses: list[dict[str, Any]],
+    critique_responses: list[dict[str, Any]],
+) -> dict | None:
+    """
+    Query a single model for its defense/revision (Round 3).
+
+    Uses query_model_with_tools so the model can search for evidence to support
+    its defense. This fixes the previous asymmetry where batch mode lacked tools.
+
+    Args:
+        model: The model identifier
+        user_query: The original user query
+        initial_responses: Results from round 1
+        critique_responses: Critiques from round 2
+
+    Returns:
+        Dict with 'model', 'response', 'revised_answer', and optionally
+        'tool_calls_made', or None on failure
+    """
+    model_to_response = {r["model"]: r["response"] for r in initial_responses}
+    original_response = model_to_response.get(model, "")
+    critiques_for_me = extract_critiques_for_model(model, critique_responses)
+    defense_prompt = build_defense_prompt(user_query, original_response, critiques_for_me)
+    messages = [{"role": "user", "content": defense_prompt}]
+    tools = [SEARCH_TOOL]
+
+    response = await query_model_with_tools(
+        model=model, messages=messages, tools=tools, tool_executor=execute_tool
+    )
+    if response is None:
+        return None
+
+    content = response.get("content", "")
+    result = {
+        "model": model,
+        "response": content,
+        "revised_answer": parse_revised_answer(content),
+    }
+    if response.get("tool_calls_made"):
+        result["tool_calls_made"] = response["tool_calls_made"]
+    return result
+
+
 async def debate_round_initial(user_query: str) -> list[dict[str, Any]]:
     """
     Debate Round 1: Collect initial responses from all models.
@@ -51,32 +153,9 @@ async def debate_round_initial(user_query: str) -> list[dict[str, Any]]:
     Returns:
         List of dicts with 'model', 'response', and optionally 'tool_calls_made' keys
     """
-    query_with_date = get_date_context() + user_query
-    messages = [{"role": "user", "content": query_with_date}]
-    tools = [SEARCH_TOOL]
-
-    # Query all models in parallel with tool support
-    async def query_single_model(model: str) -> tuple:
-        response = await query_model_with_tools(
-            model=model, messages=messages, tools=tools, tool_executor=execute_tool
-        )
-        return model, response
-
-    # Create tasks for all models
-    tasks = [query_single_model(model) for model in COUNCIL_MODELS]
+    tasks = [query_initial(model, user_query) for model in COUNCIL_MODELS]
     results = await asyncio.gather(*tasks)
-
-    # Format results
-    responses = []
-    for model, response in results:
-        if response is not None:  # Only include successful responses
-            result = {"model": model, "response": response.get("content", "")}
-            # Include tool calls info if any were made
-            if response.get("tool_calls_made"):
-                result["tool_calls_made"] = response["tool_calls_made"]
-            responses.append(result)
-
-    return responses
+    return [r for r in results if r is not None]
 
 
 async def debate_round_critique(
@@ -92,27 +171,12 @@ async def debate_round_critique(
     Returns:
         List of dicts with 'model' and 'response' containing critiques
     """
-    # Build the list of all responses for critique
-    responses_text = format_responses_for_critique(initial_responses)
-
-    async def get_critique(model: str, own_response: str) -> tuple[str, dict]:
-        """Get critique from a single model."""
-        critique_prompt = build_critique_prompt(user_query, responses_text, model)
-        messages = [{"role": "user", "content": critique_prompt}]
-        response = await query_model(model, messages)
-        return model, response
-
-    # Query all models in parallel
-    tasks = [get_critique(result["model"], result["response"]) for result in initial_responses]
+    tasks = [
+        query_critique(result["model"], user_query, initial_responses)
+        for result in initial_responses
+    ]
     results = await asyncio.gather(*tasks)
-
-    # Format results
-    critique_results = []
-    for model, response in results:
-        if response is not None:
-            critique_results.append({"model": model, "response": response.get("content", "")})
-
-    return critique_results
+    return [r for r in results if r is not None]
 
 
 async def debate_round_defense(
@@ -123,49 +187,23 @@ async def debate_round_defense(
     """
     Debate Round 3+: Each model defends/revises based on critiques received.
 
+    Models have access to web search tool to find evidence for their defense.
+
     Args:
         user_query: The original user query
         initial_responses: Results from round 1
         critique_responses: Critiques from round 2
 
     Returns:
-        List of dicts with 'model', 'response', and 'revised_answer' keys
+        List of dicts with 'model', 'response', 'revised_answer', and optionally
+        'tool_calls_made' keys
     """
-
-    async def get_defense(model: str, original_response: str) -> tuple[str, dict]:
-        """Get defense/revision from a single model."""
-        # Extract critiques specifically directed at this model
-        critiques_for_me = extract_critiques_for_model(model, critique_responses)
-        defense_prompt = build_defense_prompt(user_query, original_response, critiques_for_me)
-        messages = [{"role": "user", "content": defense_prompt}]
-        response = await query_model(model, messages)
-        return model, response
-
-    # Get the original response for each model
-    model_to_response = {r["model"]: r["response"] for r in initial_responses}
-
-    # Query all models in parallel
     tasks = [
-        get_defense(result["model"], model_to_response[result["model"]])
+        query_defense(result["model"], user_query, initial_responses, critique_responses)
         for result in initial_responses
-        if result["model"] in model_to_response
     ]
     results = await asyncio.gather(*tasks)
-
-    # Format results
-    defense_results = []
-    for model, response in results:
-        if response is not None:
-            content = response.get("content", "")
-            defense_results.append(
-                {
-                    "model": model,
-                    "response": content,
-                    "revised_answer": parse_revised_answer(content),
-                }
-            )
-
-    return defense_results
+    return [r for r in results if r is not None]
 
 
 async def synthesize_debate(

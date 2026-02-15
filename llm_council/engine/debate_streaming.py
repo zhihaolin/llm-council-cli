@@ -12,10 +12,10 @@ from ..adapters.openrouter_client import (
     query_model,
     query_model_streaming,
     query_model_streaming_with_tools,
-    query_model_with_tools,
 )
 from ..adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
 from ..settings import CHAIRMAN_MODEL, COUNCIL_MODELS
+from .debate import query_critique, query_defense, query_initial
 from .parsers import extract_critiques_for_model, parse_revised_answer
 from .prompts import (
     build_critique_prompt,
@@ -70,64 +70,32 @@ async def debate_round_streaming(
         {'type': 'model_error', 'model': str, 'error': str}
         {'type': 'round_complete', 'responses': List}
     """
-    query_with_date = get_date_context() + user_query
-
-    # Build tasks based on round type
+    # Build query functions based on round type using shared per-round functions
     if round_type == "initial":
-        # Initial round uses query_model_with_tools for web search support
-        messages = [{"role": "user", "content": query_with_date}]
-        tools = [SEARCH_TOOL]
 
-        async def query_initial(model: str):
-            response = await query_model_with_tools(
-                model=model, messages=messages, tools=tools, tool_executor=execute_tool
-            )
-            if response is None:
-                return None
-            result = {"model": model, "response": response.get("content", "")}
-            if response.get("tool_calls_made"):
-                result["tool_calls_made"] = response["tool_calls_made"]
-            return result
+        async def _query_initial(model: str):
+            return await query_initial(model, user_query)
 
-        query_funcs = {model: query_initial for model in COUNCIL_MODELS}
+        query_funcs = {model: _query_initial for model in COUNCIL_MODELS}
 
     elif round_type == "critique":
-        # Critique round
         initial_responses = context.get("initial_responses", [])
-        responses_text = format_responses_for_critique(initial_responses)
 
-        async def query_critique(model: str):
-            critique_prompt = build_critique_prompt(user_query, responses_text, model)
-            messages = [{"role": "user", "content": critique_prompt}]
-            response = await query_model(model, messages)
-            if response is None:
-                return None
-            return {"model": model, "response": response.get("content", "")}
+        async def _query_critique(model: str):
+            return await query_critique(model, user_query, initial_responses)
 
-        query_funcs = {model: query_critique for model in COUNCIL_MODELS}
+        query_funcs = {model: _query_critique for model in COUNCIL_MODELS}
 
     elif round_type == "defense":
-        # Defense round
         initial_responses = context.get("initial_responses", [])
         critique_responses = context.get("critique_responses", [])
-        model_to_response = {r["model"]: r["response"] for r in initial_responses}
 
-        async def query_defense(model: str):
-            original_response = model_to_response.get(model, "")
-            critiques_for_me = extract_critiques_for_model(model, critique_responses)
-            defense_prompt = build_defense_prompt(user_query, original_response, critiques_for_me)
-            messages = [{"role": "user", "content": defense_prompt}]
-            response = await query_model(model, messages)
-            if response is None:
-                return None
-            content = response.get("content", "")
-            return {
-                "model": model,
-                "response": content,
-                "revised_answer": parse_revised_answer(content),
-            }
+        async def _query_defense(model: str):
+            return await query_defense(
+                model, user_query, initial_responses, critique_responses
+            )
 
-        query_funcs = {model: query_defense for model in COUNCIL_MODELS}
+        query_funcs = {model: _query_defense for model in COUNCIL_MODELS}
 
     else:
         raise ValueError(f"Unknown round type: {round_type}")

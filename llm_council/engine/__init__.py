@@ -27,6 +27,9 @@ from .debate import (
     debate_round_critique,
     debate_round_defense,
     debate_round_initial,
+    query_critique,
+    query_defense,
+    query_initial,
     run_debate_council,
     synthesize_debate,
 )
@@ -77,6 +80,9 @@ __all__ = [
     "debate_round_initial",
     "debate_round_critique",
     "debate_round_defense",
+    "query_initial",
+    "query_critique",
+    "query_defense",
     "synthesize_debate",
     "run_debate_council",
     # Streaming
