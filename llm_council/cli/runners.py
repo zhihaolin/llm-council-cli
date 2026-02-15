@@ -15,20 +15,17 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from llm_council.adapters.openrouter_client import query_model_streaming
 from llm_council.cli.presenters import build_model_panel, console
 from llm_council.engine import (
     calculate_aggregate_rankings,
     stage1_collect_responses,
     stage2_collect_rankings,
-    stage3_synthesize_final,
-    synthesize_debate,
     synthesize_with_react,
+    synthesize_with_reflection,
 )
 from llm_council.engine.debate import debate_round_parallel as _debate_round_parallel
 from llm_council.engine.debate import debate_round_streaming as _debate_round_streaming
 from llm_council.engine.debate import run_debate as _run_debate
-from llm_council.engine.prompts import build_debate_synthesis_prompt
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 
@@ -94,16 +91,112 @@ async def run_react_synthesis(
     return synthesis_result
 
 
-async def run_council_with_progress(query: str, skip_synthesis: bool = False) -> tuple:
-    """Run the council with progress indicators.
+async def run_reflection_synthesis(user_query: str, context: str) -> dict:
+    """
+    Run Reflection synthesis with streaming display.
+
+    Streams all tokens dimmed, then shows the chairman's analysis and
+    final synthesis as rendered panels.
+
+    Args:
+        user_query: Original user question
+        context: Formatted context from ranking or debate mode
+
+    Returns:
+        Dict with 'model' and 'response' keys
+    """
+    terminal_width = shutil.get_terminal_size().columns
+    line_count = 0
+    current_col = 0
+
+    def track_output(text: str):
+        nonlocal line_count, current_col
+        for char in text:
+            if char == "\n":
+                line_count += 1
+                current_col = 0
+            else:
+                current_col += 1
+                if current_col >= terminal_width:
+                    line_count += 1
+                    current_col = 0
+
+    def clear_streaming_output():
+        nonlocal line_count, current_col
+        if line_count > 0:
+            sys.stdout.write(f"\033[{line_count}A\033[J")
+            sys.stdout.flush()
+            line_count = 0
+            current_col = 0
+
+    console.print()
+    console.print("[bold green]━━━ CHAIRMAN'S ANALYSIS ━━━[/bold green]")
+    console.print()
+
+    short_name = CHAIRMAN_MODEL.split("/")[-1]
+    header = f"{short_name}: "
+    track_output(header)
+    console.print(f"[grey62]{short_name}:[/grey62] ", end="")
+
+    synthesis_result = None
+
+    async for event in synthesize_with_reflection(user_query, context):
+        event_type = event["type"]
+
+        if event_type == "token":
+            token = event["content"]
+            track_output(token)
+            console.print(f"[grey62]{token}[/grey62]", end="")
+
+        elif event_type == "reflection":
+            # Clear streaming output and show reflection panel
+            console.print()
+            track_output("\n")
+            clear_streaming_output()
+
+            reflection_text = event["content"]
+            if reflection_text:
+                from rich.markdown import Markdown
+
+                console.print(
+                    Panel(
+                        Markdown(reflection_text),
+                        title=f"[bold cyan]Analysis • {short_name}[/bold cyan]",
+                        border_style="cyan",
+                        padding=(1, 2),
+                    )
+                )
+                console.print()
+
+        elif event_type == "synthesis":
+            synthesis_result = {"model": event["model"], "response": event["response"]}
+
+    # Display the synthesis panel
+    if synthesis_result:
+        from rich.markdown import Markdown
+
+        console.print(
+            Panel(
+                Markdown(synthesis_result["response"]),
+                title=f"[bold green]Final Answer • {synthesis_result['model']}[/bold green]",
+                border_style="green",
+                padding=(1, 2),
+            )
+        )
+
+    return synthesis_result
+
+
+async def run_council_with_progress(query: str) -> tuple:
+    """Run the council with progress indicators (Stages 1-2 only).
+
+    Synthesis is always handled separately via Reflection.
 
     Args:
         query: The user's question
-        skip_synthesis: If True, skip Stage 3 synthesis (for ReAct mode)
 
     Returns:
-        Tuple of (stage1_results, stage2_results, stage3_result, metadata)
-        If skip_synthesis=True, stage3_result will be None
+        Tuple of (stage1_results, stage2_results, metadata)
     """
     with Progress(
         SpinnerColumn(),
@@ -120,7 +213,7 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
 
         if not stage1_results:
             console.print("[red]Error: All models failed to respond.[/red]")
-            return None, None, None, None
+            return None, None, None
 
         console.print(f"[green]✓[/green] Stage 1 complete: {len(stage1_results)} responses")
 
@@ -132,19 +225,9 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
 
         console.print(f"[green]✓[/green] Stage 2 complete: {len(stage2_results)} rankings")
 
-        # Stage 3 (optional)
-        stage3_result = None
-        if not skip_synthesis:
-            task3 = progress.add_task("[cyan]Stage 3: Chairman synthesizing...", total=None)
-            stage3_result = await stage3_synthesize_final(query, stage1_results, stage2_results)
-            progress.remove_task(task3)
-
-            console.print("[green]✓[/green] Stage 3 complete: Final answer ready")
-
     return (
         stage1_results,
         stage2_results,
-        stage3_result,
         {
             "label_to_model": label_to_model,
             "aggregate_rankings": aggregate_rankings,
@@ -152,19 +235,19 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
     )
 
 
-async def run_debate_streaming(query: str, cycles: int = 1, skip_synthesis: bool = False) -> tuple:
+async def run_debate_streaming(query: str, cycles: int = 1) -> tuple:
     """
-    Run debate with token-by-token streaming.
+    Run debate with token-by-token streaming (rounds only, no synthesis).
 
     Streams raw text while generating, then shows rendered markdown panel when complete.
+    Synthesis is always handled separately via Reflection.
 
     Args:
         query: The user's question
         cycles: Number of critique-defense cycles
-        skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
 
     Returns:
-        Tuple of (rounds list, synthesis dict)
+        Tuple of (rounds list, None)
     """
     type_styles = {
         "initial": ("cyan", "Initial Responses"),
@@ -173,7 +256,6 @@ async def run_debate_streaming(query: str, cycles: int = 1, skip_synthesis: bool
     }
 
     rounds_data = []
-    synthesis_data = None
     current_content = ""
     current_model = ""
     line_count = 0
@@ -205,7 +287,7 @@ async def run_debate_streaming(query: str, cycles: int = 1, skip_synthesis: bool
 
     current_round_type = ""
 
-    # Phase 1: Run debate rounds
+    # Run debate rounds (no synthesis — handled separately)
     async for event in _run_debate(query, _debate_round_streaming, cycles):
         event_type = event["type"]
 
@@ -299,56 +381,22 @@ async def run_debate_streaming(query: str, cycles: int = 1, skip_synthesis: bool
         elif event_type == "debate_complete":
             rounds_data = event["rounds"]
 
-    # Phase 2: Chairman synthesis with streaming
-    if not skip_synthesis:
-        console.print()
-        console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
-        console.print()
-        current_model = CHAIRMAN_MODEL
-        current_content = ""
-        line_count = 0
-        current_col = 0
-        short_name = current_model.split("/")[-1]
-        header = f"{short_name}: "
-        track_output(header)
-        console.print(f"[grey62]{short_name}:[/grey62] ", end="")
-
-        chairman_prompt = build_debate_synthesis_prompt(query, rounds_data, len(rounds_data))
-        messages = [{"role": "user", "content": chairman_prompt}]
-
-        async for event in query_model_streaming(CHAIRMAN_MODEL, messages):
-            if event["type"] == "token":
-                current_content += event["content"]
-                token = event["content"]
-                track_output(token)
-                console.print(f"[grey62]{token}[/grey62]", end="")
-            elif event["type"] == "error":
-                current_content = f"Error: {event['error']}"
-
-        synthesis_data = {"model": CHAIRMAN_MODEL, "response": current_content}
-        console.print()
-        track_output("\n")
-        clear_streaming_output()
-        console.print(build_model_panel(current_model, current_content, "green"))
-        console.print()
-
-    return rounds_data, synthesis_data
+    return rounds_data, None
 
 
-async def run_debate_parallel(query: str, cycles: int = 1, skip_synthesis: bool = False) -> tuple:
+async def run_debate_parallel(query: str, cycles: int = 1) -> tuple:
     """
-    Run debate with parallel execution and progress spinners.
+    Run debate with parallel execution and progress spinners (rounds only, no synthesis).
 
     Shows all models querying simultaneously with spinners,
     then displays panels as each model completes.
+    Synthesis is always handled separately via Reflection.
 
     Args:
         query: The user's question
         cycles: Number of critique-defense cycles
-        skip_synthesis: If True, skip chairman synthesis (for ReAct mode)
     """
     rounds_data = []
-    synthesis_data = None
     current_round_type = ""
     current_round_num = 0
 
@@ -391,7 +439,7 @@ async def run_debate_parallel(query: str, cycles: int = 1, skip_synthesis: bool 
         )
         console.print()
 
-    # Phase 1: Run debate rounds
+    # Run debate rounds (no synthesis — handled separately)
     async for event in _run_debate(query, _debate_round_parallel, cycles):
         event_type = event["type"]
 
@@ -475,28 +523,4 @@ async def run_debate_parallel(query: str, cycles: int = 1, skip_synthesis: bool 
         elif event_type == "debate_complete":
             rounds_data = event.get("rounds", rounds_data)
 
-    # Phase 2: Chairman synthesis
-    if not skip_synthesis:
-        console.print()
-        console.print("[bold green]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold green]")
-        console.print()
-
-        # Show spinner for chairman
-        model_status.clear()
-        model_status[CHAIRMAN_MODEL] = "querying"
-        live_display = Live(
-            build_status_table(), console=console, refresh_per_second=10, transient=True
-        )
-        live_display.start()
-
-        synthesis_data = await synthesize_debate(query, rounds_data, len(rounds_data))
-
-        if live_display:
-            live_display.stop()
-            live_display = None
-
-        content = synthesis_data.get("response", "")
-        console.print(build_model_panel(CHAIRMAN_MODEL, content, "green"))
-        console.print()
-
-    return rounds_data, synthesis_data
+    return rounds_data, None

@@ -6,9 +6,10 @@ including both ranking mode and debate mode.
 
 Public API:
     - Orchestration: run_full_council, stage1_collect_responses, stage2_collect_rankings,
-                     stage3_synthesize_final, generate_conversation_title
-    - Debate: ExecuteRound, RoundConfig, build_round_config, synthesize_debate,
+                     generate_conversation_title
+    - Debate: ExecuteRound, RoundConfig, build_round_config,
               run_debate, debate_round_parallel, debate_round_streaming
+    - Reflection: synthesize_with_reflection, parse_reflection_output
     - ReAct: synthesize_with_react, build_react_context_ranking, build_react_context_debate
     - Parsing: parse_ranking_from_text, parse_revised_answer, extract_critiques_for_model,
                parse_react_output
@@ -28,7 +29,6 @@ from .debate import (
     debate_round_parallel,
     debate_round_streaming,
     run_debate,
-    synthesize_debate,
 )
 
 # Parsers
@@ -36,6 +36,7 @@ from .parsers import (
     extract_critiques_for_model,
     parse_ranking_from_text,
     parse_react_output,
+    parse_reflection_output,
     parse_revised_answer,
 )
 
@@ -52,30 +53,33 @@ from .ranking import (
     run_full_council,
     stage1_collect_responses,
     stage2_collect_rankings,
-    stage3_synthesize_final,
 )
 
-# ReAct chairman
+# ReAct chairman (kept for council member ReAct loop, wired in later commits)
 from .react import synthesize_with_react
+
+# Reflection chairman
+from .reflection import synthesize_with_reflection
 
 __all__ = [
     # Orchestrator
     "execute_tool",
     "stage1_collect_responses",
     "stage2_collect_rankings",
-    "stage3_synthesize_final",
     "run_full_council",
     "generate_conversation_title",
     # Debate
     "ExecuteRound",
     "RoundConfig",
     "build_round_config",
-    "synthesize_debate",
     "debate_round_parallel",
     "debate_round_streaming",
     "run_debate",
     # ReAct
     "synthesize_with_react",
+    # Reflection
+    "synthesize_with_reflection",
+    "parse_reflection_output",
     # Parsers
     "parse_ranking_from_text",
     "parse_revised_answer",

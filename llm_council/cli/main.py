@@ -18,17 +18,15 @@ from llm_council.cli.constants import DEFAULT_CONTEXT_TURNS
 from llm_council.cli.presenters import (
     console,
     print_debate_round,
-    print_debate_synthesis,
     print_query_header,
     print_stage1,
     print_stage2,
-    print_stage3,
 )
 from llm_council.cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,
-    run_react_synthesis,
+    run_reflection_synthesis,
 )
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
@@ -100,14 +98,14 @@ def query(
     no_react: bool = typer.Option(
         False,
         "--no-react",
-        help="Disable ReAct reasoning for chairman (skips reasoning trace)",
+        help="Disable ReAct reasoning for council members (use native function calling)",
     ),
 ):
     """
     Query the LLM Council with a question.
 
-    By default, the chairman uses ReAct reasoning to verify facts before synthesis.
-    Use --no-react to disable this behavior.
+    The chairman always uses Reflection to deeply analyse responses.
+    Council members use ReAct reasoning by default (--no-react disables it).
 
     Examples:
         llm-council "What is the best programming language?"
@@ -115,102 +113,62 @@ def query(
         llm-council -f "Just give me the answer"
         llm-council --debate "Complex question"
         llm-council --debate --rounds 3 "Very complex question"
-        llm-council --no-react "Skip reasoning trace"
+        llm-council --no-react "Use native function calling for council"
         llm-council --debate --stream "Watch responses stream token-by-token"
     """
     if not question:
         question = typer.prompt("Enter your question")
 
-    print_query_header(
-        question, COUNCIL_MODELS, CHAIRMAN_MODEL, debate, rounds, stream, not no_react
-    )
+    use_react = not no_react
+
+    print_query_header(question, COUNCIL_MODELS, CHAIRMAN_MODEL, debate, rounds, stream, use_react)
 
     if debate:
-        # Run debate mode
-        use_react = not no_react
-
+        # Run debate mode (rounds only — synthesis always via Reflection)
         if stream:
-            # Streaming mode - shows responses token-by-token (sequential)
-            debate_rounds, synthesis = asyncio.run(run_debate_streaming(question, rounds))
+            debate_rounds, _ = asyncio.run(run_debate_streaming(question, rounds))
         else:
-            # Parallel mode (default) - runs models concurrently with progress spinners
-            debate_rounds, synthesis = asyncio.run(run_debate_parallel(question, rounds))
+            debate_rounds, _ = asyncio.run(run_debate_parallel(question, rounds))
 
         if debate_rounds is None:
             raise typer.Exit(1)
 
-        # If ReAct enabled, run ReAct synthesis separately
-        if use_react and not stream:
-            from llm_council.engine import build_react_context_debate
-
-            context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
-
-            if not simple and not final_only:
-                # Show all debate rounds first
-                for round_data in debate_rounds:
-                    print_debate_round(round_data, round_data["round_number"])
-
-            # Run ReAct synthesis
-            synthesis = asyncio.run(run_react_synthesis(question, context))
-
-            if simple:
-                console.print()
-                console.print(Markdown(synthesis["response"]))
-            else:
-                print_debate_synthesis(synthesis)
-        elif stream:
-            # Streaming mode already displayed everything inline
-            pass
-        elif simple:
-            # Just print the final answer as plain text
-            console.print()
-            console.print(Markdown(synthesis["response"]))
-        elif final_only:
-            print_debate_synthesis(synthesis)
-        else:
-            # Show all debate rounds
+        # Show debate rounds (unless simple/final-only)
+        if not simple and not final_only:
             for round_data in debate_rounds:
                 print_debate_round(round_data, round_data["round_number"])
-            print_debate_synthesis(synthesis)
+
+        # Always run Reflection synthesis for chairman
+        from llm_council.engine import build_react_context_debate
+
+        context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
+        synthesis = asyncio.run(run_reflection_synthesis(question, context))
+
+        if simple:
+            console.print()
+            console.print(Markdown(synthesis["response"]))
+
     else:
-        # Run standard council mode
-        use_react = not no_react
-        stage1, stage2, stage3, metadata = asyncio.run(
-            run_council_with_progress(question, skip_synthesis=use_react)
-        )
+        # Run standard council mode (Stages 1-2 only — synthesis always via Reflection)
+        stage1, stage2, metadata = asyncio.run(run_council_with_progress(question))
 
         if stage1 is None:
             raise typer.Exit(1)
 
-        # If ReAct enabled, run ReAct synthesis separately
-        if use_react:
-            from llm_council.engine import build_react_context_ranking
-
-            context = build_react_context_ranking(question, stage1, stage2)
-
-            if not simple and not final_only:
-                # Show Stage 1 and 2 first
-                print_stage1(stage1)
-                print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
-
-            # Run ReAct synthesis
-            stage3 = asyncio.run(run_react_synthesis(question, context))
-
-            if simple:
-                console.print()
-                console.print(Markdown(stage3["response"]))
-            else:
-                print_stage3(stage3)
-        elif simple:
-            # Just print the final answer as plain text
-            console.print()
-            console.print(Markdown(stage3["response"]))
-        elif final_only:
-            print_stage3(stage3)
-        else:
+        # Show Stage 1 and 2 (unless simple/final-only)
+        if not simple and not final_only:
             print_stage1(stage1)
             print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
-            print_stage3(stage3)
+
+        # Always run Reflection synthesis for chairman
+        from llm_council.engine import build_react_context_ranking
+
+        context = build_react_context_ranking(question, stage1, stage2)
+        stage3 = asyncio.run(run_reflection_synthesis(question, context))
+
+        if simple:
+            console.print()
+            console.print(Markdown(stage3["response"]))
 
 
 @app.command()

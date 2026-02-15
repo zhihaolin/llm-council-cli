@@ -9,11 +9,10 @@ from typing import Any
 
 from ..adapters.openrouter_client import query_model, query_model_with_tools, query_models_parallel
 from ..adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
-from ..settings import CHAIRMAN_MODEL, COUNCIL_MODELS
+from ..settings import COUNCIL_MODELS
 from .aggregation import calculate_aggregate_rankings
 from .parsers import parse_ranking_from_text
 from .prompts import (
-    build_chairman_prompt,
     build_ranking_prompt,
     build_title_prompt,
     get_date_context,
@@ -125,54 +124,22 @@ async def stage2_collect_rankings(
     return stage2_results, label_to_model
 
 
-async def stage3_synthesize_final(
-    user_query: str, stage1_results: list[dict[str, Any]], stage2_results: list[dict[str, Any]]
-) -> dict[str, Any]:
+async def run_full_council(user_query: str) -> tuple[list, list, dict]:
     """
-    Stage 3: Chairman synthesizes final response.
-
-    Args:
-        user_query: The original user query
-        stage1_results: Individual model responses from Stage 1
-        stage2_results: Rankings from Stage 2
-
-    Returns:
-        Dict with 'model' and 'response' keys
-    """
-    chairman_prompt = build_chairman_prompt(user_query, stage1_results, stage2_results)
-    messages = [{"role": "user", "content": chairman_prompt}]
-
-    # Query the chairman model
-    response = await query_model(CHAIRMAN_MODEL, messages)
-
-    if response is None:
-        # Fallback if chairman fails
-        return {"model": CHAIRMAN_MODEL, "response": "Error: Unable to generate final synthesis."}
-
-    return {"model": CHAIRMAN_MODEL, "response": response.get("content", "")}
-
-
-async def run_full_council(user_query: str) -> tuple[list, list, dict, dict]:
-    """
-    Run the complete 3-stage council process.
+    Run Stages 1-2 of the council process (synthesis handled separately via Reflection).
 
     Args:
         user_query: The user's question
 
     Returns:
-        Tuple of (stage1_results, stage2_results, stage3_result, metadata)
+        Tuple of (stage1_results, stage2_results, metadata)
     """
     # Stage 1: Collect individual responses
     stage1_results = await stage1_collect_responses(user_query)
 
     # If no models responded successfully, return error
     if not stage1_results:
-        return (
-            [],
-            [],
-            {"model": "error", "response": "All models failed to respond. Please try again."},
-            {},
-        )
+        return [], [], {}
 
     # Stage 2: Collect rankings
     stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
@@ -180,13 +147,10 @@ async def run_full_council(user_query: str) -> tuple[list, list, dict, dict]:
     # Calculate aggregate rankings
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
 
-    # Stage 3: Synthesize final answer
-    stage3_result = await stage3_synthesize_final(user_query, stage1_results, stage2_results)
-
     # Prepare metadata
     metadata = {"label_to_model": label_to_model, "aggregate_rankings": aggregate_rankings}
 
-    return stage1_results, stage2_results, stage3_result, metadata
+    return stage1_results, stage2_results, metadata
 
 
 async def generate_conversation_title(user_query: str) -> str:

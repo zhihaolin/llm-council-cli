@@ -23,18 +23,16 @@ from llm_council.cli.presenters import (
     print_chat_banner,
     print_chat_help,
     print_chat_suggestions,
-    print_debate_synthesis,
     print_history_table,
     print_stage1,
     print_stage2,
-    print_stage3,
     print_user_question_panel,
 )
 from llm_council.cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,
-    run_react_synthesis,
+    run_reflection_synthesis,
 )
 from llm_council.engine import generate_conversation_title
 
@@ -280,22 +278,16 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         print_user_question_panel(question)
 
         if state.debate_enabled:
-            # Use ReAct if enabled (works with all modes)
-            use_react_here = state.react_enabled
-
+            # Run debate rounds (synthesis always via Reflection)
             if state.stream_enabled:
-                # Streaming mode - shows responses token-by-token (sequential)
-                debate_rounds_data, synthesis = await run_debate_streaming(
+                debate_rounds_data, _ = await run_debate_streaming(
                     full_query,
                     state.debate_rounds,
-                    skip_synthesis=use_react_here,
                 )
             else:
-                # Parallel mode (default) - runs models concurrently with progress spinners
-                debate_rounds_data, synthesis = await run_debate_parallel(
+                debate_rounds_data, _ = await run_debate_parallel(
                     full_query,
                     state.debate_rounds,
-                    skip_synthesis=use_react_here,
                 )
 
             if debate_rounds_data is None:
@@ -304,16 +296,13 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 )
                 continue
 
-            # If using ReAct, run synthesis separately
-            if use_react_here:
-                from llm_council.engine import build_react_context_debate
+            # Always run Reflection synthesis for chairman
+            from llm_council.engine import build_react_context_debate
 
-                # Run ReAct synthesis (both parallel and streaming already displayed rounds)
-                context = build_react_context_debate(
-                    full_query, debate_rounds_data, len(debate_rounds_data)
-                )
-                synthesis = await run_react_synthesis(full_query, context)
-                print_debate_synthesis(synthesis)
+            context = build_react_context_debate(
+                full_query, debate_rounds_data, len(debate_rounds_data)
+            )
+            synthesis = await run_reflection_synthesis(full_query, context)
 
             storage.add_debate_message(state.conversation_id, debate_rounds_data, synthesis)
 
@@ -321,35 +310,25 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 state.title = await title_task
                 storage.update_conversation_title(state.conversation_id, state.title)
         else:
-            # Standard ranking mode
-            use_react_here = state.react_enabled
-            stage1, stage2, stage3, metadata = await run_council_with_progress(
-                full_query, skip_synthesis=use_react_here
-            )
+            # Standard ranking mode (synthesis always via Reflection)
+            stage1, stage2, metadata = await run_council_with_progress(full_query)
 
             if stage1 is None:
                 console.print("[chat.error]Error: All models failed to respond.[/chat.error]")
                 continue
 
-            # If using ReAct, run synthesis separately
-            if use_react_here:
-                from llm_council.engine import build_react_context_ranking
+            # Show Stage 1 and 2
+            print_stage1(stage1)
+            print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
 
-                # Show Stage 1 and 2 first
-                print_stage1(stage1)
-                print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
-                # Run ReAct synthesis
-                context = build_react_context_ranking(full_query, stage1, stage2)
-                stage3 = await run_react_synthesis(full_query, context)
-                print_stage3(stage3)
+            # Always run Reflection synthesis for chairman
+            from llm_council.engine import build_react_context_ranking
+
+            context = build_react_context_ranking(full_query, stage1, stage2)
+            stage3 = await run_reflection_synthesis(full_query, context)
 
             storage.add_assistant_message(state.conversation_id, stage1, stage2, stage3)
 
             if title_task:
                 state.title = await title_task
                 storage.update_conversation_title(state.conversation_id, state.title)
-
-            if not use_react_here:
-                print_stage1(stage1)
-                print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
-                print_stage3(stage3)

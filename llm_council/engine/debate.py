@@ -17,11 +17,10 @@ from ..adapters.openrouter_client import (
     query_model_with_tools,
 )
 from ..adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
-from ..settings import CHAIRMAN_MODEL, COUNCIL_MODELS
+from ..settings import COUNCIL_MODELS
 from .parsers import extract_critiques_for_model, parse_revised_answer
 from .prompts import (
     build_critique_prompt,
-    build_debate_synthesis_prompt,
     build_defense_prompt,
     format_responses_for_critique,
     get_date_context,
@@ -136,32 +135,6 @@ def build_round_config(round_type: str, user_query: str, context: dict[str, Any]
         return RoundConfig(uses_tools=True, build_prompt=_defense_prompt, has_revised_answer=True)
 
     raise ValueError(f"Unknown round type: {round_type}")
-
-
-async def synthesize_debate(
-    user_query: str, rounds: list[dict[str, Any]], num_rounds: int
-) -> dict[str, Any]:
-    """
-    Chairman synthesizes based on the full debate transcript.
-
-    Args:
-        user_query: The original user query
-        rounds: List of round data dicts
-        num_rounds: Number of debate rounds completed
-
-    Returns:
-        Dict with 'model' and 'response' keys
-    """
-    chairman_prompt = build_debate_synthesis_prompt(user_query, rounds, num_rounds)
-    messages = [{"role": "user", "content": chairman_prompt}]
-
-    # Query the chairman model
-    response = await query_model(CHAIRMAN_MODEL, messages)
-
-    if response is None:
-        return {"model": CHAIRMAN_MODEL, "response": "Error: Unable to generate debate synthesis."}
-
-    return {"model": CHAIRMAN_MODEL, "response": response.get("content", "")}
 
 
 async def run_debate(
