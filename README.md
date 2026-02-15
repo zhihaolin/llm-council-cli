@@ -73,27 +73,36 @@ The CLI shows which models used search with a subtle `• searched` indicator.
 
 ![Models autonomously searching for current information](images/search.png)
 
-### ReAct Chairman
+### Chairman Reflection
 
-The chairman uses ReAct (Reasoning + Acting) to verify facts before synthesizing. If model responses disagree on factual claims, the chairman can search to verify before producing the final answer.
+The chairman deeply analyzes all model responses before synthesizing. It identifies areas of agreement, disagreement, and factual claims that warrant scrutiny—then produces a well-reasoned final answer.
 
 ```
-━━━ CHAIRMAN'S REASONING ━━━
+━━━ CHAIRMAN'S ANALYSIS ━━━
 
-Thought: The responses disagree on the current Bitcoin price. I should verify.
+┌─ Analysis • gemini-2.5-pro ─────────────────────────┐
+│ Areas of agreement: All models agree that...         │
+│ Areas of disagreement: GPT claims X while Claude...  │
+│ Factual claims to verify: The price cited by...      │
+└──────────────────────────────────────────────────────┘
 
-Action: search_web("bitcoin price today")
-
-Observation: Bitcoin is currently trading at $67,234...
-
-Thought: Now I can synthesize with verified data.
-
-Action: synthesize()
-
-━━━ CHAIRMAN'S SYNTHESIS ━━━
+┌─ Final Answer • gemini-2.5-pro ─────────────────────┐
+│ [Synthesized answer]                                 │
+└──────────────────────────────────────────────────────┘
 ```
 
-ReAct is enabled by default. Disable with `--no-react` or `/react off` in chat mode.
+### Council ReAct
+
+Council members use ReAct (Reasoning + Acting) to decide when to search for current information. Their reasoning is visible in streaming mode.
+
+```
+  gpt-4.1 thought: The question asks about current prices. I should verify.
+  gpt-4.1 search: "bitcoin price today"
+  Bitcoin is currently trading at $67,234...
+  gpt-4.1: Based on my research, Bitcoin is currently...
+```
+
+ReAct is enabled by default for council members. Disable with `--no-react` or `/react off` in chat mode.
 
 ### Interactive Chat Mode
 
@@ -108,9 +117,9 @@ uv run llm-council chat
 │ Resumed conversation                       │
 │ Previous Topic Title                       │
 │ ID: abc12345                               │
-│ Mode: Debate (2 rounds) [parallel] [react] │
+│ Mode: Debate (2 rounds) [stream] [react]   │
 └────────────────────────────────────────────┘
-Commands: /help, /history, /use <id>, /new, /debate, /parallel, /stream, /react, /rounds, /mode, /exit
+Commands: /help, /history, /use <id>, /new, /debate, /stream, /react, /rounds, /mode, /exit
 
 debate(2)> What is the capital of France?
 ```
@@ -120,9 +129,8 @@ Slash commands:
 - `/use <id>` — Switch to a conversation by ID prefix
 - `/new` — Start a new conversation
 - `/debate on|off` — Toggle debate mode
-- `/parallel on|off` — Toggle parallel mode (default: on)
 - `/stream on|off` — Toggle streaming mode
-- `/react on|off` — Toggle ReAct reasoning (default: on)
+- `/react on|off` — Toggle council ReAct reasoning (default: on)
 - `/rounds N` — Set debate rounds
 - `/mode` — Show current mode
 - `/exit` — Exit chat
@@ -287,8 +295,7 @@ uv run llm-council chat --new  # Start fresh conversation
 | `--debate` | `-d` | Enable debate mode |
 | `--rounds N` | `-r N` | Number of debate rounds (default: 2) |
 | `--stream` | | Stream token-by-token (sequential, debate mode) |
-| `--parallel` | `-p` | Run models in parallel with progress spinners (debate mode) |
-| `--no-react` | | Disable ReAct reasoning for chairman |
+| `--no-react` | | Disable council ReAct reasoning (use native function calling) |
 | `--new` | | Start a new conversation (chat mode) |
 | `--max-turns N` | `-t N` | Context turns to include (chat mode, default: 6) |
 
@@ -336,7 +343,7 @@ All models are accessed through [OpenRouter](https://openrouter.ai/), which prov
 |----------|--------|---------|
 | **Async/Parallel** | ✅ | Concurrent API calls with `asyncio.gather()` |
 | **Graceful Degradation** | ✅ | Continues if individual models fail |
-| **Test Suite** | ✅ | pytest + pytest-asyncio, 84 tests |
+| **Test Suite** | ✅ | pytest + pytest-asyncio, 107 tests |
 | **Linting** | ✅ | Ruff (check + format) in CI |
 | **Type Checking** | ✅ | Pyright in basic mode |
 | **Type Hints** | ✅ | Throughout codebase |
@@ -370,11 +377,12 @@ tests/
 ├── test_chat_commands.py        # Chat REPL command parsing (10 tests)
 ├── test_cli_imports.py          # CLI smoke test (1 test)
 ├── test_conversation_context.py # Context extraction (5 tests)
-├── test_debate.py               # Debate mode (15 tests)
+├── test_debate.py               # Debate mode + RoundConfig + ReAct (24 tests)
 ├── test_ranking_parser.py       # Ranking extraction (14 tests)
-├── test_react.py                # ReAct chairman (12 tests)
-├── test_search.py               # Web search & tool calling (17 tests)
-├── test_streaming.py            # Streaming & parallel (10 tests)
+├── test_react.py                # ReAct parsing & council loop (12 tests)
+├── test_reflection.py           # Chairman Reflection parsing & loop (6 tests)
+├── test_search.py               # Web search & tool calling (18 tests)
+├── test_streaming.py            # Streaming & parallel (17 tests)
 └── integration/                 # CLI integration tests (planned)
 ```
 
@@ -394,15 +402,16 @@ tests/
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates (ruff, pyright) | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
-| v1.7 | File/Document Upload | Planned |
-| v1.8 | Strategy Pattern (OCP/DIP) | Planned |
-| v1.9 | Self-Reflection Round | Planned |
-| v1.10 | Workflow State Machine | Planned |
-| v1.11 | Human-in-the-Loop (HITL) | Planned |
-| v1.12 | Observability (OpenTelemetry) | Planned |
-| v1.13 | Tool Registry (MCP) | Planned |
-| v1.14 | Retry & Fallback Logic | Planned |
-| v1.15 | Security Foundations | Planned |
+| v1.7 | Chairman Reflection + Council ReAct | ✅ Complete |
+| v1.8 | File/Document Upload | Planned |
+| v1.9 | Strategy Pattern (OCP/DIP) | Planned |
+| v1.10 | Self-Reflection Round | Planned |
+| v1.11 | Workflow State Machine | Planned |
+| v1.12 | Human-in-the-Loop (HITL) | Planned |
+| v1.13 | Observability (OpenTelemetry) | Planned |
+| v1.14 | Tool Registry (MCP) | Planned |
+| v1.15 | Retry & Fallback Logic | Planned |
+| v1.16 | Security Foundations | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 
@@ -417,6 +426,7 @@ This fork extends the original with:
 - Interactive chat with conversation history
 - Autonomous web search via tool calling
 - Multi-turn debate mode
+- Chairman Reflection + Council ReAct reasoning
 - Rich terminal output with progress indicators
 
 ---
