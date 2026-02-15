@@ -89,18 +89,17 @@ async def synthesize_with_react(query, context) -> AsyncGenerator: ...
 llm_council/engine/
 ├── __init__.py             # Public API exports
 ├── ranking.py              # Stage 1-2-3 coordination
-├── debate.py               # Debate round logic
+├── debate.py               # Debate orchestration + async execution
 ├── react.py                # ReAct chairman
 ├── prompts.py              # Prompt templates
 ├── parsers.py              # Text parsing utilities
-├── debate_async.py         # Async execution strategies
 └── aggregation.py          # Ranking calculations
 ```
 
 Each module has **one reason to change**:
 - `parsers.py` changes when parsing logic changes
 - `prompts.py` changes when prompt templates change
-- `debate_async.py` changes when async execution behavior changes
+- `debate.py` changes when debate orchestration or execution behavior changes
 
 ---
 
@@ -402,7 +401,7 @@ from .debate import (
     run_debate_council,
 )
 
-from .debate_async import (
+from .debate import (
     run_debate_parallel,
     run_debate_streaming,
 )
@@ -427,7 +426,7 @@ from llm_council.engine import (
 )
 
 # If you need streaming, import from specific submodule
-from llm_council.engine.debate_async import run_debate_streaming
+from llm_council.engine.debate import run_debate_streaming
 ```
 
 ---
@@ -571,12 +570,11 @@ Split 1,722-line council.py into focused modules:
 llm_council/engine/
 ├── __init__.py             # Public API exports
 ├── aggregation.py          # Ranking calculations
-├── debate.py               # Debate orchestration
+├── debate.py               # Debate orchestration + async execution strategies
 ├── ranking.py              # Stage 1-2-3 flow
 ├── parsers.py              # Regex/text parsing
 ├── prompts.py              # Prompt templates
 ├── react.py                # ReAct chairman logic
-└── debate_async.py         # Async execution strategies
 ```
 
 ### Phase 4: Apply OCP (v1.9) ✅

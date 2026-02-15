@@ -4,6 +4,27 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Merge debate.py and debate_async.py
+*February 2026*
+
+### Overview
+Merged `debate.py` (per-model query functions) and `debate_async.py` (orchestrator and execution strategies) into a single `debate.py`. The split was historical — after v1.9's strategy pattern refactoring, `debate_async.py` just called through to functions in `debate.py`, and both files shared a duplicate `execute_tool()`. No clean architectural boundary remained.
+
+### Changes
+- Absorbed `query_initial`, `query_critique`, `query_defense`, `synthesize_debate` into `debate_async.py`
+- Removed duplicate `execute_tool()` (kept the one in debate_async.py, identical)
+- Deleted old `debate.py`, renamed `debate_async.py` → `debate.py` via `git mv`
+- Dropped `debate_round_initial`, `debate_round_critique`, `debate_round_defense` (batch wrappers unused in production)
+- Updated `__init__.py`, `runners.py`, `test_debate.py`, `test_streaming.py`
+- Collapsed duplicate mock target patches in tests (previously needed separate targets for each module)
+
+### Results
+- Net reduction: ~100 lines (removed duplicates and batch wrappers)
+- 91 tests pass (7 tests removed for dropped batch wrappers)
+- Single module for all debate logic — easier to navigate
+
+---
+
 ## v1.9: Consolidate Round-Sequencing with Strategy Pattern
 *February 2026*
 

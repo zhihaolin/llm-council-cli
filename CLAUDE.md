@@ -114,8 +114,7 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 llm_council/engine/
 ├── __init__.py             # Public API exports (backward compatible)
 ├── ranking.py              # Stage 1-2-3 flow
-├── debate.py               # Debate orchestration
-├── debate_async.py         # Async execution strategies (parallel/streaming)
+├── debate.py               # Debate orchestration + async execution strategies
 ├── react.py                # ReAct chairman logic
 ├── prompts.py              # All prompt templates
 ├── parsers.py              # Regex/text parsing utilities
@@ -236,7 +235,7 @@ llm-council --debate --simple "Question"           # Just final answer
 
 ### Debate Functions (in `llm_council/engine/debate.py`)
 
-**Shared per-round query functions** (used by both batch and streaming orchestrators):
+**Per-model query functions** (used by both parallel and streaming executors):
 
 **`query_initial(model, user_query)`** — Round 1 for a single model
 - Uses `query_model_with_tools()` (web search enabled)
@@ -250,21 +249,7 @@ llm-council --debate --simple "Question"           # Just final answer
 - Uses `query_model_with_tools()` (web search enabled for evidence gathering)
 - Returns `{"model": ..., "response": ..., "revised_answer": ..., "tool_calls_made": ...}` or `None`
 
-**Orchestration functions** (call per-round functions with `asyncio.gather()`):
-
-**`debate_round_initial(user_query)`** → queries all council models via `query_initial`
-
-**`debate_round_critique(query, initial_responses)`**
-- Each model receives all responses and critiques the others
-- Models are told their own model name so they skip self-critique
-- Prompt requests structured format: `## Critique of [Model Name]`
-
-**`debate_round_defense(query, initial_responses, critique_responses)`**
-- Each model receives their original response + all critiques of them
-- Prompt requests: "Addressing Critiques" + "Revised Response" sections
-- Returns both full response and parsed `revised_answer`
-
-**Orchestrator** (in `llm_council/engine/debate_async.py`):
+**Orchestrator and execution strategies** (also in `debate.py`):
 
 **`run_debate(user_query, execute_round, max_rounds)`**
 - Single orchestrator defining debate round sequence once
@@ -384,7 +369,7 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Yields `{'type': 'tool_result', 'tool': str, 'result': str}` after tool execution
   - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
-**`llm_council/engine/debate_async.py`**
+**`llm_council/engine/debate.py`** (orchestration and execution strategies)
 - `run_debate()`: Single orchestrator — defines round sequence once, delegates to executor callback
 - `debate_round_parallel()`: Execute-round strategy — parallel with per-model events
 - `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
@@ -430,7 +415,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Round Sequence**: The round sequence (initial → critique → defense → extra rounds) is defined once in `run_debate()`. Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. Per-model query logic lives in `query_initial()`, `query_critique()`, `query_defense()` in `debate.py`
+6. **Debate Round Sequence**: The round sequence (initial → critique → defense → extra rounds) is defined once in `run_debate()`. Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. All debate logic (per-model queries, orchestrator, execution strategies) lives in `debate.py`
 
 ## Known Technical Debt
 
@@ -450,14 +435,14 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (95 tests)
+### Test Suite (91 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
 ├── test_chat_commands.py        # 10 tests - chat REPL command parsing
 ├── test_cli_imports.py          # 1 test - CLI module imports
 ├── test_conversation_context.py # 5 tests - conversation context handling
-├── test_debate.py               # 23 tests - debate mode
+├── test_debate.py               # 16 tests - debate mode
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
 ├── test_react.py                # 12 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling
@@ -586,7 +571,7 @@ async def get_shared_client() -> httpx.AsyncClient:
         return _shared_client
 ```
 
-**Per-model Timeout (`llm_council/engine/debate_async.py`):**
+**Per-model Timeout (`llm_council/engine/debate.py`):**
 ```python
 async def query_with_model(model: str):
     try:
