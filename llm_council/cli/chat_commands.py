@@ -74,25 +74,9 @@ def format_chat_mode_line(
     return f"[chat.meta]Mode:[/chat.meta] [chat.accent]{mode_str}[/chat.accent]"
 
 
-def format_prompt_mode(
-    debate_enabled: bool,
-    debate_rounds: int,
-    stream_enabled: bool = False,
-) -> str:
-    """Format the prompt mode indicator (mode shown in banner, not prompt)."""
-    if debate_enabled:
-        return f"debate({debate_rounds})"
-    return "rank"
-
-
-def build_chat_prompt(
-    debate_enabled: bool,
-    debate_rounds: int,
-    stream_enabled: bool = False,
-) -> str:
-    """Build the chat prompt string with mode indicator."""
-    mode = format_prompt_mode(debate_enabled, debate_rounds, stream_enabled)
-    return f"[chat.prompt]{mode}>[/chat.prompt] "
+def build_chat_prompt() -> str:
+    """Build the chat prompt string."""
+    return "[chat.prompt]council>[/chat.prompt] "
 
 
 def extract_assistant_reply(message: dict[str, Any]) -> str:

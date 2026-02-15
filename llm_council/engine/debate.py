@@ -306,7 +306,7 @@ async def debate_round_parallel(
                     tool_calls_made = event.get("tool_calls_made", [])
             if not content:
                 return None
-            result = {"model": model, "response": content}
+            result = {"model": model, "response": content, "reasoned": True}
             if config.has_revised_answer:
                 result["revised_answer"] = parse_revised_answer(content)
             if tool_calls_made:
@@ -487,6 +487,8 @@ async def debate_round_streaming(
 
             if full_content and not had_error:
                 result = {"model": model, "response": full_content}
+                if config.uses_react:
+                    result["reasoned"] = True
                 if config.has_revised_answer:
                     result["revised_answer"] = parse_revised_answer(full_content)
                 if tool_calls_made:

@@ -234,9 +234,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
 
     while True:
         try:
-            user_input = console.input(
-                build_chat_prompt(state.debate_enabled, state.debate_rounds, state.stream_enabled)
-            ).strip()
+            user_input = console.input(build_chat_prompt()).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[chat.meta]Exiting chat.[/chat.meta]")
             break

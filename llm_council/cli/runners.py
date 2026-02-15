@@ -68,7 +68,7 @@ async def run_reflection_synthesis(user_query: str, context: str) -> dict:
             current_col = 0
 
     console.print()
-    console.print("[bold green]━━━ CHAIRMAN'S ANALYSIS ━━━[/bold green]")
+    console.print("[bold green]━━━ CHAIRMAN'S REFLECTION ━━━[/bold green]")
     console.print()
 
     short_name = CHAIRMAN_MODEL.split("/")[-1]
@@ -99,7 +99,7 @@ async def run_reflection_synthesis(user_query: str, context: str) -> dict:
                 console.print(
                     Panel(
                         Markdown(reflection_text),
-                        title=f"[bold cyan]Analysis • {short_name}[/bold cyan]",
+                        title=f"[bold cyan]Reflection • {short_name}[/bold cyan]",
                         border_style="cyan",
                         padding=(1, 2),
                     )
@@ -324,10 +324,15 @@ async def run_debate_streaming(query: str, cycles: int = 1, react_enabled: bool 
             console.print()  # End the streaming line
             track_output("\n")
             clear_streaming_output()
-            # Show rendered panel (check if model used web search)
+            # Show rendered panel (check if model used web search / ReAct)
             response_data = event.get("response", {})
             searched = bool(response_data.get("tool_calls_made"))
-            console.print(build_model_panel(current_model, current_content, searched=searched))
+            reasoned = bool(response_data.get("reasoned"))
+            console.print(
+                build_model_panel(
+                    current_model, current_content, searched=searched, reasoned=reasoned
+                )
+            )
             console.print()
 
         elif event_type == "model_error":
@@ -454,10 +459,13 @@ async def run_debate_parallel(query: str, cycles: int = 1, react_enabled: bool =
             if live_display:
                 live_display.update(build_status_table())
 
-            # Check if model used web search
+            # Check if model used web search / ReAct
             searched = bool(response_data.get("tool_calls_made"))
+            reasoned = bool(response_data.get("reasoned"))
             content = response_data.get("response", "")
-            panel = build_model_panel(model, content, color="", searched=searched)
+            panel = build_model_panel(
+                model, content, color="", searched=searched, reasoned=reasoned
+            )
             completed_panels.append(panel)
 
         elif event_type == "model_error":

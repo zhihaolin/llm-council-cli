@@ -62,23 +62,27 @@ def print_chat_banner(
         )
     )
     console.print(
-        "[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /stream, /react, /mode, /exit[/chat.meta]"
+        "[chat.meta]/new /history /use <id>  |  /debate /rounds /stream /react  |  /mode /help /exit[/chat.meta]"
     )
     console.print()
 
 
 def print_chat_help() -> None:
     """Print available chat commands."""
-    console.print("[chat.accent]Chat commands[/chat.accent]")
-    console.print("[chat.command]/help[/chat.command]    Show this help")
+    console.print("[chat.accent]Session[/chat.accent]")
+    console.print("[chat.command]/new[/chat.command]     Start a new conversation")
     console.print("[chat.command]/history[/chat.command] List saved conversations")
     console.print("[chat.command]/use <id>[/chat.command] Switch to a conversation by ID prefix")
-    console.print("[chat.command]/new[/chat.command]     Start a new conversation")
+    console.print()
+    console.print("[chat.accent]Config[/chat.accent]")
     console.print("[chat.command]/debate on|off[/chat.command] Toggle debate mode")
     console.print("[chat.command]/rounds N[/chat.command] Set debate rounds")
     console.print("[chat.command]/stream on|off[/chat.command] Toggle streaming (debate only)")
     console.print("[chat.command]/react on|off[/chat.command] Toggle ReAct reasoning")
+    console.print()
+    console.print("[chat.accent]Info[/chat.accent]")
     console.print("[chat.command]/mode[/chat.command]    Show current mode")
+    console.print("[chat.command]/help[/chat.command]    Show this help")
     console.print("[chat.command]/exit[/chat.command]    Exit chat")
     console.print()
 
@@ -123,18 +127,12 @@ def print_stage1(results: list) -> None:
     """Display Stage 1 results."""
     console.print("\n[bold cyan]━━━ STAGE 1: Individual Responses ━━━[/bold cyan]\n")
     for result in results:
-        model = result["model"]
-        response = result["response"]
-        searched = result.get("tool_calls_made")
-        title = f"[bold blue]{model}[/bold blue]"
-        if searched:
-            title += " [dim]• searched[/dim]"
         console.print(
-            Panel(
-                Markdown(response),
-                title=title,
-                border_style="blue",
-                padding=(1, 2),
+            build_model_panel(
+                result["model"],
+                result["response"],
+                searched=bool(result.get("tool_calls_made")),
+                reasoned=bool(result.get("reasoned")),
             )
         )
         console.print()
@@ -217,20 +215,12 @@ def print_debate_round(round_data: dict, round_num: int) -> None:
     console.print(f"\n[bold {color}]━━━ ROUND {round_num}: {label} ━━━[/bold {color}]\n")
 
     for result in responses:
-        model = result["model"]
-        response = result["response"]
-        searched = result.get("tool_calls_made")
-
-        title = f"[bold blue]{model}[/bold blue]"
-        if searched:
-            title += " [dim]• searched[/dim]"
-
         console.print(
-            Panel(
-                Markdown(response),
-                title=title,
-                border_style="blue",
-                padding=(1, 2),
+            build_model_panel(
+                result["model"],
+                result["response"],
+                searched=bool(result.get("tool_calls_made")),
+                reasoned=bool(result.get("reasoned")),
             )
         )
         console.print()
@@ -238,7 +228,7 @@ def print_debate_round(round_data: dict, round_num: int) -> None:
 
 def print_debate_synthesis(synthesis: dict) -> None:
     """Display chairman's debate synthesis."""
-    console.print("\n[bold cyan]━━━ CHAIRMAN'S SYNTHESIS ━━━[/bold cyan]\n")
+    console.print("\n[bold cyan]━━━ CHAIRMAN'S REFLECTION ━━━[/bold cyan]\n")
     console.print(
         Panel(
             Markdown(synthesis["response"]),
@@ -250,13 +240,22 @@ def print_debate_synthesis(synthesis: dict) -> None:
 
 
 def build_model_panel(
-    model: str, content: str, color: str = "blue", searched: bool = False
+    model: str,
+    content: str,
+    color: str = "blue",
+    searched: bool = False,
+    reasoned: bool = False,
 ) -> Panel:
     """Build a panel with rendered markdown for a model response."""
     short_name = model.split("/")[-1]
     title = f"[bold {color}]{short_name}[/bold {color}]"
+    indicators = []
+    if reasoned:
+        indicators.append("reasoned")
     if searched:
-        title += " [dim]• searched[/dim]"
+        indicators.append("searched")
+    if indicators:
+        title += " [dim]" + " ".join(f"[{i}]" for i in indicators) + "[/dim]"
     return Panel(
         Markdown(content) if content.strip() else Text("(empty)", style="dim"),
         title=title,

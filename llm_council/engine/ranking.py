@@ -76,7 +76,7 @@ async def stage1_collect_responses(
         stage1_results = []
         for model, content, tool_calls_made in results:
             if content:
-                result = {"model": model, "response": content}
+                result = {"model": model, "response": content, "reasoned": True}
                 if tool_calls_made:
                     result["tool_calls_made"] = tool_calls_made
                 stage1_results.append(result)

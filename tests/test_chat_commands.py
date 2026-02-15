@@ -7,6 +7,7 @@ from llm_council.cli.chat_commands import (
     format_chat_mode_line,
     parse_chat_command,
 )
+from llm_council.cli.presenters import build_model_panel
 
 
 def test_parse_command_with_argument():
@@ -55,11 +56,23 @@ def test_format_chat_mode_line_ranking():
     assert "Council (ranking)" in line
 
 
-def test_build_chat_prompt_debate():
-    prompt = build_chat_prompt(True, 3)
-    assert "debate(3)>" in prompt
+def test_build_chat_prompt_always_council():
+    prompt = build_chat_prompt()
+    assert "council>" in prompt
 
 
-def test_build_chat_prompt_ranking():
-    prompt = build_chat_prompt(False, 2)
-    assert "rank>" in prompt
+def test_build_model_panel_with_indicators():
+    panel = build_model_panel("openai/gpt-4.1", "Hello", reasoned=True, searched=True)
+    # Title should contain the short model name and both indicators
+    title_text = panel.title
+    assert "gpt-4.1" in title_text
+    assert "[reasoned]" in title_text
+    assert "[searched]" in title_text
+
+
+def test_build_model_panel_no_indicators():
+    panel = build_model_panel("openai/gpt-4.1", "Hello")
+    title_text = panel.title
+    assert "gpt-4.1" in title_text
+    assert "[reasoned]" not in title_text
+    assert "[searched]" not in title_text
