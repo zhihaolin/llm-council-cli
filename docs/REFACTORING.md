@@ -550,7 +550,7 @@ async def test_stage1():
 | Principle | Before (Violation) | After (Fixed) |
 |-----------|-------------------|---------------|
 | **Single Responsibility** | 1,722-line council.py with 8 responsibilities | 7 focused modules (~200 lines each) |
-| **Open/Closed** | if/elif chain for round types | Strategy pattern with registry |
+| **Open/Closed** | 4x duplicated round-sequencing | `run_debate()` orchestrator with executor callback (v1.9) |
 | **Liskov Substitution** | Inconsistent return types per stage | Uniform StageResult dataclass |
 | **Interface Segregation** | Import 15 functions, use 5 | Focused module exports |
 | **Dependency Inversion** | Hardcoded COUNCIL_MODELS | Dependency injection with defaults |
@@ -579,8 +579,11 @@ llm_council/engine/
 └── debate_async.py         # Async execution strategies
 ```
 
-### Phase 4: Apply OCP/DIP (Future)
-Add strategy pattern and dependency injection
+### Phase 4: Apply OCP (v1.9) ✅
+Strategy pattern for debate execution:
+- `run_debate()` orchestrator defines round sequence once
+- `debate_round_parallel()` and `debate_round_streaming()` as pluggable executors
+- Removed `run_debate_council()` dead code, ~400 lines of duplication eliminated
 
 ---
 

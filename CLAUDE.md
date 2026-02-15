@@ -127,7 +127,11 @@ Key functions (all exported from `llm_council.engine`):
 - `stage2_collect_rankings()`: Anonymizes responses and collects peer rankings
 - `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
 - `run_full_council()`: Orchestrates the complete 3-stage flow
-- `run_debate_council()`: Orchestrates complete debate flow
+- `run_debate()`: Single orchestrator defining debate round sequence, delegates to executor callback
+- `debate_round_parallel()`: Execute-round strategy — parallel with per-model events
+- `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
+- `run_debate_parallel()`: Full debate flow using parallel executor + synthesis
+- `run_debate_streaming()`: Full debate flow using streaming executor + synthesis
 - `synthesize_with_react()`: ReAct reasoning loop for chairman
 - `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section
 - `calculate_aggregate_rankings()`: Computes average rank position
@@ -260,9 +264,14 @@ llm-council --debate --simple "Question"           # Just final answer
 - Prompt requests: "Addressing Critiques" + "Revised Response" sections
 - Returns both full response and parsed `revised_answer`
 
-**`run_debate_council(query, max_rounds)`**
-- Orchestrates complete debate flow
+**Orchestrator** (in `llm_council/engine/debate_async.py`):
+
+**`run_debate(user_query, execute_round, max_rounds)`**
+- Single orchestrator defining debate round sequence once
+- Delegates execution to `execute_round` callback (strategy pattern)
 - `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
+- Yields: `round_start` → (pass-through events from executor) → `round_complete` → ... → `debate_complete`
+- Does NOT handle synthesis (each mode does it differently)
 
 ### Parsing Functions (in `llm_council/engine/parsers.py`)
 
@@ -321,8 +330,9 @@ llm_council/cli/
 - `print_stage1/2/3()` - Standard mode output
 
 **Runners (in `llm_council/cli/runners.py`):**
-- `run_debate_with_progress()` - Progress spinners for each round
+- `run_debate_with_progress()` - Consumes `run_debate` events with progress spinners
 - `run_debate_parallel()` - Parallel execution with Rich Live display
+- `run_debate_streaming()` - Token streaming with line wrap tracking
 - `run_react_synthesis()` - ReAct trace display
 
 ### API Costs
@@ -375,9 +385,11 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
 **`llm_council/engine/debate_async.py`**
-- `debate_round_parallel()`: Yields events as each model completes (parallel mode, not token streaming)
-- `run_debate_parallel()`: Full debate with model-completion events
-- `run_debate_streaming()`: Full debate with token-by-token streaming (sequential)
+- `run_debate()`: Single orchestrator — defines round sequence once, delegates to executor callback
+- `debate_round_parallel()`: Execute-round strategy — parallel with per-model events
+- `debate_round_streaming()`: Execute-round strategy — sequential with per-token events
+- `run_debate_parallel()`: Full debate using `run_debate(debate_round_parallel)` + synthesis
+- `run_debate_streaming()`: Full debate using `run_debate(debate_round_streaming)` + synthesis
 
 **`llm_council/cli/runners.py`**
 - `run_debate_streaming()`: Renders streaming output with Rich
@@ -418,7 +430,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Round Functions**: Shared `query_initial()`, `query_critique()`, `query_defense()` in `debate.py` are the single source of truth for per-round query logic. Both batch and streaming orchestrators delegate to these functions
+6. **Debate Round Sequence**: The round sequence (initial → critique → defense → extra rounds) is defined once in `run_debate()`. Execution is delegated to either `debate_round_parallel()` or `debate_round_streaming()`. Per-model query logic lives in `query_initial()`, `query_critique()`, `query_defense()` in `debate.py`
 
 ## Known Technical Debt
 
@@ -438,7 +450,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (92 tests)
+### Test Suite (95 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
@@ -449,7 +461,7 @@ tests/
 ├── test_ranking_parser.py       # 14 tests - ranking extraction
 ├── test_react.py                # 12 tests - ReAct chairman parsing & loop
 ├── test_search.py               # 17 tests - web search & tool calling
-├── test_streaming.py            # 10 tests - streaming & parallel mode
+├── test_streaming.py            # 13 tests - streaming, parallel, orchestrator
 └── integration/                 # CLI tests (planned)
 ```
 

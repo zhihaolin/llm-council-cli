@@ -4,6 +4,33 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## v1.9: Consolidate Round-Sequencing with Strategy Pattern
+*February 2026*
+
+### Overview
+Eliminated 4x duplication of the debate round sequence (initial → critique → defense → extra rounds) by introducing a single `run_debate()` orchestrator with pluggable execution strategies.
+
+### Problem
+The round sequence was duplicated in `run_debate_council()`, `run_debate_parallel()`, `run_debate_streaming()`, and `run_debate_with_progress()`. Any change to the debate structure required updating all four.
+
+### Solution: Strategy Pattern
+- **`run_debate(user_query, execute_round, max_rounds)`** — single orchestrator defining the sequence once
+- **`debate_round_parallel()`** — executor strategy: parallel with per-model events (existing, already matched protocol)
+- **`debate_round_streaming()`** — executor strategy: sequential with per-token events (new, consolidates `stream_initial_round_with_tools()` + `stream_round()`)
+
+### Changes
+- `debate_async.py`: Added `run_debate()` and `debate_round_streaming()`; simplified `run_debate_parallel()` and `run_debate_streaming()` to delegate to `run_debate()`
+- `debate.py`: Removed `run_debate_council()` (dead code)
+- `runners.py`: Rewrote `run_debate_with_progress()` to consume `run_debate` events
+- `__init__.py`: Updated exports
+
+### Results
+- Net reduction: ~400 lines of duplicated round-sequencing logic
+- 95 tests pass (3 new tests for orchestrator + streaming executor)
+- Round sequence changes now require editing only `run_debate()`
+
+---
+
 ## Post-v1.6.3: Package Reorganization
 *February 2026*
 

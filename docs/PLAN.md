@@ -16,7 +16,7 @@
 | v1.6.3 | Docker Support | ✅ Complete |
 | v1.7 | Unify Debate Logic | ✅ Complete |
 | v1.8 | Rename Debate Functions | ✅ Complete |
-| v1.9 | Strategy Pattern (OCP/DIP) | Planned |
+| v1.9 | Strategy Pattern (OCP/DIP) | ✅ Complete |
 | v1.10 | Self-Reflection Round | Planned |
 | v1.11 | Workflow State Machine | Planned |
 | v1.12 | Human-in-the-Loop (HITL) | Planned |
@@ -92,30 +92,19 @@
 - `run_debate_council_streaming()` → `run_debate_parallel()` (full debate, parallel mode)
 - `run_debate_token_streaming()` → `run_debate_streaming()` (actual token streaming)
 
+### v1.9: Consolidate Round-Sequencing with Strategy Pattern
+- Single `run_debate()` orchestrator defines round sequence once (initial → critique → defense → extra rounds)
+- Strategy pattern: `execute_round` callback plugs in execution strategy
+- Two executors: `debate_round_parallel()` (parallel with per-model events) and `debate_round_streaming()` (sequential with per-token events)
+- `run_debate_parallel()` and `run_debate_streaming()` simplified to delegate to `run_debate()`
+- `run_debate_with_progress()` rewritten to consume `run_debate` events
+- Removed `run_debate_council()` (dead code, unused by CLI)
+- Removed nested generators `stream_initial_round_with_tools()` and `stream_round()`
+- Net reduction: ~400 lines of duplicated round-sequencing logic
+
 ---
 
 ## Next Up
-
-### v1.9: Strategy Pattern (OCP/DIP)
-
-Apply Open/Closed and Dependency Inversion principles for extensibility.
-
-**Features:**
-- Strategy pattern for round types (initial, critique, defense, reflection)
-- Dependency injection for model querier (testable, swappable)
-- Registry pattern for adding new round types without modifying existing code
-
-**Implementation:**
-- `RoundStrategy` abstract base class with `execute()` and `build_prompt()` methods
-- `InitialRound`, `CritiqueRound`, `DefenseRound` strategy classes
-- `ROUND_STRATEGIES` registry dict for round type lookup
-- `ModelQuerier` protocol for dependency injection
-- Functions accept `models` and `querier` as parameters with defaults
-
-**Benefits:**
-- Add new round types by creating new classes (no modification to existing code)
-- Easy to test with mock queriers
-- Swap OpenRouter for Ollama by injecting different querier
 
 ### v1.10: Self-Reflection Round
 
@@ -351,19 +340,19 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 92 tests |
+| Test Suite | pytest + pytest-asyncio, 95 tests |
 | Linting | Ruff check + format in CI |
 | Type Checking | Pyright in basic mode |
 | Type Hints | Function signatures throughout |
 | CI/CD | GitHub Actions (lint → test → docker pipeline) |
 | SOLID (SRP/ISP) | Focused modules, clean API exports (v1.6.1) |
+| SOLID (OCP) | Strategy pattern for debate execution (v1.9) |
 | Config Extraction | YAML config file (`config.yaml`) |
 
 ### Planned
 
 | Practice | Details | Roadmap |
 |----------|---------|---------|
-| SOLID (OCP/DIP) | Strategy pattern, dependency injection | v1.9 |
 | Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.11, v1.15 |
 | Structured Logging | JSON logs with correlation IDs | v1.13 |
 | Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.15 |
@@ -422,7 +411,7 @@ tests/
 ├── test_ranking_parser.py       # 14 tests
 ├── test_react.py                # 12 tests
 ├── test_search.py               # 17 tests
-├── test_streaming.py            # 10 tests
+├── test_streaming.py            # 13 tests
 └── integration/                 # CLI tests (planned)
 ```
 
