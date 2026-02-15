@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from llm_council.engine import execute_tool
 from llm_council.adapters.openrouter_client import query_model_with_tools
 from llm_council.adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
+from llm_council.engine import execute_tool
 
 
 class TestSearchTool:
