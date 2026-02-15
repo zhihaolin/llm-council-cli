@@ -24,10 +24,10 @@ from llm_council.engine import (
     synthesize_debate,
     synthesize_with_react,
 )
-from llm_council.engine.debate_async import debate_round_parallel as _debate_round_parallel
-from llm_council.engine.debate_async import run_debate as _run_debate
-from llm_council.engine.debate_async import run_debate_parallel as _run_debate_parallel
-from llm_council.engine.debate_async import run_debate_streaming as _run_debate_streaming
+from llm_council.engine.debate import debate_round_parallel as _debate_round_parallel
+from llm_council.engine.debate import run_debate as _run_debate
+from llm_council.engine.debate import run_debate_parallel as _run_debate_parallel
+from llm_council.engine.debate import run_debate_streaming as _run_debate_streaming
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 

@@ -7,9 +7,9 @@ including both ranking mode and debate mode.
 Public API:
     - Orchestration: run_full_council, stage1_collect_responses, stage2_collect_rankings,
                      stage3_synthesize_final, generate_conversation_title
-    - Debate: debate_round_critique, debate_round_defense, synthesize_debate
-    - Async: run_debate, debate_round_parallel, debate_round_streaming,
-             run_debate_parallel, run_debate_streaming
+    - Debate: query_initial, query_critique, query_defense, synthesize_debate,
+              run_debate, debate_round_parallel, debate_round_streaming,
+              run_debate_parallel, run_debate_streaming
     - ReAct: synthesize_with_react, build_react_context_ranking, build_react_context_debate
     - Parsing: parse_ranking_from_text, parse_revised_answer, extract_critiques_for_model,
                parse_react_output
@@ -21,24 +21,17 @@ Public API:
 # Aggregation
 from .aggregation import calculate_aggregate_rankings
 
-# Debate mode
+# Debate mode (per-model functions, async strategies, and orchestration)
 from .debate import (
-    debate_round_critique,
-    debate_round_defense,
-    debate_round_initial,
+    debate_round_parallel,
+    debate_round_streaming,
     query_critique,
     query_defense,
     query_initial,
-    synthesize_debate,
-)
-
-# Async execution strategies
-from .debate_async import (
-    debate_round_parallel,
-    debate_round_streaming,
     run_debate,
     run_debate_parallel,
     run_debate_streaming,
+    synthesize_debate,
 )
 
 # Parsers
@@ -77,14 +70,10 @@ __all__ = [
     "run_full_council",
     "generate_conversation_title",
     # Debate
-    "debate_round_initial",
-    "debate_round_critique",
-    "debate_round_defense",
     "query_initial",
     "query_critique",
     "query_defense",
     "synthesize_debate",
-    # Async execution strategies
     "debate_round_parallel",
     "debate_round_streaming",
     "run_debate",

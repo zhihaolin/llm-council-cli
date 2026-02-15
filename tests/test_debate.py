@@ -7,11 +7,7 @@ defense parsing, and debate orchestration.
 
 from unittest.mock import AsyncMock, patch
 
-import pytest
-
 from llm_council.engine import (
-    debate_round_critique,
-    debate_round_defense,
     extract_critiques_for_model,
     parse_revised_answer,
     query_critique,
@@ -161,93 +157,6 @@ My answer with whitespace around header."""
         result = parse_revised_answer(defense_text)
 
         assert "whitespace around header" in result
-
-
-class TestDebateRoundCritique:
-    """Tests for debate_round_critique async function."""
-
-    @pytest.mark.asyncio
-    async def test_critique_round_queries_all_models(self, sample_initial_responses):
-        """Test that critique round queries all participating models."""
-        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = {"content": "## Critique of model\nTest critique."}
-
-            result = await debate_round_critique(
-                "What is the best programming language?", sample_initial_responses
-            )
-
-            # Should have called query_model for each model
-            assert mock_query.call_count == len(sample_initial_responses)
-
-            # Should return responses for all models
-            assert len(result) == len(sample_initial_responses)
-
-    @pytest.mark.asyncio
-    async def test_critique_round_handles_failures(self, sample_initial_responses):
-        """Test that critique round continues if some models fail."""
-        call_count = 0
-
-        async def mock_query(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return None  # First model fails
-            return {"content": "Valid critique"}
-
-        with patch("llm_council.engine.debate.query_model", side_effect=mock_query):
-            result = await debate_round_critique("Test question", sample_initial_responses)
-
-            # Should still have results from successful models
-            assert len(result) == len(sample_initial_responses) - 1
-
-
-class TestDebateRoundDefense:
-    """Tests for debate_round_defense async function."""
-
-    @pytest.mark.asyncio
-    async def test_defense_round_includes_revised_answer(
-        self, sample_initial_responses, sample_critique_responses
-    ):
-        """Test that defense round extracts revised answers."""
-        defense_content = """## Addressing Critiques
-Valid points were raised.
-
-## Revised Response
-This is my improved answer."""
-
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = {"content": defense_content}
-
-            result = await debate_round_defense(
-                "Test question", sample_initial_responses, sample_critique_responses
-            )
-
-            # Each result should have a revised_answer field
-            for r in result:
-                assert "revised_answer" in r
-                assert "improved answer" in r["revised_answer"]
-
-    @pytest.mark.asyncio
-    async def test_defense_round_passes_critiques_to_model(
-        self, sample_initial_responses, sample_critique_responses
-    ):
-        """Test that each model receives critiques directed at them."""
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = {"content": "## Revised Response\nTest"}
-
-            await debate_round_defense(
-                "Test question", sample_initial_responses, sample_critique_responses
-            )
-
-            # Verify that prompts contain critique information
-            for call in mock_query.call_args_list:
-                messages = call[1].get("messages", call[0][1] if len(call[0]) > 1 else [])
-                prompt = messages[0]["content"] if messages else ""
-                assert "Critiques of your response" in prompt or "critique" in prompt.lower()
 
 
 class TestDebateDataStructures:

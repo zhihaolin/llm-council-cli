@@ -14,14 +14,9 @@ from tests.conftest import (
     SAMPLE_MODELS,
 )
 
-# Mock targets:
-# - debate_round_parallel delegates to shared query functions in debate.py
-#   which call debate.query_model_with_tools and debate.query_model
-# - run_debate_parallel uses debate_async.query_model for synthesis
+# Mock targets — all functions now live in llm_council.engine.debate
 DEBATE_QUERY_MODEL = "llm_council.engine.debate.query_model"
 DEBATE_QUERY_MODEL_WITH_TOOLS = "llm_council.engine.debate.query_model_with_tools"
-ASYNC_QUERY_MODEL = "llm_council.engine.debate_async.query_model"
-ASYNC_COUNCIL_MODELS = "llm_council.engine.debate_async.COUNCIL_MODELS"
 DEBATE_COUNCIL_MODELS = "llm_council.engine.debate.COUNCIL_MODELS"
 
 # =============================================================================
@@ -53,16 +48,15 @@ async def test_debate_round_parallel_yields_as_completed():
         return {"content": f"Response from {model}"}
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                async for event in debate_round_parallel(
-                    round_type="initial",
-                    user_query="Test question",
-                    context={},
-                ):
-                    events.append(event)
-                    if event["type"] == "model_complete":
-                        completion_times.append(event["model"])
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
+                if event["type"] == "model_complete":
+                    completion_times.append(event["model"])
 
     # Should have model_complete events for each model plus round_complete
     model_completes = [e for e in events if e["type"] == "model_complete"]
@@ -100,15 +94,14 @@ async def test_streaming_preserves_model_identity():
         return {"content": expected_responses[model]}
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="initial",
-                    user_query="Test question",
-                    context={},
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
 
     # Check each model_complete event has correct model and response
     model_completes = [e for e in events if e["type"] == "model_complete"]
@@ -137,15 +130,14 @@ async def test_streaming_handles_model_failure():
         return {"content": f"Response from {model}"}
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="initial",
-                    user_query="Test question",
-                    context={},
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
 
     # Should have model_complete for successful models
     model_completes = [e for e in events if e["type"] == "model_complete"]
@@ -180,15 +172,14 @@ async def test_round_complete_contains_all_responses():
         return {"content": f"Response from {model}"}
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="initial",
-                    user_query="Test question",
-                    context={},
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
 
     round_complete = [e for e in events if e["type"] == "round_complete"][0]
 
@@ -225,15 +216,13 @@ async def test_debate_streaming_event_order():
 
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(ASYNC_QUERY_MODEL, side_effect=mock_query):
-                with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-                    with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                        events = []
-                        async for event in run_debate_parallel(
-                            user_query="Test question",
-                            max_rounds=2,
-                        ):
-                            events.append(event)
+            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                events = []
+                async for event in run_debate_parallel(
+                    user_query="Test question",
+                    max_rounds=2,
+                ):
+                    events.append(event)
 
     # Verify event sequence for debate with 2 rounds (= 3 actual rounds + synthesis)
     # Expected sequence:
@@ -275,7 +264,7 @@ async def test_streaming_same_result_as_batch():
     Verify that run_debate with debate_round_parallel produces the same
     rounds as run_debate_parallel (which delegates to run_debate internally).
     """
-    from llm_council.engine.debate_async import (
+    from llm_council.engine.debate import (
         debate_round_parallel,
         run_debate,
         run_debate_parallel,
@@ -305,33 +294,28 @@ async def test_streaming_same_result_as_batch():
     # Run via run_debate directly (batch-like: no synthesis)
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-                with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                    batch_rounds = None
-                    async for event in run_debate(
-                        "Test question",
-                        execute_round=debate_round_parallel,
-                        max_rounds=2,
-                    ):
-                        if event["type"] == "debate_complete":
-                            batch_rounds = event["rounds"]
+            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                batch_rounds = None
+                async for event in run_debate(
+                    "Test question",
+                    execute_round=debate_round_parallel,
+                    max_rounds=2,
+                ):
+                    if event["type"] == "debate_complete":
+                        batch_rounds = event["rounds"]
 
     # Run via run_debate_parallel (which delegates to run_debate internally)
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(ASYNC_QUERY_MODEL, side_effect=mock_query):
-                with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-                    with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                        with patch(
-                            "llm_council.engine.debate_async.CHAIRMAN_MODEL", SAMPLE_MODELS[0]
-                        ):
-                            stream_result = None
-                            async for event in run_debate_parallel(
-                                "Test question",
-                                max_rounds=2,
-                            ):
-                                if event["type"] == "complete":
-                                    stream_result = event
+            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                with patch("llm_council.engine.debate.CHAIRMAN_MODEL", SAMPLE_MODELS[0]):
+                    stream_result = None
+                    async for event in run_debate_parallel(
+                        "Test question",
+                        max_rounds=2,
+                    ):
+                        if event["type"] == "complete":
+                            stream_result = event
 
     # Both should have same number of rounds
     assert len(stream_result["rounds"]) == len(batch_rounds)
@@ -361,15 +345,14 @@ async def test_critique_round_streaming():
     initial_responses = [{"model": m, "response": f"Initial from {m}"} for m in SAMPLE_MODELS]
 
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="critique",
-                    user_query="Test question",
-                    context={"initial_responses": initial_responses},
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="critique",
+                user_query="Test question",
+                context={"initial_responses": initial_responses},
+            ):
+                events.append(event)
 
     model_completes = [e for e in events if e["type"] == "model_complete"]
     assert len(model_completes) == len(SAMPLE_MODELS)
@@ -398,18 +381,17 @@ async def test_defense_round_streaming():
     ]
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="defense",
-                    user_query="Test question",
-                    context={
-                        "initial_responses": initial_responses,
-                        "critique_responses": critique_responses,
-                    },
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="defense",
+                user_query="Test question",
+                context={
+                    "initial_responses": initial_responses,
+                    "critique_responses": critique_responses,
+                },
+            ):
+                events.append(event)
 
     model_completes = [e for e in events if e["type"] == "model_complete"]
     assert len(model_completes) == len(SAMPLE_MODELS)
@@ -436,15 +418,14 @@ async def test_streaming_emits_model_start_events():
         return {"content": f"Response from {model}"}
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="initial",
-                    user_query="Test question",
-                    context={},
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+            ):
+                events.append(event)
 
     # Should have model_start events for each model
     model_starts = [e for e in events if e["type"] == "model_start"]
@@ -479,16 +460,15 @@ async def test_streaming_handles_model_timeout():
         return {"content": f"Response from {model}"}
 
     with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                events = []
-                async for event in debate_round_parallel(
-                    round_type="initial",
-                    user_query="Test question",
-                    context={},
-                    model_timeout=0.1,  # Very short timeout
-                ):
-                    events.append(event)
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+                model_timeout=0.1,  # Very short timeout
+            ):
+                events.append(event)
 
     # Should have model_error for the timed out model
     model_errors = [e for e in events if e["type"] == "model_error"]
@@ -512,7 +492,7 @@ async def test_run_debate_event_sequence():
     Verify that run_debate with debate_round_parallel yields correct event
     sequence: round_start → model events → round_complete × 3 → debate_complete.
     """
-    from llm_council.engine.debate_async import debate_round_parallel, run_debate
+    from llm_council.engine.debate import debate_round_parallel, run_debate
 
     async def mock_query(model, messages, *args, **kwargs):
         return {"content": f"Response from {model}"}
@@ -522,15 +502,14 @@ async def test_run_debate_event_sequence():
 
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-                with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                    events = []
-                    async for event in run_debate(
-                        user_query="Test question",
-                        execute_round=debate_round_parallel,
-                        max_rounds=2,
-                    ):
-                        events.append(event)
+            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                events = []
+                async for event in run_debate(
+                    user_query="Test question",
+                    execute_round=debate_round_parallel,
+                    max_rounds=2,
+                ):
+                    events.append(event)
 
     event_types = [e["type"] for e in events]
 
@@ -575,7 +554,7 @@ async def test_run_debate_error_on_insufficient_models():
     """
     Verify that run_debate yields error event when <2 models respond.
     """
-    from llm_council.engine.debate_async import debate_round_parallel, run_debate
+    from llm_council.engine.debate import debate_round_parallel, run_debate
 
     async def mock_query(model, messages, *args, **kwargs):
         # Only one model succeeds
@@ -590,15 +569,14 @@ async def test_run_debate_error_on_insufficient_models():
 
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
-                with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                    events = []
-                    async for event in run_debate(
-                        user_query="Test question",
-                        execute_round=debate_round_parallel,
-                        max_rounds=2,
-                    ):
-                        events.append(event)
+            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                events = []
+                async for event in run_debate(
+                    user_query="Test question",
+                    execute_round=debate_round_parallel,
+                    max_rounds=2,
+                ):
+                    events.append(event)
 
     event_types = [e["type"] for e in events]
 
@@ -613,9 +591,9 @@ async def test_run_debate_error_on_insufficient_models():
 # Test: debate_round_streaming yields token events
 # =============================================================================
 
-ASYNC_QUERY_MODEL_STREAMING = "llm_council.engine.debate_async.query_model_streaming"
-ASYNC_QUERY_MODEL_STREAMING_WITH_TOOLS = (
-    "llm_council.engine.debate_async.query_model_streaming_with_tools"
+DEBATE_QUERY_MODEL_STREAMING = "llm_council.engine.debate.query_model_streaming"
+DEBATE_QUERY_MODEL_STREAMING_WITH_TOOLS = (
+    "llm_council.engine.debate.query_model_streaming_with_tools"
 )
 
 
@@ -625,7 +603,7 @@ async def test_debate_round_streaming_yields_tokens():
     Verify that debate_round_streaming yields token events, model_start/complete,
     and round_complete matching the execute-round protocol.
     """
-    from llm_council.engine.debate_async import debate_round_streaming
+    from llm_council.engine.debate import debate_round_streaming
 
     async def mock_streaming_with_tools(model, messages, tools, tool_executor, **kwargs):
         """Mock streaming with tools - yields token events then done."""
@@ -633,8 +611,8 @@ async def test_debate_round_streaming_yields_tokens():
         yield {"type": "token", "content": "world"}
         yield {"type": "done", "content": "Hello world", "tool_calls_made": []}
 
-    with patch(ASYNC_QUERY_MODEL_STREAMING_WITH_TOOLS, side_effect=mock_streaming_with_tools):
-        with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
+    with patch(DEBATE_QUERY_MODEL_STREAMING_WITH_TOOLS, side_effect=mock_streaming_with_tools):
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
             events = []
             async for event in debate_round_streaming(
                 round_type="initial",
