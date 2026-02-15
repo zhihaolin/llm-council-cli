@@ -290,7 +290,8 @@ llm-council --debate --simple "Question"           # Just final answer
         {
             "model": "openai/gpt-5.2",
             "response": "...",
-            "revised_answer": "..."  # Only for defense rounds
+            "reasoned": true,         # Only when ReAct was used
+            "revised_answer": "..."   # Only for defense rounds
         }
     ]
 }
@@ -312,19 +313,20 @@ llm_council/cli/
 ├── presenters.py     # All print_* display functions
 ├── runners.py        # run_* execution with progress
 ├── chat_session.py   # ChatState + command dispatch + REPL loop
-├── chat_commands.py  # Command parsing utilities
+├── chat_commands.py  # Command parsing, prompt (always "council>")
 └── constants.py      # Constants
 ```
 
 **Display functions (in `llm_council/cli/presenters.py`):**
+- `build_model_panel()` - Builds panel with `[reasoned]` and `[searched]` indicators in title
 - `print_debate_round()` - Color-coded by round type
-- `print_debate_synthesis()` - Green-styled panel for final answer
+- `print_debate_synthesis()` - Green-styled panel for final answer (header: "CHAIRMAN'S REFLECTION")
 - `print_stage1/2/3()` - Standard mode output
 
 **Runners (in `llm_council/cli/runners.py`):**
 - `run_debate_parallel()` - Calls `run_debate()` with Rich Live display (default debate mode)
 - `run_debate_streaming()` - Calls `run_debate()` with token streaming and line wrap tracking
-- `run_reflection_synthesis()` - Chairman Reflection with streaming display
+- `run_reflection_synthesis()` - Chairman Reflection with streaming display (header: "CHAIRMAN'S REFLECTION")
 - `run_council_with_progress()` - Stages 1-2 with progress spinners
 
 **Chat session (in `llm_council/cli/chat_session.py`):**
@@ -451,11 +453,11 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (107 tests)
+### Test Suite (108 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
-├── test_chat_commands.py        # 10 tests - chat REPL command parsing
+├── test_chat_commands.py        # 11 tests - chat REPL command parsing + model panel indicators
 ├── test_cli_imports.py          # 1 test - CLI module imports
 ├── test_conversation_context.py # 5 tests - conversation context handling
 ├── test_debate.py               # 24 tests - debate mode + RoundConfig + ReAct

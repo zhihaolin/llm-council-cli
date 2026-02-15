@@ -4,6 +4,23 @@ Technical decisions and implementation notes for LLM Council.
 
 ---
 
+## Post-v1.9: Chat UI improvements
+*February 2026*
+
+### Overview
+Cleaned up the chat REPL interface: simplified prompt, organized commands, added visibility into ReAct reasoning and Reflection synthesis.
+
+### Changes
+- **Chat prompt**: Always shows `council>` instead of `debate(N)>` / `rank>`. Mode details available via `/mode`. Removed `format_prompt_mode()`.
+- **Commands**: Grouped by function with `|` separators in banner (`/new /history /use <id> | /debate /rounds /stream /react | /mode /help /exit`). `/help` output organized into Session / Config / Info sections.
+- **Model panels**: Show `[reasoned]` and `[searched]` indicators in title (e.g., `gpt-4.1 [reasoned] [searched]`). Engine sets `"reasoned": True` in result dicts when ReAct was used.
+- **Chairman headers**: Changed from "CHAIRMAN'S ANALYSIS"/"CHAIRMAN'S SYNTHESIS" to "CHAIRMAN'S REFLECTION". Analysis panel title changed to "Reflection".
+
+### Results
+- 108 tests across 10 test files, ruff clean
+
+---
+
 ## Post-v1.9: Chairman Reflection + Council Member ReAct
 *February 2026*
 
