@@ -287,7 +287,7 @@ uv run llm-council chat --new  # Start fresh conversation
 | `--simple` | `-s` | Output only the final answer (no formatting) |
 | `--final-only` | `-f` | Show only chairman's synthesis (with formatting) |
 | `--debate` | `-d` | Enable debate mode |
-| `--rounds N` | `-r N` | Number of debate rounds (default: 2) |
+| `--rounds N` | `-r N` | Number of critique-defense cycles (default: 1) |
 | `--stream` | | Stream token-by-token (sequential, debate mode) |
 | `--no-react` | | Disable council ReAct reasoning (use native function calling) |
 | `--new` | | Start a new conversation (chat mode) |
@@ -396,9 +396,11 @@ tests/
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates (ruff, pyright) | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
-| v1.7 | Chairman Reflection + Council ReAct | ✅ Complete |
-| v1.8 | File/Document Upload | Planned |
-| v1.9 | Strategy Pattern (OCP/DIP) | Planned |
+| v1.7 | Unify Debate Logic | ✅ Complete |
+| v1.8 | Rename Debate Functions | ✅ Complete |
+| v1.9 | Strategy Pattern (OCP/DIP) | ✅ Complete |
+| Post-v1.9 | Chairman Reflection + Council ReAct | ✅ Complete |
+| Post-v1.9 | Chat UI Improvements | ✅ Complete |
 | v1.10 | Self-Reflection Round | Planned |
 | v1.11 | Workflow State Machine | Planned |
 | v1.12 | Human-in-the-Loop (HITL) | Planned |
