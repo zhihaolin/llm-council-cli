@@ -268,27 +268,35 @@ async def debate_round_streaming(
     initial_responses = context.get("initial_responses", [])
     critique_responses = context.get("critique_responses", [])
 
+    prompt_builder: Callable[[str], str]
+
     if round_type == "initial":
         with_tools = True
 
-        def build_prompt(_model: str) -> str:
+        def _initial_prompt(_model: str) -> str:
             return query_with_date
+
+        prompt_builder = _initial_prompt
 
     elif round_type == "critique":
         with_tools = False
         responses_text = format_responses_for_critique(initial_responses)
 
-        def build_prompt(model: str) -> str:
+        def _critique_prompt(model: str) -> str:
             return build_critique_prompt(user_query, responses_text, model)
+
+        prompt_builder = _critique_prompt
 
     elif round_type == "defense":
         with_tools = True
         model_to_response = {r["model"]: r["response"] for r in initial_responses}
 
-        def build_prompt(model: str) -> str:
+        def _defense_prompt(model: str) -> str:
             original = model_to_response.get(model, "")
             critiques = extract_critiques_for_model(model, critique_responses)
             return build_defense_prompt(user_query, original, critiques)
+
+        prompt_builder = _defense_prompt
 
     else:
         raise ValueError(f"Unknown round type: {round_type}")
@@ -296,7 +304,7 @@ async def debate_round_streaming(
     for model in COUNCIL_MODELS:
         yield {"type": "model_start", "model": model}
 
-        prompt = build_prompt(model)
+        prompt = prompt_builder(model)
         messages = [{"role": "user", "content": prompt}]
         full_content = ""
         tool_calls_made = []
