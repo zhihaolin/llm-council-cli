@@ -21,7 +21,6 @@ from llm_council.cli.presenters import (
     print_chat_banner,
     print_chat_help,
     print_chat_suggestions,
-    print_debate_round,
     print_debate_synthesis,
     print_history_table,
     print_stage1,
@@ -33,7 +32,6 @@ from llm_council.cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,
-    run_debate_with_progress,
     run_react_synthesis,
 )
 from llm_council.engine import generate_conversation_title
@@ -66,7 +64,6 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
     resumed = False
     debate_enabled = True
     debate_rounds = DEFAULT_DEBATE_ROUNDS
-    parallel_enabled = True
     stream_enabled = False
     react_enabled = True
 
@@ -88,14 +85,13 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
         debate_enabled=debate_enabled,
         debate_rounds=debate_rounds,
         stream_enabled=stream_enabled,
-        parallel_enabled=parallel_enabled,
         react_enabled=react_enabled,
     )
 
     while True:
         try:
             user_input = console.input(
-                build_chat_prompt(debate_enabled, debate_rounds, stream_enabled, parallel_enabled)
+                build_chat_prompt(debate_enabled, debate_rounds, stream_enabled)
             ).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[chat.meta]Exiting chat.[/chat.meta]")
@@ -141,7 +137,6 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled=debate_enabled,
                         debate_rounds=debate_rounds,
                         stream_enabled=stream_enabled,
-                        parallel_enabled=parallel_enabled,
                         react_enabled=react_enabled,
                     )
                 continue
@@ -156,7 +151,6 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     debate_enabled=debate_enabled,
                     debate_rounds=debate_rounds,
                     stream_enabled=stream_enabled,
-                    parallel_enabled=parallel_enabled,
                     react_enabled=react_enabled,
                 )
                 continue
@@ -170,8 +164,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled,
                         debate_rounds,
                         stream_enabled,
-                        parallel_enabled,
-                        react_enabled,
+                        react_enabled=react_enabled,
                     )
                 )
                 continue
@@ -193,29 +186,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled,
                         debate_rounds,
                         stream_enabled,
-                        parallel_enabled,
-                        react_enabled,
-                    )
-                )
-                continue
-            if command == "parallel":
-                if argument not in ("on", "off"):
-                    console.print("[chat.error]Usage: /parallel on|off[/chat.error]")
-                    continue
-                parallel_enabled = argument == "on"
-                if parallel_enabled:
-                    stream_enabled = False  # Parallel and stream are mutually exclusive
-                if parallel_enabled and not debate_enabled:
-                    console.print(
-                        "[chat.meta]Note: Parallel only applies in debate mode.[/chat.meta]"
-                    )
-                console.print(
-                    format_chat_mode_line(
-                        debate_enabled,
-                        debate_rounds,
-                        stream_enabled,
-                        parallel_enabled,
-                        react_enabled,
+                        react_enabled=react_enabled,
                     )
                 )
                 continue
@@ -224,8 +195,6 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                     console.print("[chat.error]Usage: /stream on|off[/chat.error]")
                     continue
                 stream_enabled = argument == "on"
-                if stream_enabled:
-                    parallel_enabled = False  # Stream and parallel are mutually exclusive
                 if stream_enabled and not debate_enabled:
                     console.print(
                         "[chat.meta]Note: Streaming only applies in debate mode.[/chat.meta]"
@@ -235,8 +204,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled,
                         debate_rounds,
                         stream_enabled,
-                        parallel_enabled,
-                        react_enabled,
+                        react_enabled=react_enabled,
                     )
                 )
                 continue
@@ -250,8 +218,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled,
                         debate_rounds,
                         stream_enabled,
-                        parallel_enabled,
-                        react_enabled,
+                        react_enabled=react_enabled,
                     )
                 )
                 continue
@@ -261,8 +228,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                         debate_enabled,
                         debate_rounds,
                         stream_enabled,
-                        parallel_enabled,
-                        react_enabled,
+                        react_enabled=react_enabled,
                     )
                 )
                 continue
@@ -291,23 +257,16 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
             # Use ReAct if enabled (works with all modes)
             use_react_here = react_enabled
 
-            if parallel_enabled:
-                # Parallel mode - runs models in parallel with progress spinners
-                debate_rounds_data, synthesis = await run_debate_parallel(
-                    full_query,
-                    debate_rounds,
-                    skip_synthesis=use_react_here,
-                )
-            elif stream_enabled:
-                # Streaming mode - shows responses as they complete (sequential)
+            if stream_enabled:
+                # Streaming mode - shows responses token-by-token (sequential)
                 debate_rounds_data, synthesis = await run_debate_streaming(
                     full_query,
                     debate_rounds,
                     skip_synthesis=use_react_here,
                 )
             else:
-                # Batch mode - shows progress spinners
-                debate_rounds_data, synthesis = await run_debate_with_progress(
+                # Parallel mode (default) - runs models concurrently with progress spinners
+                debate_rounds_data, synthesis = await run_debate_parallel(
                     full_query,
                     debate_rounds,
                     skip_synthesis=use_react_here,
@@ -323,20 +282,11 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
             if use_react_here:
                 from llm_council.engine import build_react_context_debate
 
-                # Only print rounds if batch mode (parallel/streaming already displayed them)
-                if not parallel_enabled and not stream_enabled:
-                    for round_data in debate_rounds_data:
-                        print_debate_round(round_data, round_data["round_number"])
-                # Run ReAct synthesis
+                # Run ReAct synthesis (both parallel and streaming already displayed rounds)
                 context = build_react_context_debate(
                     full_query, debate_rounds_data, len(debate_rounds_data)
                 )
                 synthesis = await run_react_synthesis(full_query, context)
-                print_debate_synthesis(synthesis)
-            elif not stream_enabled and not parallel_enabled:
-                # Batch mode without ReAct - print rounds and synthesis
-                for round_data in debate_rounds_data:
-                    print_debate_round(round_data, round_data["round_number"])
                 print_debate_synthesis(synthesis)
 
             storage.add_debate_message(conversation_id, debate_rounds_data, synthesis)

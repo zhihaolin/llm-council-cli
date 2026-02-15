@@ -28,7 +28,6 @@ from llm_council.cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,
-    run_debate_with_progress,
     run_react_synthesis,
 )
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
@@ -98,12 +97,6 @@ def query(
         "--stream",
         help="Stream token-by-token (sequential, debate mode only)",
     ),
-    parallel: bool = typer.Option(
-        False,
-        "--parallel",
-        "-p",
-        help="Run models in parallel with progress spinners (debate mode only)",
-    ),
     no_react: bool = typer.Option(
         False,
         "--no-react",
@@ -124,13 +117,12 @@ def query(
         llm-council --debate --rounds 3 "Very complex question"
         llm-council --no-react "Skip reasoning trace"
         llm-council --debate --stream "Watch responses stream token-by-token"
-        llm-council --debate --parallel "Watch models query in parallel"
     """
     if not question:
         question = typer.prompt("Enter your question")
 
     print_query_header(
-        question, COUNCIL_MODELS, CHAIRMAN_MODEL, debate, rounds, stream, parallel, not no_react
+        question, COUNCIL_MODELS, CHAIRMAN_MODEL, debate, rounds, stream, not no_react
     )
 
     if debate:
@@ -140,20 +132,15 @@ def query(
         if stream:
             # Streaming mode - shows responses token-by-token (sequential)
             debate_rounds, synthesis = asyncio.run(run_debate_streaming(question, rounds))
-        elif parallel:
-            # Parallel mode - runs models in parallel with progress spinners
-            debate_rounds, synthesis = asyncio.run(run_debate_parallel(question, rounds))
         else:
-            # Batch mode - shows single progress spinner per round
-            debate_rounds, synthesis = asyncio.run(
-                run_debate_with_progress(question, rounds, skip_synthesis=use_react)
-            )
+            # Parallel mode (default) - runs models concurrently with progress spinners
+            debate_rounds, synthesis = asyncio.run(run_debate_parallel(question, rounds))
 
         if debate_rounds is None:
             raise typer.Exit(1)
 
         # If ReAct enabled, run ReAct synthesis separately
-        if use_react and not stream and not parallel:
+        if use_react and not stream:
             from llm_council.engine import build_react_context_debate
 
             context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
@@ -171,8 +158,8 @@ def query(
                 console.print(Markdown(synthesis["response"]))
             else:
                 print_debate_synthesis(synthesis)
-        elif stream or parallel:
-            # Streaming/parallel mode already displayed everything via Live
+        elif stream:
+            # Streaming mode already displayed everything inline
             pass
         elif simple:
             # Just print the final answer as plain text

@@ -41,7 +41,6 @@ def print_chat_banner(
     debate_enabled: bool,
     debate_rounds: int,
     stream_enabled: bool = False,
-    parallel_enabled: bool = False,
     react_enabled: bool = True,
 ) -> None:
     """Show chat banner with conversation details."""
@@ -51,7 +50,7 @@ def print_chat_banner(
         f"[chat.meta]{status} conversation[/chat.meta]\n"
         f"[chat.accent]{title}[/chat.accent]\n"
         f"[chat.meta]ID: {short_id}[/chat.meta]\n"
-        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, parallel_enabled, react_enabled)}"
+        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, react_enabled=react_enabled)}"
     )
     console.print()
     console.print(
@@ -63,7 +62,7 @@ def print_chat_banner(
         )
     )
     console.print(
-        "[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /parallel, /stream, /react, /mode, /exit[/chat.meta]"
+        "[chat.meta]Commands: /help, /history, /use <id>, /new, /debate, /rounds, /stream, /react, /mode, /exit[/chat.meta]"
     )
     console.print()
 
@@ -77,9 +76,6 @@ def print_chat_help() -> None:
     console.print("[chat.command]/new[/chat.command]     Start a new conversation")
     console.print("[chat.command]/debate on|off[/chat.command] Toggle debate mode")
     console.print("[chat.command]/rounds N[/chat.command] Set debate rounds")
-    console.print(
-        "[chat.command]/parallel on|off[/chat.command] Toggle parallel mode (debate only)"
-    )
     console.print("[chat.command]/stream on|off[/chat.command] Toggle streaming (debate only)")
     console.print("[chat.command]/react on|off[/chat.command] Toggle ReAct reasoning")
     console.print("[chat.command]/mode[/chat.command]    Show current mode")
@@ -276,7 +272,6 @@ def print_query_header(
     debate: bool,
     rounds: int,
     stream: bool,
-    parallel: bool,
     react: bool,
 ) -> None:
     """Print the query header with mode information."""
@@ -296,8 +291,6 @@ def print_query_header(
         mode_parts.append(f"Debate ({rounds} rounds)")
         if stream:
             mode_parts.append("[streaming]")
-        elif parallel:
-            mode_parts.append("[parallel]")
     else:
         mode_parts.append("Ranking")
     if react:
