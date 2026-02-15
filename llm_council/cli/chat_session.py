@@ -283,11 +283,13 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 debate_rounds_data, _ = await run_debate_streaming(
                     full_query,
                     state.debate_rounds,
+                    react_enabled=state.react_enabled,
                 )
             else:
                 debate_rounds_data, _ = await run_debate_parallel(
                     full_query,
                     state.debate_rounds,
+                    react_enabled=state.react_enabled,
                 )
 
             if debate_rounds_data is None:

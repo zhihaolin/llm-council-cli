@@ -24,7 +24,9 @@ from .prompts import (
     build_defense_prompt,
     format_responses_for_critique,
     get_date_context,
+    wrap_prompt_with_react,
 )
+from .react import council_react_loop
 
 
 class ExecuteRound(Protocol):
@@ -77,14 +79,21 @@ class RoundConfig:
         uses_tools: Whether the model should have access to web search tools.
         build_prompt: A callable (model) -> prompt_string for this round.
         has_revised_answer: Whether the response should be parsed for a revised answer.
+        uses_react: Whether council members use text-based ReAct reasoning.
     """
 
     uses_tools: bool
     build_prompt: Callable[[str], str]
     has_revised_answer: bool
+    uses_react: bool = False
 
 
-def build_round_config(round_type: str, user_query: str, context: dict[str, Any]) -> RoundConfig:
+def build_round_config(
+    round_type: str,
+    user_query: str,
+    context: dict[str, Any],
+    react_enabled: bool = False,
+) -> RoundConfig:
     """Build a RoundConfig for the given round type.
 
     Single point of dispatch replacing duplicated if/elif chains in both
@@ -96,6 +105,9 @@ def build_round_config(round_type: str, user_query: str, context: dict[str, Any]
         context: Context dict containing:
             - For critique: {"initial_responses": [...]}
             - For defense: {"initial_responses": [...], "critique_responses": [...]}
+        react_enabled: Whether council members should use text-based ReAct reasoning.
+            Only applies to tool-enabled rounds (initial, defense). Critique rounds
+            never use ReAct.
 
     Returns:
         RoundConfig with the appropriate prompt builder and flags
@@ -105,11 +117,20 @@ def build_round_config(round_type: str, user_query: str, context: dict[str, Any]
     """
     if round_type == "initial":
         query_with_date = get_date_context() + user_query
+        use_react = react_enabled  # initial round supports tools
 
         def _initial_prompt(_model: str) -> str:
-            return query_with_date
+            prompt = query_with_date
+            if use_react:
+                return wrap_prompt_with_react(prompt)
+            return prompt
 
-        return RoundConfig(uses_tools=True, build_prompt=_initial_prompt, has_revised_answer=False)
+        return RoundConfig(
+            uses_tools=True,
+            build_prompt=_initial_prompt,
+            has_revised_answer=False,
+            uses_react=use_react,
+        )
 
     if round_type == "critique":
         initial_responses = context.get("initial_responses", [])
@@ -126,13 +147,22 @@ def build_round_config(round_type: str, user_query: str, context: dict[str, Any]
         initial_responses = context.get("initial_responses", [])
         critique_responses = context.get("critique_responses", [])
         model_to_response = {r["model"]: r["response"] for r in initial_responses}
+        use_react = react_enabled  # defense round supports tools
 
         def _defense_prompt(model: str) -> str:
             original = model_to_response.get(model, "")
             critiques = extract_critiques_for_model(model, critique_responses)
-            return build_defense_prompt(user_query, original, critiques)
+            prompt = build_defense_prompt(user_query, original, critiques)
+            if use_react:
+                return wrap_prompt_with_react(prompt)
+            return prompt
 
-        return RoundConfig(uses_tools=True, build_prompt=_defense_prompt, has_revised_answer=True)
+        return RoundConfig(
+            uses_tools=True,
+            build_prompt=_defense_prompt,
+            has_revised_answer=True,
+            uses_react=use_react,
+        )
 
     raise ValueError(f"Unknown round type: {round_type}")
 
@@ -238,6 +268,7 @@ async def debate_round_parallel(
     user_query: str,
     context: dict[str, Any],
     model_timeout: float = 120.0,
+    react_enabled: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream a single debate round, yielding events as each model completes.
@@ -251,6 +282,7 @@ async def debate_round_parallel(
             - For critique: {"initial_responses": [...]}
             - For defense: {"initial_responses": [...], "critique_responses": [...]}
         model_timeout: Timeout in seconds for each model (default: 120s)
+        react_enabled: Whether council members use text-based ReAct reasoning
 
     Yields:
         {'type': 'model_start', 'model': str}
@@ -258,11 +290,29 @@ async def debate_round_parallel(
         {'type': 'model_error', 'model': str, 'error': str}
         {'type': 'round_complete', 'responses': List}
     """
-    config = build_round_config(round_type, user_query, context)
+    config = build_round_config(round_type, user_query, context, react_enabled=react_enabled)
 
     async def _query_model(model: str) -> dict | None:
         """Query a single model using the round config."""
         prompt = config.build_prompt(model)
+
+        if config.uses_react:
+            # Use text-based ReAct loop — consume events, return final result
+            content = ""
+            tool_calls_made = []
+            async for event in council_react_loop(model, prompt):
+                if event["type"] == "done":
+                    content = event["content"]
+                    tool_calls_made = event.get("tool_calls_made", [])
+            if not content:
+                return None
+            result = {"model": model, "response": content}
+            if config.has_revised_answer:
+                result["revised_answer"] = parse_revised_answer(content)
+            if tool_calls_made:
+                result["tool_calls_made"] = tool_calls_made
+            return result
+
         messages = [{"role": "user", "content": prompt}]
 
         if config.uses_tools:
@@ -321,6 +371,7 @@ async def debate_round_streaming(
     round_type: str,
     user_query: str,
     context: dict[str, Any],
+    react_enabled: bool = False,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Execute a single debate round with token-level streaming (sequential).
@@ -335,17 +386,21 @@ async def debate_round_streaming(
         context: Context dict containing:
             - For critique: {"initial_responses": [...]}
             - For defense: {"initial_responses": [...], "critique_responses": [...]}
+        react_enabled: Whether council members use text-based ReAct reasoning
 
     Yields:
         {'type': 'model_start', 'model': str}
         {'type': 'token', 'model': str, 'content': str}
+        {'type': 'thought', 'model': str, 'content': str}
+        {'type': 'action', 'model': str, 'tool': str, 'args': str}
+        {'type': 'observation', 'model': str, 'content': str}
         {'type': 'tool_call', 'model': str, 'tool': str, 'args': dict}
         {'type': 'tool_result', 'model': str, 'tool': str, 'result': str}
         {'type': 'model_complete', 'model': str, 'response': Dict}
         {'type': 'model_error', 'model': str, 'error': str}
         {'type': 'round_complete', 'responses': List}
     """
-    config = build_round_config(round_type, user_query, context)
+    config = build_round_config(round_type, user_query, context, react_enabled=react_enabled)
     tools = [SEARCH_TOOL]
     responses = []
 
@@ -353,13 +408,42 @@ async def debate_round_streaming(
         yield {"type": "model_start", "model": model}
 
         prompt = config.build_prompt(model)
-        messages = [{"role": "user", "content": prompt}]
         full_content = ""
         tool_calls_made = []
         had_error = False
 
         try:
-            if config.uses_tools:
+            if config.uses_react:
+                # Text-based ReAct loop — pass through thought/action/observation events
+                async for event in council_react_loop(model, prompt):
+                    if event["type"] == "token":
+                        full_content += event["content"]
+                        yield {"type": "token", "model": model, "content": event["content"]}
+                    elif event["type"] == "thought":
+                        yield {"type": "thought", "model": model, "content": event["content"]}
+                    elif event["type"] == "action":
+                        yield {
+                            "type": "action",
+                            "model": model,
+                            "tool": event["tool"],
+                            "args": event.get("args"),
+                        }
+                    elif event["type"] == "observation":
+                        yield {
+                            "type": "observation",
+                            "model": model,
+                            "content": event["content"],
+                        }
+                    elif event["type"] == "done":
+                        full_content = event["content"]
+                        tool_calls_made = event.get("tool_calls_made", [])
+                    elif event["type"] == "error":
+                        yield {"type": "model_error", "model": model, "error": event["error"]}
+                        had_error = True
+                        break
+
+            elif config.uses_tools:
+                messages = [{"role": "user", "content": prompt}]
                 async for event in query_model_streaming_with_tools(
                     model=model,
                     messages=messages,
@@ -391,6 +475,7 @@ async def debate_round_streaming(
                         had_error = True
                         break
             else:
+                messages = [{"role": "user", "content": prompt}]
                 async for event in query_model_streaming(model, messages):
                     if event["type"] == "token":
                         full_content += event["content"]

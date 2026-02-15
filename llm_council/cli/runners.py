@@ -5,6 +5,7 @@ Contains run_* functions that wrap backend logic with CLI presentation
 (progress indicators, spinners, Rich panels).
 """
 
+import functools
 import shutil
 import sys
 
@@ -235,7 +236,7 @@ async def run_council_with_progress(query: str) -> tuple:
     )
 
 
-async def run_debate_streaming(query: str, cycles: int = 1) -> tuple:
+async def run_debate_streaming(query: str, cycles: int = 1, react_enabled: bool = False) -> tuple:
     """
     Run debate with token-by-token streaming (rounds only, no synthesis).
 
@@ -245,6 +246,7 @@ async def run_debate_streaming(query: str, cycles: int = 1) -> tuple:
     Args:
         query: The user's question
         cycles: Number of critique-defense cycles
+        react_enabled: Whether council members use text-based ReAct reasoning
 
     Returns:
         Tuple of (rounds list, None)
@@ -287,8 +289,11 @@ async def run_debate_streaming(query: str, cycles: int = 1) -> tuple:
 
     current_round_type = ""
 
+    # Build executor with react_enabled bound
+    executor = functools.partial(_debate_round_streaming, react_enabled=react_enabled)
+
     # Run debate rounds (no synthesis — handled separately)
-    async for event in _run_debate(query, _debate_round_streaming, cycles):
+    async for event in _run_debate(query, executor, cycles):
         event_type = event["type"]
 
         if event_type == "round_start":
@@ -384,7 +389,7 @@ async def run_debate_streaming(query: str, cycles: int = 1) -> tuple:
     return rounds_data, None
 
 
-async def run_debate_parallel(query: str, cycles: int = 1) -> tuple:
+async def run_debate_parallel(query: str, cycles: int = 1, react_enabled: bool = False) -> tuple:
     """
     Run debate with parallel execution and progress spinners (rounds only, no synthesis).
 
@@ -395,6 +400,7 @@ async def run_debate_parallel(query: str, cycles: int = 1) -> tuple:
     Args:
         query: The user's question
         cycles: Number of critique-defense cycles
+        react_enabled: Whether council members use text-based ReAct reasoning
     """
     rounds_data = []
     current_round_type = ""
@@ -439,8 +445,11 @@ async def run_debate_parallel(query: str, cycles: int = 1) -> tuple:
         )
         console.print()
 
+    # Build executor with react_enabled bound
+    executor = functools.partial(_debate_round_parallel, react_enabled=react_enabled)
+
     # Run debate rounds (no synthesis — handled separately)
-    async for event in _run_debate(query, _debate_round_parallel, cycles):
+    async for event in _run_debate(query, executor, cycles):
         event_type = event["type"]
 
         if event_type == "round_start":

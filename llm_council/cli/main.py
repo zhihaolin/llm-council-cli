@@ -126,9 +126,13 @@ def query(
     if debate:
         # Run debate mode (rounds only — synthesis always via Reflection)
         if stream:
-            debate_rounds, _ = asyncio.run(run_debate_streaming(question, rounds))
+            debate_rounds, _ = asyncio.run(
+                run_debate_streaming(question, rounds, react_enabled=use_react)
+            )
         else:
-            debate_rounds, _ = asyncio.run(run_debate_parallel(question, rounds))
+            debate_rounds, _ = asyncio.run(
+                run_debate_parallel(question, rounds, react_enabled=use_react)
+            )
 
         if debate_rounds is None:
             raise typer.Exit(1)

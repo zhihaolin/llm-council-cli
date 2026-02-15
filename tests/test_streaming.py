@@ -677,6 +677,109 @@ async def test_multiple_cycles_produces_correct_rounds():
 
 
 # =============================================================================
+# Test: debate_round_parallel with react uses council_react_loop
+# =============================================================================
+
+
+DEBATE_COUNCIL_REACT_LOOP = "llm_council.engine.debate.council_react_loop"
+
+
+@pytest.mark.asyncio
+async def test_debate_round_parallel_with_react():
+    """
+    Verify that debate_round_parallel uses council_react_loop when
+    react_enabled=True, instead of query_model_with_tools.
+    """
+    from llm_council.engine import debate_round_parallel
+
+    async def mock_react_loop(model, prompt, max_iterations=3):
+        """Mock council_react_loop that yields done immediately."""
+        yield {"type": "thought", "content": "I know the answer."}
+        yield {"type": "action", "tool": "respond", "args": None}
+        yield {
+            "type": "done",
+            "content": f"ReAct response from {model}",
+            "tool_calls_made": [],
+        }
+
+    with patch(DEBATE_COUNCIL_REACT_LOOP, side_effect=mock_react_loop):
+        with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+            events = []
+            async for event in debate_round_parallel(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+                react_enabled=True,
+            ):
+                events.append(event)
+
+    # Should have model_complete events
+    model_completes = [e for e in events if e["type"] == "model_complete"]
+    assert len(model_completes) == len(SAMPLE_MODELS)
+
+    # Responses should come from the ReAct loop
+    for event in model_completes:
+        assert "ReAct response from" in event["response"]["response"]
+
+    # round_complete should have all responses
+    round_complete = [e for e in events if e["type"] == "round_complete"]
+    assert len(round_complete) == 1
+    assert len(round_complete[0]["responses"]) == len(SAMPLE_MODELS)
+
+
+# =============================================================================
+# Test: debate_round_streaming with react yields thought/action events
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_debate_round_streaming_with_react_yields_thought():
+    """
+    Verify that debate_round_streaming yields thought and action events
+    when react_enabled=True.
+    """
+    from llm_council.engine.debate import debate_round_streaming
+
+    async def mock_react_loop(model, prompt, max_iterations=3):
+        """Mock council_react_loop that yields thought, action, then done."""
+        yield {"type": "token", "content": "Thought: I know this."}
+        yield {"type": "thought", "content": "I know this."}
+        yield {"type": "action", "tool": "respond", "args": None}
+        yield {
+            "type": "done",
+            "content": f"Final answer from {model}",
+            "tool_calls_made": [],
+        }
+
+    with patch(DEBATE_COUNCIL_REACT_LOOP, side_effect=mock_react_loop):
+        with patch(DEBATE_COUNCIL_MODELS, [SAMPLE_MODELS[0]]):
+            events = []
+            async for event in debate_round_streaming(
+                round_type="initial",
+                user_query="Test question",
+                context={},
+                react_enabled=True,
+            ):
+                events.append(event)
+
+    event_types = [e["type"] for e in events]
+
+    # Should have thought and action events passed through
+    assert "thought" in event_types
+    assert "action" in event_types
+    assert "token" in event_types
+    assert "model_complete" in event_types
+
+    # Thought event should have model field
+    thought_events = [e for e in events if e["type"] == "thought"]
+    assert thought_events[0]["model"] == SAMPLE_MODELS[0]
+
+    # model_complete should have the final content
+    mc = [e for e in events if e["type"] == "model_complete"][0]
+    assert "Final answer from" in mc["response"]["response"]
+
+
+# =============================================================================
 # Test: Streaming error prevents model_complete
 # =============================================================================
 

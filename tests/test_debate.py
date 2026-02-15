@@ -255,3 +255,51 @@ class TestBuildRoundConfig:
         """Unknown round type should raise ValueError."""
         with pytest.raises(ValueError, match="Unknown round type"):
             build_round_config("invalid", "Q?", {})
+
+    def test_initial_with_react_sets_uses_react(self):
+        """Initial round with react_enabled=True should set uses_react=True."""
+        config = build_round_config("initial", "What is AI?", {}, react_enabled=True)
+        assert config.uses_react is True
+        assert config.uses_tools is True
+
+    def test_critique_ignores_react(self):
+        """Critique round should never use ReAct, even with react_enabled=True."""
+        context = {
+            "initial_responses": [{"model": "test/m", "response": "answer"}],
+        }
+        config = build_round_config("critique", "What is AI?", context, react_enabled=True)
+        assert config.uses_react is False
+        assert config.uses_tools is False
+
+    def test_defense_with_react_sets_uses_react(self):
+        """Defense round with react_enabled=True should set uses_react=True."""
+        context = {
+            "initial_responses": [{"model": "test/m", "response": "answer"}],
+            "critique_responses": [{"model": "test/m2", "response": "critique"}],
+        }
+        config = build_round_config("defense", "What is AI?", context, react_enabled=True)
+        assert config.uses_react is True
+        assert config.uses_tools is True
+
+    def test_react_wraps_initial_prompt(self):
+        """When react_enabled, initial prompt should include ReAct instructions."""
+        config = build_round_config("initial", "What is AI?", {}, react_enabled=True)
+        prompt = config.build_prompt("test/model")
+        assert "search_web" in prompt
+        assert "respond()" in prompt
+
+    def test_react_wraps_defense_prompt(self):
+        """When react_enabled, defense prompt should include ReAct instructions."""
+        context = {
+            "initial_responses": [{"model": "test/m", "response": "answer"}],
+            "critique_responses": [{"model": "test/m2", "response": "critique"}],
+        }
+        config = build_round_config("defense", "Q?", context, react_enabled=True)
+        prompt = config.build_prompt("test/m")
+        assert "search_web" in prompt
+        assert "respond()" in prompt
+
+    def test_no_react_by_default(self):
+        """Without react_enabled, uses_react should be False."""
+        config = build_round_config("initial", "What is AI?", {})
+        assert config.uses_react is False
