@@ -91,9 +91,7 @@ async def debate_round_parallel(
         critique_responses = context.get("critique_responses", [])
 
         async def _query_defense(model: str):
-            return await query_defense(
-                model, user_query, initial_responses, critique_responses
-            )
+            return await query_defense(model, user_query, initial_responses, critique_responses)
 
         query_funcs = {model: _query_defense for model in COUNCIL_MODELS}
 

@@ -495,9 +495,7 @@ async def run_debate_parallel(
         )
         console.print()
 
-    async for event in _run_debate_parallel(
-        query, max_rounds, skip_synthesis=skip_synthesis
-    ):
+    async for event in _run_debate_parallel(query, max_rounds, skip_synthesis=skip_synthesis):
         event_type = event["type"]
 
         if event_type == "round_start":
