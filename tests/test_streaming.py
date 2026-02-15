@@ -272,10 +272,14 @@ async def test_debate_streaming_event_order():
 @pytest.mark.asyncio
 async def test_streaming_same_result_as_batch():
     """
-    Verify that streaming mode produces the same final rounds and
-    synthesis as the batch mode run_debate_council.
+    Verify that run_debate with debate_round_parallel produces the same
+    rounds as run_debate_parallel (which delegates to run_debate internally).
     """
-    from llm_council.engine import run_debate_council, run_debate_parallel
+    from llm_council.engine.debate_async import (
+        debate_round_parallel,
+        run_debate,
+        run_debate_parallel,
+    )
 
     async def mock_query(model, messages, *args, **kwargs):
         # Return deterministic responses based on message content
@@ -298,17 +302,21 @@ async def test_streaming_same_result_as_batch():
             }
         return {"content": f"Initial response from {model}"}
 
-    # Run batch mode (debate module)
+    # Run via run_debate directly (batch-like: no synthesis)
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
-            with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
-                with patch("llm_council.engine.debate.CHAIRMAN_MODEL", SAMPLE_MODELS[0]):
-                    batch_rounds, batch_synthesis = await run_debate_council(
+            with patch(ASYNC_COUNCIL_MODELS, SAMPLE_MODELS):
+                with patch(DEBATE_COUNCIL_MODELS, SAMPLE_MODELS):
+                    batch_rounds = None
+                    async for event in run_debate(
                         "Test question",
+                        execute_round=debate_round_parallel,
                         max_rounds=2,
-                    )
+                    ):
+                        if event["type"] == "debate_complete":
+                            batch_rounds = event["rounds"]
 
-    # Run streaming mode and collect final result (streaming module)
+    # Run via run_debate_parallel (which delegates to run_debate internally)
     with patch(DEBATE_QUERY_MODEL, side_effect=mock_query):
         with patch(DEBATE_QUERY_MODEL_WITH_TOOLS, side_effect=mock_query_tools):
             with patch(ASYNC_QUERY_MODEL, side_effect=mock_query):

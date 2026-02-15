@@ -18,14 +18,14 @@ from rich.text import Text
 from llm_council.cli.presenters import build_model_panel, console
 from llm_council.engine import (
     calculate_aggregate_rankings,
-    debate_round_critique,
-    debate_round_defense,
     stage1_collect_responses,
     stage2_collect_rankings,
     stage3_synthesize_final,
     synthesize_debate,
     synthesize_with_react,
 )
+from llm_council.engine.debate_async import debate_round_parallel as _debate_round_parallel
+from llm_council.engine.debate_async import run_debate as _run_debate
 from llm_council.engine.debate_async import run_debate_parallel as _run_debate_parallel
 from llm_council.engine.debate_async import run_debate_streaming as _run_debate_streaming
 from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
@@ -154,8 +154,24 @@ async def run_council_with_progress(query: str, skip_synthesis: bool = False) ->
 async def run_debate_with_progress(
     query: str, max_rounds: int = 2, skip_synthesis: bool = False
 ) -> tuple:
-    """Run the debate council with progress indicators."""
+    """Run the debate council with progress indicators.
+
+    Consumes events from run_debate() with debate_round_parallel executor.
+    Shows spinners during each round and checkmarks on completion.
+    """
+    type_colors = {
+        "initial": "cyan",
+        "critique": "yellow",
+        "defense": "magenta",
+    }
+    type_labels = {
+        "initial": "Collecting initial responses",
+        "critique": "Models critiquing each other",
+        "defense": "Models defending and revising",
+    }
+
     rounds = []
+    current_task = None
 
     with Progress(
         SpinnerColumn(),
@@ -163,92 +179,42 @@ async def run_debate_with_progress(
         console=console,
         transient=True,
     ) as progress:
-        # Round 1: Initial responses
-        task = progress.add_task(
-            f"[cyan]Round 1: Collecting initial responses from {len(COUNCIL_MODELS)} models...",
-            total=None,
-        )
-        initial_responses = await stage1_collect_responses(query)
-        progress.remove_task(task)
-
-        if len(initial_responses) < 2:
-            console.print(
-                "[red]Error: Not enough models responded for debate (need at least 2).[/red]"
-            )
-            return None, None
-
-        console.print(
-            f"[green]✓[/green] Round 1 complete: {len(initial_responses)} initial responses"
-        )
-
-        rounds.append({"round_number": 1, "round_type": "initial", "responses": initial_responses})
-
-        # Round 2: Critiques
-        task = progress.add_task("[yellow]Round 2: Models critiquing each other...", total=None)
-        critique_responses = await debate_round_critique(query, initial_responses)
-        progress.remove_task(task)
-
-        console.print(f"[green]✓[/green] Round 2 complete: {len(critique_responses)} critiques")
-
-        rounds.append(
-            {"round_number": 2, "round_type": "critique", "responses": critique_responses}
-        )
-
-        # Round 3: Defense/Revision
-        task = progress.add_task("[magenta]Round 3: Models defending and revising...", total=None)
-        defense_responses = await debate_round_defense(query, initial_responses, critique_responses)
-        progress.remove_task(task)
-
-        console.print(
-            f"[green]✓[/green] Round 3 complete: {len(defense_responses)} revised responses"
-        )
-
-        rounds.append({"round_number": 3, "round_type": "defense", "responses": defense_responses})
-
-        # Additional rounds if requested
-        current_responses = defense_responses
-        for round_num in range(4, max_rounds + 2):
-            if round_num % 2 == 0:
-                # Even rounds: critique
-                task = progress.add_task(
-                    f"[yellow]Round {round_num}: Additional critiques...", total=None
-                )
-                critique_responses = await debate_round_critique(query, current_responses)
-                progress.remove_task(task)
-
-                console.print(
-                    f"[green]✓[/green] Round {round_num} complete: {len(critique_responses)} critiques"
+        async for event in _run_debate(query, _debate_round_parallel, max_rounds):
+            if event["type"] == "round_start":
+                rnd_num = event["round_number"]
+                rnd_type = event["round_type"]
+                color = type_colors.get(rnd_type, "white")
+                label = type_labels.get(rnd_type, rnd_type.title())
+                current_task = progress.add_task(
+                    f"[{color}]Round {rnd_num}: {label}...",
+                    total=None,
                 )
 
+            elif event["type"] == "round_complete":
+                if current_task is not None:
+                    progress.remove_task(current_task)
+                    current_task = None
+                rnd_num = event["round_number"]
+                rnd_type = event["round_type"]
+                responses = event["responses"]
                 rounds.append(
-                    {
-                        "round_number": round_num,
-                        "round_type": "critique",
-                        "responses": critique_responses,
-                    }
+                    {"round_number": rnd_num, "round_type": rnd_type, "responses": responses}
                 )
-            else:
-                # Odd rounds: defense
-                task = progress.add_task(
-                    f"[magenta]Round {round_num}: Defense and revision...", total=None
-                )
-                defense_responses = await debate_round_defense(
-                    query, current_responses, critique_responses
-                )
-                progress.remove_task(task)
-
                 console.print(
-                    f"[green]✓[/green] Round {round_num} complete: {len(defense_responses)} revised responses"
+                    f"[green]✓[/green] Round {rnd_num} complete: {len(responses)} responses"
                 )
 
-                rounds.append(
-                    {
-                        "round_number": round_num,
-                        "round_type": "defense",
-                        "responses": defense_responses,
-                    }
-                )
-                current_responses = defense_responses
+            elif event["type"] == "error":
+                if current_task is not None:
+                    progress.remove_task(current_task)
+                    current_task = None
+                console.print(f"[red]Error: {event['message']}[/red]")
+                return None, None
+
+            elif event["type"] == "debate_complete":
+                rounds = event["rounds"]
+
+            # Ignore model_start, model_complete, model_error events (no per-model display)
 
         # Chairman synthesis (optional)
         synthesis = None
