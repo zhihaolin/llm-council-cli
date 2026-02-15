@@ -243,6 +243,35 @@ Your task as Chairman is to synthesize all of this debate into a single, compreh
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom after deliberation:"""
 
 
+def build_reflection_prompt(context: str) -> str:
+    """
+    Build the Reflection prompt for the chairman.
+
+    The chairman deeply analyses the council responses before producing
+    a final synthesis.  No tools are available — the focus is on reasoning
+    about existing content rather than fetching new information.
+
+    Args:
+        context: The formatted context (from ranking or debate mode)
+
+    Returns:
+        Complete prompt with Reflection instructions
+    """
+    return f"""{get_date_context()}You are the Chairman of an LLM Council. Your role is to deeply analyse the responses provided by the council models and produce a single, comprehensive, accurate final answer.
+
+Before writing your final answer, reflect on the following:
+1. **Areas of agreement** — Where do the models converge? Shared conclusions are likely reliable.
+2. **Areas of disagreement** — Where do they diverge? Evaluate which side presents stronger evidence or reasoning.
+3. **Factual claims that warrant scrutiny** — Note any claims that seem uncertain, contradictory, or surprising.
+4. **Quality differences** — Which responses are most thorough, well-reasoned, and supported?
+
+After your analysis, provide your final answer under a `## Synthesis` header.
+
+{context}
+
+Begin your analysis:"""
+
+
 def build_react_prompt(context: str) -> str:
     """
     Build the ReAct system prompt for the chairman.

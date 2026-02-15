@@ -105,6 +105,26 @@ def extract_critiques_for_model(target_model: str, critique_responses: list[dict
     return "\n\n".join(critiques)
 
 
+def parse_reflection_output(text: str) -> tuple[str, str]:
+    """
+    Split chairman reflection output at the ``## Synthesis`` header.
+
+    Args:
+        text: Raw model output containing optional reflection and a
+              ``## Synthesis`` section.
+
+    Returns:
+        Tuple of (reflection_text, synthesis_text).
+        Falls back to ("", full_text) if the header is not found.
+    """
+    match = re.search(r"##\s*Synthesis\s*\n", text, re.IGNORECASE)
+    if match:
+        reflection = text[: match.start()].strip()
+        synthesis = text[match.end() :].strip()
+        return reflection, synthesis
+    return "", text
+
+
 def parse_react_output(text: str) -> tuple[str, str, str]:
     """
     Parse ReAct output to extract Thought and Action.
