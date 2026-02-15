@@ -2,17 +2,15 @@
 Tests for the debate mode functionality in debate.py.
 
 These tests verify the multi-round debate logic including critique extraction,
-defense parsing, and debate orchestration.
+defense parsing, RoundConfig, and debate orchestration.
 """
 
-from unittest.mock import AsyncMock, patch
+import pytest
 
 from llm_council.engine import (
+    build_round_config,
     extract_critiques_for_model,
     parse_revised_answer,
-    query_critique,
-    query_defense,
-    query_initial,
 )
 
 
@@ -188,155 +186,72 @@ class TestDebateDataStructures:
         assert "revised_answer" in defense_response
 
 
-class TestQueryInitial:
-    """Tests for the query_initial per-round function."""
+class TestBuildRoundConfig:
+    """Tests for the build_round_config factory function."""
 
-    async def test_query_initial_returns_response_with_tools(self):
-        """query_initial should call query_model_with_tools and return result dict."""
-        mock_response = {
-            "content": "Here is my initial answer.",
-            "tool_calls_made": [{"tool": "search_web", "args": {"query": "test"}}],
+    def test_initial_config(self):
+        """Initial round should use tools and not parse revised answers."""
+        config = build_round_config("initial", "What is AI?", {})
+        assert config.uses_tools is True
+        assert config.has_revised_answer is False
+
+    def test_critique_config(self):
+        """Critique round should not use tools and not parse revised answers."""
+        context = {
+            "initial_responses": [{"model": "test/m", "response": "answer"}],
         }
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = mock_response
+        config = build_round_config("critique", "What is AI?", context)
+        assert config.uses_tools is False
+        assert config.has_revised_answer is False
 
-            result = await query_initial("openai/gpt-5.2", "What is AI?")
-
-            assert result is not None
-            assert result["model"] == "openai/gpt-5.2"
-            assert result["response"] == "Here is my initial answer."
-            assert result["tool_calls_made"] == mock_response["tool_calls_made"]
-            mock_query.assert_called_once()
-
-    async def test_query_initial_returns_none_on_failure(self):
-        """query_initial should return None when the model fails."""
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = None
-
-            result = await query_initial("openai/gpt-5.2", "What is AI?")
-
-            assert result is None
-
-    async def test_query_initial_omits_tool_calls_when_none(self):
-        """query_initial should omit tool_calls_made when model didn't use tools."""
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = {"content": "Direct answer."}
-
-            result = await query_initial("openai/gpt-5.2", "What is 2+2?")
-
-            assert result is not None
-            assert "tool_calls_made" not in result
-
-
-class TestQueryCritique:
-    """Tests for the query_critique per-round function."""
-
-    async def test_query_critique_returns_response_no_tools(self, sample_initial_responses):
-        """query_critique should call query_model (no tools) and return result dict."""
-        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = {"content": "## Critique of model\nTest critique."}
-
-            result = await query_critique(
-                "openai/gpt-5.2",
-                "What is the best language?",
-                sample_initial_responses,
-            )
-
-            assert result is not None
-            assert result["model"] == "openai/gpt-5.2"
-            assert "Test critique" in result["response"]
-            assert "tool_calls_made" not in result
-            mock_query.assert_called_once()
-
-    async def test_query_critique_returns_none_on_failure(self, sample_initial_responses):
-        """query_critique should return None when the model fails."""
-        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = None
-
-            result = await query_critique(
-                "openai/gpt-5.2", "Test question", sample_initial_responses
-            )
-
-            assert result is None
-
-
-class TestQueryDefense:
-    """Tests for the query_defense per-round function."""
-
-    async def test_query_defense_returns_response_with_tools(
-        self, sample_initial_responses, sample_critique_responses
-    ):
-        """query_defense should call query_model_with_tools and return result with revised_answer."""
-        defense_content = """## Addressing Critiques
-Valid points raised.
-
-## Revised Response
-My improved answer."""
-
-        mock_response = {
-            "content": defense_content,
-            "tool_calls_made": [{"tool": "search_web", "args": {"query": "evidence"}}],
+    def test_defense_config(self):
+        """Defense round should use tools and parse revised answers."""
+        context = {
+            "initial_responses": [{"model": "test/m", "response": "answer"}],
+            "critique_responses": [{"model": "test/m2", "response": "critique"}],
         }
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = mock_response
+        config = build_round_config("defense", "What is AI?", context)
+        assert config.uses_tools is True
+        assert config.has_revised_answer is True
 
-            result = await query_defense(
-                "openai/gpt-5.2",
-                "Test question",
-                sample_initial_responses,
-                sample_critique_responses,
-            )
+    def test_initial_prompt_includes_date(self):
+        """Initial prompt should contain date context."""
+        config = build_round_config("initial", "What is AI?", {})
+        prompt = config.build_prompt("test/model")
+        assert "Today's date is" in prompt
+        assert "What is AI?" in prompt
 
-            assert result is not None
-            assert result["model"] == "openai/gpt-5.2"
-            assert result["response"] == defense_content
-            assert "improved answer" in result["revised_answer"].lower()
-            assert result["tool_calls_made"] == mock_response["tool_calls_made"]
-            mock_query.assert_called_once()
+    def test_critique_prompt_per_model(self):
+        """Critique prompts should differ per model (model name in prompt)."""
+        context = {
+            "initial_responses": [{"model": "test/m", "response": "answer"}],
+        }
+        config = build_round_config("critique", "Q?", context)
+        prompt_a = config.build_prompt("model/a")
+        prompt_b = config.build_prompt("model/b")
+        assert "model/a" in prompt_a
+        assert "model/b" in prompt_b
+        assert prompt_a != prompt_b
 
-    async def test_query_defense_returns_none_on_failure(
-        self, sample_initial_responses, sample_critique_responses
-    ):
-        """query_defense should return None when the model fails."""
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = None
+    def test_defense_prompt_includes_critiques(self):
+        """Defense prompt should include critique content for the model."""
+        context = {
+            "initial_responses": [
+                {"model": "test/m", "response": "my original answer"},
+            ],
+            "critique_responses": [
+                {
+                    "model": "test/m2",
+                    "response": "## Critique of test/m\nYour answer is weak.",
+                },
+            ],
+        }
+        config = build_round_config("defense", "Q?", context)
+        prompt = config.build_prompt("test/m")
+        assert "my original answer" in prompt
+        assert "weak" in prompt.lower()
 
-            result = await query_defense(
-                "openai/gpt-5.2",
-                "Test question",
-                sample_initial_responses,
-                sample_critique_responses,
-            )
-
-            assert result is None
-
-    async def test_query_defense_omits_tool_calls_when_none(
-        self, sample_initial_responses, sample_critique_responses
-    ):
-        """query_defense should omit tool_calls_made when model didn't use tools."""
-        defense_content = """## Revised Response
-My answer without tools."""
-        with patch(
-            "llm_council.engine.debate.query_model_with_tools", new_callable=AsyncMock
-        ) as mock_query:
-            mock_query.return_value = {"content": defense_content}
-
-            result = await query_defense(
-                "openai/gpt-5.2",
-                "Test question",
-                sample_initial_responses,
-                sample_critique_responses,
-            )
-
-            assert result is not None
-            assert "tool_calls_made" not in result
+    def test_unknown_round_type_raises(self):
+        """Unknown round type should raise ValueError."""
+        with pytest.raises(ValueError, match="Unknown round type"):
+            build_round_config("invalid", "Q?", {})

@@ -1,12 +1,13 @@
 """
 Debate mode orchestration for council deliberation.
 
-Contains per-model query functions, async execution strategies (parallel and
-streaming), and the debate orchestrator.
+Contains RoundConfig, async execution strategies (parallel and streaming),
+and the debate orchestrator.
 """
 
 import asyncio
 from collections.abc import AsyncGenerator, Callable
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from ..adapters.openrouter_client import (
@@ -66,106 +67,75 @@ async def execute_tool(tool_name: str, tool_args: dict[str, Any]) -> str:
         return f"Unknown tool: {tool_name}"
 
 
-async def query_initial(model: str, user_query: str) -> dict | None:
-    """
-    Query a single model for its initial response (Round 1).
+@dataclass(frozen=True)
+class RoundConfig:
+    """Configuration for a single debate round.
 
-    Uses query_model_with_tools so the model can search the web if needed.
+    Captures the per-round-type differences so that execution strategies
+    don't need to duplicate if/elif dispatch on round_type.
+
+    Attributes:
+        uses_tools: Whether the model should have access to web search tools.
+        build_prompt: A callable (model) -> prompt_string for this round.
+        has_revised_answer: Whether the response should be parsed for a revised answer.
+    """
+
+    uses_tools: bool
+    build_prompt: Callable[[str], str]
+    has_revised_answer: bool
+
+
+def build_round_config(round_type: str, user_query: str, context: dict[str, Any]) -> RoundConfig:
+    """Build a RoundConfig for the given round type.
+
+    Single point of dispatch replacing duplicated if/elif chains in both
+    parallel and streaming execution strategies.
 
     Args:
-        model: The model identifier
+        round_type: One of "initial", "critique", or "defense"
         user_query: The user's question
+        context: Context dict containing:
+            - For critique: {"initial_responses": [...]}
+            - For defense: {"initial_responses": [...], "critique_responses": [...]}
 
     Returns:
-        Dict with 'model', 'response', and optionally 'tool_calls_made', or None on failure
+        RoundConfig with the appropriate prompt builder and flags
+
+    Raises:
+        ValueError: If round_type is not recognized
     """
-    query_with_date = get_date_context() + user_query
-    messages = [{"role": "user", "content": query_with_date}]
-    tools = [SEARCH_TOOL]
+    if round_type == "initial":
+        query_with_date = get_date_context() + user_query
 
-    response = await query_model_with_tools(
-        model=model, messages=messages, tools=tools, tool_executor=execute_tool
-    )
-    if response is None:
-        return None
+        def _initial_prompt(_model: str) -> str:
+            return query_with_date
 
-    result = {"model": model, "response": response.get("content", "")}
-    if response.get("tool_calls_made"):
-        result["tool_calls_made"] = response["tool_calls_made"]
-    return result
+        return RoundConfig(uses_tools=True, build_prompt=_initial_prompt, has_revised_answer=False)
 
+    if round_type == "critique":
+        initial_responses = context.get("initial_responses", [])
+        responses_text = format_responses_for_critique(initial_responses)
 
-async def query_critique(
-    model: str, user_query: str, initial_responses: list[dict[str, Any]]
-) -> dict | None:
-    """
-    Query a single model for its critique of other models (Round 2).
+        def _critique_prompt(model: str) -> str:
+            return build_critique_prompt(user_query, responses_text, model)
 
-    Uses query_model (no tools) — critiques evaluate existing responses.
+        return RoundConfig(
+            uses_tools=False, build_prompt=_critique_prompt, has_revised_answer=False
+        )
 
-    Args:
-        model: The model identifier
-        user_query: The original user query
-        initial_responses: Results from round 1
+    if round_type == "defense":
+        initial_responses = context.get("initial_responses", [])
+        critique_responses = context.get("critique_responses", [])
+        model_to_response = {r["model"]: r["response"] for r in initial_responses}
 
-    Returns:
-        Dict with 'model' and 'response', or None on failure
-    """
-    responses_text = format_responses_for_critique(initial_responses)
-    critique_prompt = build_critique_prompt(user_query, responses_text, model)
-    messages = [{"role": "user", "content": critique_prompt}]
+        def _defense_prompt(model: str) -> str:
+            original = model_to_response.get(model, "")
+            critiques = extract_critiques_for_model(model, critique_responses)
+            return build_defense_prompt(user_query, original, critiques)
 
-    response = await query_model(model, messages)
-    if response is None:
-        return None
+        return RoundConfig(uses_tools=True, build_prompt=_defense_prompt, has_revised_answer=True)
 
-    return {"model": model, "response": response.get("content", "")}
-
-
-async def query_defense(
-    model: str,
-    user_query: str,
-    initial_responses: list[dict[str, Any]],
-    critique_responses: list[dict[str, Any]],
-) -> dict | None:
-    """
-    Query a single model for its defense/revision (Round 3).
-
-    Uses query_model_with_tools so the model can search for evidence to support
-    its defense. This fixes the previous asymmetry where batch mode lacked tools.
-
-    Args:
-        model: The model identifier
-        user_query: The original user query
-        initial_responses: Results from round 1
-        critique_responses: Critiques from round 2
-
-    Returns:
-        Dict with 'model', 'response', 'revised_answer', and optionally
-        'tool_calls_made', or None on failure
-    """
-    model_to_response = {r["model"]: r["response"] for r in initial_responses}
-    original_response = model_to_response.get(model, "")
-    critiques_for_me = extract_critiques_for_model(model, critique_responses)
-    defense_prompt = build_defense_prompt(user_query, original_response, critiques_for_me)
-    messages = [{"role": "user", "content": defense_prompt}]
-    tools = [SEARCH_TOOL]
-
-    response = await query_model_with_tools(
-        model=model, messages=messages, tools=tools, tool_executor=execute_tool
-    )
-    if response is None:
-        return None
-
-    content = response.get("content", "")
-    result = {
-        "model": model,
-        "response": content,
-        "revised_answer": parse_revised_answer(content),
-    }
-    if response.get("tool_calls_made"):
-        result["tool_calls_made"] = response["tool_calls_made"]
-    return result
+    raise ValueError(f"Unknown round type: {round_type}")
 
 
 async def synthesize_debate(
@@ -315,39 +285,35 @@ async def debate_round_parallel(
         {'type': 'model_error', 'model': str, 'error': str}
         {'type': 'round_complete', 'responses': List}
     """
-    # Build query functions based on round type using shared per-round functions
-    if round_type == "initial":
+    config = build_round_config(round_type, user_query, context)
 
-        async def _query_initial(model: str):
-            return await query_initial(model, user_query)
+    async def _query_model(model: str) -> dict | None:
+        """Query a single model using the round config."""
+        prompt = config.build_prompt(model)
+        messages = [{"role": "user", "content": prompt}]
 
-        query_funcs = {model: _query_initial for model in COUNCIL_MODELS}
+        if config.uses_tools:
+            response = await query_model_with_tools(
+                model=model, messages=messages, tools=[SEARCH_TOOL], tool_executor=execute_tool
+            )
+        else:
+            response = await query_model(model, messages)
 
-    elif round_type == "critique":
-        initial_responses = context.get("initial_responses", [])
+        if response is None:
+            return None
 
-        async def _query_critique(model: str):
-            return await query_critique(model, user_query, initial_responses)
-
-        query_funcs = {model: _query_critique for model in COUNCIL_MODELS}
-
-    elif round_type == "defense":
-        initial_responses = context.get("initial_responses", [])
-        critique_responses = context.get("critique_responses", [])
-
-        async def _query_defense(model: str):
-            return await query_defense(model, user_query, initial_responses, critique_responses)
-
-        query_funcs = {model: _query_defense for model in COUNCIL_MODELS}
-
-    else:
-        raise ValueError(f"Unknown round type: {round_type}")
+        result = {"model": model, "response": response.get("content", "")}
+        if config.has_revised_answer:
+            result["revised_answer"] = parse_revised_answer(result["response"])
+        if response.get("tool_calls_made"):
+            result["tool_calls_made"] = response["tool_calls_made"]
+        return result
 
     # Wrapper to include model identity in result with timeout
     async def query_with_model(model: str):
         try:
             # Apply per-model timeout
-            result = await asyncio.wait_for(query_funcs[model](model), timeout=model_timeout)
+            result = await asyncio.wait_for(_query_model(model), timeout=model_timeout)
             return model, result, None
         except asyncio.TimeoutError:
             return model, None, f"Timeout after {model_timeout}s"
@@ -406,58 +372,21 @@ async def debate_round_streaming(
         {'type': 'model_error', 'model': str, 'error': str}
         {'type': 'round_complete', 'responses': List}
     """
-    query_with_date = get_date_context() + user_query
+    config = build_round_config(round_type, user_query, context)
     tools = [SEARCH_TOOL]
     responses = []
-
-    # Build per-model prompt and determine tool availability
-    initial_responses = context.get("initial_responses", [])
-    critique_responses = context.get("critique_responses", [])
-
-    prompt_builder: Callable[[str], str]
-
-    if round_type == "initial":
-        with_tools = True
-
-        def _initial_prompt(_model: str) -> str:
-            return query_with_date
-
-        prompt_builder = _initial_prompt
-
-    elif round_type == "critique":
-        with_tools = False
-        responses_text = format_responses_for_critique(initial_responses)
-
-        def _critique_prompt(model: str) -> str:
-            return build_critique_prompt(user_query, responses_text, model)
-
-        prompt_builder = _critique_prompt
-
-    elif round_type == "defense":
-        with_tools = True
-        model_to_response = {r["model"]: r["response"] for r in initial_responses}
-
-        def _defense_prompt(model: str) -> str:
-            original = model_to_response.get(model, "")
-            critiques = extract_critiques_for_model(model, critique_responses)
-            return build_defense_prompt(user_query, original, critiques)
-
-        prompt_builder = _defense_prompt
-
-    else:
-        raise ValueError(f"Unknown round type: {round_type}")
 
     for model in COUNCIL_MODELS:
         yield {"type": "model_start", "model": model}
 
-        prompt = prompt_builder(model)
+        prompt = config.build_prompt(model)
         messages = [{"role": "user", "content": prompt}]
         full_content = ""
         tool_calls_made = []
         had_error = False
 
         try:
-            if with_tools:
+            if config.uses_tools:
                 async for event in query_model_streaming_with_tools(
                     model=model,
                     messages=messages,
@@ -500,7 +429,7 @@ async def debate_round_streaming(
 
             if full_content and not had_error:
                 result = {"model": model, "response": full_content}
-                if round_type == "defense":
+                if config.has_revised_answer:
                     result["revised_answer"] = parse_revised_answer(full_content)
                 if tool_calls_made:
                     result["tool_calls_made"] = tool_calls_made
