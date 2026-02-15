@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+from ..settings import OPENROUTER_API_KEY, OPENROUTER_API_URL
 
 # Shared client for connection reuse
 _shared_client: httpx.AsyncClient | None = None

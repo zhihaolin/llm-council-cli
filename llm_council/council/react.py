@@ -9,9 +9,9 @@ import re
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from ..config import CHAIRMAN_MODEL
-from ..openrouter import query_model_streaming
-from ..search import format_search_results, search_web
+from ..adapters.openrouter_client import query_model_streaming
+from ..adapters.tavily_search import format_search_results, search_web
+from ..settings import CHAIRMAN_MODEL
 from .parsers import parse_react_output
 from .prompts import build_react_prompt
 

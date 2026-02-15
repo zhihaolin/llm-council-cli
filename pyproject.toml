@@ -27,13 +27,13 @@ dev = [
 ]
 
 [project.scripts]
-llm-council = "cli.main:app"
+llm-council = "llm_council.cli.main:app"
 
 [tool.uv]
 package = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["cli", "backend"]
+packages = ["llm_council"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -59,7 +59,7 @@ ignore = [
 [tool.pyright]
 pythonVersion = "3.10"
 typeCheckingMode = "basic"
-include = ["backend", "cli"]
+include = ["llm_council"]
 exclude = ["tests"]
 # Relax checks for CLI project - these are common in dynamic Python code
 reportOptionalMemberAccess = "warning"

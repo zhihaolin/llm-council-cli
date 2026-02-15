@@ -15,10 +15,7 @@ wheels/
 # Data files
 data/
 
-# Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/*.egg-info
 .coverage
 .DS_Store
 .pytest_cache/
+.ruff_cache/

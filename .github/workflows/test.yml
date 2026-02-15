@@ -24,13 +24,13 @@ jobs:
         run: uv sync --extra dev
 
       - name: Ruff check
-        run: uv run ruff check backend/ cli/
+        run: uv run ruff check llm_council/
 
       - name: Ruff format check
-        run: uv run ruff format --check backend/ cli/
+        run: uv run ruff format --check llm_council/
 
       - name: Pyright
-        run: uv run pyright backend/ cli/
+        run: uv run pyright llm_council/
 
   test:
     runs-on: ubuntu-latest

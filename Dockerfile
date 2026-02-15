@@ -12,8 +12,7 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy source code
-COPY backend/ backend/
-COPY cli/ cli/
+COPY llm_council/ llm_council/
 
 # Install the project package
 RUN uv sync --frozen --no-dev

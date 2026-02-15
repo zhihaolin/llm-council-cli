@@ -2,7 +2,7 @@
 Tests for chat helpers.
 """
 
-from cli.chat import (
+from llm_council.cli.chat_commands import (
     build_chat_prompt,
     format_chat_mode_line,
     parse_chat_command,

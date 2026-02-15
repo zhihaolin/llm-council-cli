@@ -8,14 +8,14 @@ import asyncio
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
-from ..config import CHAIRMAN_MODEL, COUNCIL_MODELS
-from ..openrouter import (
+from ..adapters.openrouter_client import (
     query_model,
     query_model_streaming,
     query_model_streaming_with_tools,
     query_model_with_tools,
 )
-from ..search import SEARCH_TOOL, format_search_results, search_web
+from ..adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
+from ..settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 from .parsers import extract_critiques_for_model, parse_revised_answer
 from .prompts import (
     build_critique_prompt,

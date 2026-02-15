@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .config import DATA_DIR
+from ..settings import DATA_DIR
 
 
 def ensure_data_dir():

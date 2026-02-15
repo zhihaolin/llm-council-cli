@@ -14,9 +14,8 @@ import typer
 from rich.markdown import Markdown
 from rich.table import Table
 
-from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
-from cli.chat_session import run_chat_session
-from cli.presenters import (
+from llm_council.cli.constants import DEFAULT_CONTEXT_TURNS
+from llm_council.cli.presenters import (
     console,
     print_debate_round,
     print_debate_synthesis,
@@ -25,14 +24,14 @@ from cli.presenters import (
     print_stage2,
     print_stage3,
 )
-from cli.runners import (
+from llm_council.cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,
     run_debate_with_progress,
     run_react_synthesis,
 )
-from cli.utils import DEFAULT_CONTEXT_TURNS
+from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 app = typer.Typer(
     name="llm-council",
@@ -59,6 +58,8 @@ def chat(
     """
     Start an interactive chat session with conversation history.
     """
+    from llm_council.cli.chat_session import run_chat_session
+
     asyncio.run(run_chat_session(max_turns=max_turns, start_new=new))
 
 
@@ -153,7 +154,7 @@ def query(
 
         # If ReAct enabled, run ReAct synthesis separately
         if use_react and not stream and not parallel:
-            from backend.council import build_react_context_debate
+            from llm_council.council import build_react_context_debate
 
             context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
 
@@ -196,7 +197,7 @@ def query(
 
         # If ReAct enabled, run ReAct synthesis separately
         if use_react:
-            from backend.council import build_react_context_ranking
+            from llm_council.council import build_react_context_ranking
 
             context = build_react_context_ranking(question, stage1, stage2)
 
@@ -258,7 +259,7 @@ def interactive(
         llm-council interactive
         llm-council interactive "Start with this question"
     """
-    from cli.tui import run_tui
+    from llm_council.cli.tui import run_tui
 
     run_tui(query=question)
 

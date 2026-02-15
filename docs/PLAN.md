@@ -173,7 +173,7 @@ User control during autonomous execution via optional async callbacks. All three
 
 **Prerequisites:** v1.7-v1.10 completed (v1.8 Strategy Pattern in particular introduces `models` parameter and DI patterns that make threading callbacks cleaner).
 
-**New type definitions** in `backend/council/types.py`:
+**New type definitions** in `llm_council/council/types.py`:
 ```python
 ToolApprovalCallback = Callable[[str, dict[str, Any]], Awaitable[bool]]
 RoundInterventionCallback = Callable[[int, str, list[dict[str, Any]]], Awaitable[str | None]]
@@ -183,7 +183,7 @@ RoundInterventionCallback = Callable[[int, str, list[dict[str, Any]]], Awaitable
 
 Before executing `search_web`, prompt user to approve/reject.
 
-- **Gate location:** `openrouter.py:query_model_with_tools()` and `query_model_streaming_with_tools()` — before `result = await tool_executor(...)`
+- **Gate location:** `adapters/openrouter_client.py:query_model_with_tools()` and `query_model_streaming_with_tools()` — before `result = await tool_executor(...)`
 - **Behavior:** `tool_approval: ToolApprovalCallback | None = None` param. When present, await before execution. If rejected, insert `"Tool call rejected by user."` as tool result.
 - **CLI:** `--approve` flag on `query`; `/approve on|off` in chat REPL
 
@@ -191,15 +191,15 @@ Before executing `search_web`, prompt user to approve/reject.
 
 Between rounds, let user inject their perspective into the next round's prompt.
 
-- **Pause location:** `streaming.py` — after `round_complete` yield, before next round. `debate.py` — after each round completes.
-- **Behavior:** `round_intervention: RoundInterventionCallback | None = None` param. After each round, await callback. If returns a string, prepend to next round's prompt via `inject_human_perspective()` in `prompts.py`. If returns `None`, continue normally.
+- **Pause location:** `council/debate_streaming.py` — after `round_complete` yield, before next round. `council/debate.py` — after each round completes.
+- **Behavior:** `round_intervention: RoundInterventionCallback | None = None` param. After each round, await callback. If returns a string, prepend to next round's prompt via `inject_human_perspective()` in `council/prompts.py`. If returns `None`, continue normally.
 - **CLI:** `--intervene` flag on `query`; `/intervene on|off` in chat REPL
 
 #### Feature 3: Model Selection
 
 Let user choose which models participate (absorbs v1.17 "Configurable council").
 
-- **Current state:** `COUNCIL_MODELS` is a module-level constant used directly in `streaming.py` (7 refs) and `debate.py` (1 ref).
+- **Current state:** `COUNCIL_MODELS` is a module-level constant used directly in `council/debate_streaming.py` (7 refs) and `council/debate.py` (1 ref).
 - **Change:** Add `models: list[str] | None = None` parameter to all debate/streaming functions. Default to `COUNCIL_MODELS` when `None`.
 - **CLI:** `--select-models` (interactive picker); `--models "model-a,model-b"` (explicit); `/select` in chat REPL (minimum 2 models enforced)
 
@@ -207,15 +207,15 @@ Let user choose which models participate (absorbs v1.17 "Configurable council").
 
 | # | Scope | Files |
 |---|-------|-------|
-| 1 | HITL callback type definitions | `backend/council/types.py`, `__init__.py`, `tests/test_hitl_types.py` |
-| 2-3 | `tool_approval` in openrouter | `backend/openrouter.py`, `tests/test_tool_approval.py` |
-| 4 | Thread `tool_approval` through streaming/debate | `backend/council/streaming.py`, `backend/council/debate.py` |
-| 5 | `inject_human_perspective` prompt | `backend/council/prompts.py`, `tests/test_hitl_intervention.py` |
-| 6-7 | Thread `round_intervention` into streaming/debate | `backend/council/streaming.py`, `backend/council/debate.py` |
-| 8-9 | `models` parameter in debate/streaming | `backend/council/debate.py`, `backend/council/streaming.py`, `tests/test_model_selection.py` |
-| 10-11 | CLI prompt functions + callback wiring | `cli/runners.py` |
-| 12 | Chat commands (`/approve`, `/intervene`, `/select`) | `cli/chat.py`, `cli/chat_session.py`, `cli/presenters.py` |
-| 13 | CLI flags (`--approve`, `--intervene`, `--select-models`, `--models`) | `cli/main.py` |
+| 1 | HITL callback type definitions | `llm_council/council/types.py`, `__init__.py`, `tests/test_hitl_types.py` |
+| 2-3 | `tool_approval` in openrouter | `llm_council/adapters/openrouter_client.py`, `tests/test_tool_approval.py` |
+| 4 | Thread `tool_approval` through streaming/debate | `llm_council/council/debate_streaming.py`, `llm_council/council/debate.py` |
+| 5 | `inject_human_perspective` prompt | `llm_council/council/prompts.py`, `tests/test_hitl_intervention.py` |
+| 6-7 | Thread `round_intervention` into streaming/debate | `llm_council/council/debate_streaming.py`, `llm_council/council/debate.py` |
+| 8-9 | `models` parameter in debate/streaming | `llm_council/council/debate.py`, `llm_council/council/debate_streaming.py`, `tests/test_model_selection.py` |
+| 10-11 | CLI prompt functions + callback wiring | `llm_council/cli/runners.py` |
+| 12 | Chat commands (`/approve`, `/intervene`, `/select`) | `llm_council/cli/chat_commands.py`, `llm_council/cli/chat_session.py`, `llm_council/cli/presenters.py` |
+| 13 | CLI flags (`--approve`, `--intervene`, `--select-models`, `--models`) | `llm_council/cli/main.py` |
 
 #### Risks
 
@@ -334,11 +334,11 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 
 | Issue | Location | Severity | Fix Strategy |
 |-------|----------|----------|--------------|
-| Off-by-one in tool call loops | `openrouter.py:198` vs `:372` | Medium | Align both to `range(max_tool_calls)` — the `+1` appears to be a bug |
-| `datetime.utcnow()` deprecated | `storage.py:36` | Low | Replace with `datetime.now(datetime.UTC)` |
-| Hardcoded title gen model | `orchestrator.py:206` | Medium | Add `title_model` to config.yaml; default to cheap/fast model |
-| Redundant import | `openrouter.py:455` | Trivial | Delete the inner `import asyncio` |
-| Shared HTTP client unused | `openrouter.py:21-52` | Low | Either use it in all query functions or delete it (YAGNI) |
+| Off-by-one in tool call loops | `adapters/openrouter_client.py` | Medium | Align both to `range(max_tool_calls)` — the `+1` appears to be a bug |
+| `datetime.utcnow()` deprecated | `adapters/json_storage.py` | Low | Replace with `datetime.now(datetime.UTC)` |
+| Hardcoded title gen model | `council/ranking.py` | Medium | Add `title_model` to config.yaml; default to cheap/fast model |
+| Redundant import | `adapters/openrouter_client.py` | Trivial | Delete the inner `import asyncio` |
+| Shared HTTP client unused | `adapters/openrouter_client.py` | Low | Either use it in all query functions or delete it (YAGNI) |
 
 **Note:** Several other issues (duplicated `execute_tool`, feature asymmetry, storage inefficiency, logging) are addressed by planned versions:
 - v1.8 Strategy Pattern fixes round duplication and feature asymmetry

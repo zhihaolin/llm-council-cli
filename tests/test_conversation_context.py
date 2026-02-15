@@ -2,7 +2,7 @@
 Tests for building conversation context from stored messages.
 """
 
-from cli.chat import (
+from llm_council.cli.chat_commands import (
     build_context_prompt,
     extract_conversation_pairs,
     select_context_pairs,

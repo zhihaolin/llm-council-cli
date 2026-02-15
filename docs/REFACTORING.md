@@ -32,7 +32,7 @@ This document captures educational examples of SOLID principle violations found 
 
 **In plain English:** Each module should do ONE thing. If you have to use the word "and" to describe what a module does ("it handles parsing AND streaming AND orchestration"), it's doing too much. A module that does one thing is easier to understand, test, and change without breaking other things.
 
-### Bad Example: `backend/council.py` (1,722 lines)
+### Bad Example: `backend/council.py` (1,722 lines, pre-refactor)
 
 This single file handles **8+ distinct responsibilities**:
 
@@ -82,15 +82,15 @@ async def synthesize_with_react(query, context) -> AsyncGenerator: ...
 ### Good Example: Split into focused modules
 
 ```
-backend/council/
-├── __init__.py          # Public API exports
-├── orchestrator.py      # Stage 1-2-3 coordination
-├── debate.py            # Debate round logic
-├── react.py             # ReAct chairman
-├── prompts.py           # Prompt templates
-├── parsers.py           # Text parsing utilities
-├── streaming.py         # Async generators
-└── aggregation.py       # Ranking calculations
+llm_council/council/
+├── __init__.py             # Public API exports
+├── ranking.py              # Stage 1-2-3 coordination
+├── debate.py               # Debate round logic
+├── react.py                # ReAct chairman
+├── prompts.py              # Prompt templates
+├── parsers.py              # Text parsing utilities
+├── debate_streaming.py     # Async generators
+└── aggregation.py          # Ranking calculations
 ```
 
 Each module has **one reason to change**:
@@ -100,7 +100,7 @@ Each module has **one reason to change**:
 
 ---
 
-### Bad Example: `cli/main.py` (1,407 lines)
+### Bad Example: `cli/main.py` (1,407 lines, pre-refactor)
 
 Mixed presentation, orchestration, and state management:
 
@@ -131,19 +131,19 @@ def chat(...): ...
 ### Good Example: Split by responsibility
 
 ```python
-# cli/presenters.py - ONLY presentation
+# llm_council/cli/presenters.py - ONLY presentation
 def print_stage1(results): ...
 def print_stage2(results, label_to_model, aggregate): ...
 def print_debate_round(round_data, round_num): ...
 
-# cli/runners.py - ONLY execution flow (renamed from orchestrators.py)
+# llm_council/cli/runners.py - ONLY execution flow (renamed from orchestrators.py)
 async def run_council_with_progress(query): ...
 async def run_debate_with_progress(query, max_rounds): ...
 
-# cli/chat_session.py - ONLY chat state management
+# llm_council/cli/chat_session.py - ONLY chat state management
 async def run_chat_session(max_turns, start_new): ...
 
-# cli/main.py - ONLY command routing (~150 lines)
+# llm_council/cli/main.py - ONLY command routing (~150 lines)
 @app.command()
 def query(...):
     print_query_header(...)
@@ -162,7 +162,7 @@ def query(...):
 ### Bad Example: Adding a new round type requires modifying existing code
 
 ```python
-# backend/council.py - VIOLATION: must modify to extend
+# llm_council/council.py - VIOLATION: must modify to extend
 
 async def debate_round_streaming(round_type, query, context):
     if round_type == "initial":
@@ -187,7 +187,7 @@ async def debate_round_streaming(round_type, query, context):
 ### Good Example: Strategy pattern for round types
 
 ```python
-# backend/council/rounds.py - OPEN FOR EXTENSION
+# llm_council/council/rounds.py - OPEN FOR EXTENSION
 
 from abc import ABC, abstractmethod
 
@@ -271,7 +271,7 @@ async def debate_round_streaming(round_type: str, query: str, context: dict):
 ### Bad Example: Inconsistent return types
 
 ```python
-# backend/council.py - VIOLATION: inconsistent returns
+# llm_council/council.py - VIOLATION: inconsistent returns
 
 async def stage1_collect_responses(query) -> List[Dict]:
     """Returns list of response dicts."""
@@ -292,7 +292,7 @@ async def stage3_synthesize_final(query, stage1, stage2) -> Dict:
 ### Good Example: Consistent interface with result objects
 
 ```python
-# backend/council/types.py - CONSISTENT INTERFACE
+# llm_council/council/types.py - CONSISTENT INTERFACE
 
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional
@@ -357,9 +357,9 @@ async def run_pipeline(query: str, stages: List[Callable]) -> List[StageResult]:
 ### Bad Example: Importing entire module for one function
 
 ```python
-# cli/main.py - VIOLATION: imports everything
+# llm_council/cli/main.py - VIOLATION: imports everything
 
-from backend.council import (
+from llm_council.council import (
     stage1_collect_responses,
     stage2_collect_rankings,
     stage3_synthesize_final,
@@ -384,10 +384,10 @@ from backend.council import (
 ### Good Example: Focused module APIs
 
 ```python
-# backend/council/__init__.py - FOCUSED EXPORTS
+# llm_council/council/__init__.py - FOCUSED EXPORTS
 
 # Only export what external users need
-from .orchestrator import (
+from .ranking import (
     run_full_council,
     stage1_collect_responses,
     stage2_collect_rankings,
@@ -398,7 +398,7 @@ from .debate import (
     run_debate_council,
 )
 
-from .streaming import (
+from .debate_streaming import (
     run_debate_council_streaming,
     run_debate_token_streaming,
 )
@@ -414,16 +414,16 @@ from .react import (
 ```
 
 ```python
-# cli/main.py - CLEAN IMPORTS
+# llm_council/cli/main.py - CLEAN IMPORTS
 
 # Import only what's needed
-from backend.council import (
+from llm_council.council import (
     run_full_council,
     run_debate_council,
 )
 
 # If you need streaming, import from specific submodule
-from backend.council.streaming import run_debate_token_streaming
+from llm_council.council.debate_streaming import run_debate_token_streaming
 ```
 
 ---
@@ -437,9 +437,9 @@ from backend.council.streaming import run_debate_token_streaming
 ### Bad Example: Hardcoded dependencies
 
 ```python
-# backend/council.py - VIOLATION: hardcoded config
+# llm_council/council.py - VIOLATION: hardcoded config
 
-from .config import COUNCIL_MODELS, CHAIRMAN_MODEL  # Concrete dependency
+from .settings import COUNCIL_MODELS, CHAIRMAN_MODEL  # Concrete dependency
 
 async def stage1_collect_responses(query: str):
     """Uses hardcoded COUNCIL_MODELS - can't test or customize."""
@@ -461,7 +461,7 @@ async def stage3_synthesize_final(query, stage1, stage2):
 ### Good Example: Dependency injection
 
 ```python
-# backend/council/orchestrator.py - DEPENDENCY INJECTION
+# llm_council/council/ranking.py - DEPENDENCY INJECTION
 
 from typing import List, Optional, Protocol
 
@@ -503,8 +503,8 @@ async def run_full_council(
     querier: Optional[ModelQuerier] = None,
 ):
     """Dependency injection with sensible defaults."""
-    from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
-    from .openrouter import OpenRouterQuerier
+    from .settings import COUNCIL_MODELS, CHAIRMAN_MODEL
+    from .adapters.openrouter_client import OpenRouterQuerier
 
     models = models or COUNCIL_MODELS
     chairman = chairman or CHAIRMAN_MODEL
@@ -564,15 +564,15 @@ Created presenters.py, runners.py (originally orchestrators.py), chat_session.py
 ### Phase 3: Split Council Module ✅
 Split 1,722-line council.py into focused modules:
 ```
-backend/council/
-├── __init__.py       # Public API exports
-├── aggregation.py    # Ranking calculations
-├── debate.py         # Debate orchestration
-├── orchestrator.py   # Stage 1-2-3 flow
-├── parsers.py        # Regex/text parsing
-├── prompts.py        # Prompt templates
-├── react.py          # ReAct chairman logic
-└── streaming.py      # Event generators
+llm_council/council/
+├── __init__.py             # Public API exports
+├── aggregation.py          # Ranking calculations
+├── debate.py               # Debate orchestration
+├── ranking.py              # Stage 1-2-3 flow
+├── parsers.py              # Regex/text parsing
+├── prompts.py              # Prompt templates
+├── react.py                # ReAct chairman logic
+└── debate_streaming.py     # Event generators
 ```
 
 ### Phase 4: Apply OCP/DIP (Future)

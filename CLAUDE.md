@@ -80,9 +80,9 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 
 ## Architecture
 
-### Backend Structure (`backend/`)
+### Backend Structure (`llm_council/`)
 
-**`config.py`**
+**`settings.py`**
 - Loads settings from `config.yaml` in project root (falls back to defaults if missing)
 - Exports: `COUNCIL_MODELS`, `CHAIRMAN_MODEL`, `OPENROUTER_API_URL`, `DATA_DIR`
 - API key loaded from environment variable `OPENROUTER_API_KEY` (never in YAML)
@@ -92,7 +92,7 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 - Settings: `council_models`, `chairman_model`, `openrouter_api_url`, `data_dir`
 - Optional - defaults are built into `config.py`
 
-**`openrouter.py`**
+**`adapters/openrouter_client.py`**
 - `query_model()`: Single async model query
 - `query_models_parallel()`: Parallel queries using `asyncio.gather()`
 - `query_model_with_tools()`: Query with tool/function calling support
@@ -102,7 +102,7 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 - Returns dict with 'content' and optional 'reasoning_details'
 - Graceful degradation: returns None on failure, continues with successful responses
 
-**`search.py`** - Web Search Integration
+**`adapters/tavily_search.py`** - Web Search Integration
 - `SEARCH_TOOL`: OpenAI-format tool definition for function calling
 - `search_web(query)`: Async function to query Tavily API
 - `format_search_results()`: Converts search results to LLM-readable text
@@ -111,18 +111,18 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 **`council/`** - The Core Logic (v1.6.1 modular structure)
 
 ```
-backend/council/
-├── __init__.py       # Public API exports (backward compatible)
-├── orchestrator.py   # Stage 1-2-3 flow
-├── debate.py         # Debate orchestration
-├── streaming.py      # Event generators for parallel/streaming modes
-├── react.py          # ReAct chairman logic
-├── prompts.py        # All prompt templates
-├── parsers.py        # Regex/text parsing utilities
-└── aggregation.py    # Ranking calculations
+llm_council/council/
+├── __init__.py             # Public API exports (backward compatible)
+├── ranking.py              # Stage 1-2-3 flow
+├── debate.py               # Debate orchestration
+├── debate_streaming.py     # Event generators for parallel/streaming modes
+├── react.py                # ReAct chairman logic
+├── prompts.py              # All prompt templates
+├── parsers.py              # Regex/text parsing utilities
+└── aggregation.py          # Ranking calculations
 ```
 
-Key functions (all exported from `backend.council`):
+Key functions (all exported from `llm_council.council`):
 - `stage1_collect_responses()`: Parallel queries to all council models with tool support
 - `stage2_collect_rankings()`: Anonymizes responses and collects peer rankings
 - `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
@@ -132,7 +132,7 @@ Key functions (all exported from `backend.council`):
 - `parse_ranking_from_text()`: Extracts "FINAL RANKING:" section
 - `calculate_aggregate_rankings()`: Computes average rank position
 
-**`storage.py`**
+**`adapters/json_storage.py`**
 - JSON-based conversation storage in `data/conversations/`
 - Each conversation: `{id, created_at, messages[]}`
 - Assistant messages contain: `{role, stage1, stage2, stage3}`
@@ -230,7 +230,7 @@ llm-council --debate --simple "Question"           # Just final answer
 | Defense format | Structured sections | Easy to parse revised answers |
 | Default rounds | 2 | Sufficient for most questions |
 
-### Debate Functions (in `council/debate.py`)
+### Debate Functions (in `llm_council/council/debate.py`)
 
 **`debate_round_critique(query, initial_responses)`**
 - Each model receives all responses and critiques the others
@@ -246,7 +246,7 @@ llm-council --debate --simple "Question"           # Just final answer
 - Orchestrates complete debate flow
 - `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
 
-### Parsing Functions (in `council/parsers.py`)
+### Parsing Functions (in `llm_council/council/parsers.py`)
 
 **`extract_critiques_for_model(target_model, critique_responses)`**
 - Parses all critique responses to find sections about a specific model
@@ -275,7 +275,7 @@ llm-council --debate --simple "Question"           # Just final answer
     ]
 }
 
-# Storage format (backend/storage.py)
+# Storage format (llm_council/adapters/json_storage.py)
 {
     "role": "assistant",
     "mode": "debate",
@@ -287,22 +287,22 @@ llm-council --debate --simple "Question"           # Just final answer
 ### CLI Structure (v1.6.1 modular)
 
 ```
-cli/
+llm_council/cli/
 ├── main.py           # Command routing only
 ├── presenters.py     # All print_* display functions
 ├── runners.py        # run_* execution with progress
 ├── chat_session.py   # Chat REPL logic
-├── chat.py           # Command parsing utilities
+├── chat_commands.py  # Command parsing utilities
 ├── tui.py            # Textual TUI app
-└── utils.py          # Constants
+└── constants.py      # Constants
 ```
 
-**Display functions (in `cli/presenters.py`):**
+**Display functions (in `llm_council/cli/presenters.py`):**
 - `print_debate_round()` - Color-coded by round type
 - `print_debate_synthesis()` - Green-styled panel for final answer
 - `print_stage1/2/3()` - Standard mode output
 
-**Runners (in `cli/runners.py`):**
+**Runners (in `llm_council/cli/runners.py`):**
 - `run_debate_with_progress()` - Progress spinners for each round
 - `run_debate_parallel()` - Parallel execution with Rich Live display
 - `run_react_synthesis()` - ReAct trace display
@@ -345,7 +345,7 @@ llm-council chat                               # REPL (streaming+debate on by de
 
 ### Streaming Functions
 
-**`backend/openrouter.py`**
+**`llm_council/adapters/openrouter_client.py`**
 - `query_model_streaming()`: Async generator that yields SSE tokens
   - Yields `{'type': 'token', 'content': str}` for each token
   - Yields `{'type': 'done', 'content': str}` when complete
@@ -356,12 +356,12 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Yields `{'type': 'tool_result', 'tool': str, 'result': str}` after tool execution
   - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
-**`backend/council/streaming.py`**
+**`llm_council/council/debate_streaming.py`**
 - `debate_round_streaming()`: Yields events as each model completes (parallel mode, not token streaming)
 - `run_debate_council_streaming()`: Full debate with model-completion events
 - `run_debate_token_streaming()`: Full debate with token-by-token streaming (sequential)
 
-**`cli/runners.py`**
+**`llm_council/cli/runners.py`**
 - `run_debate_streaming()`: Renders streaming output with Rich
   - Tracks terminal line wrapping for accurate clearing
   - Uses ANSI escape codes for cursor movement
@@ -395,12 +395,12 @@ def clear_streaming_output():
 
 ## Common Gotchas
 
-1. **Module Import Errors**: Always run via `uv run llm-council` (not `python cli/main.py`). The project is packaged (`[tool.uv] package = true`), so both `cli` and `backend` are on the Python path automatically. Backend modules use relative imports internally (e.g., `from .config import ...`)
+1. **Module Import Errors**: Always run via `uv run llm-council` (not `python -m llm_council.cli`). The project is packaged (`[tool.uv] package = true`), so `llm_council` is on the Python path automatically. Backend modules use relative imports internally (e.g., `from ..settings import ...`)
 2. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`backend/council/streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`backend/council/debate.py` uses plain `query_model`)
+6. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`llm_council/council/debate_streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`llm_council/council/debate.py` uses plain `query_model`)
 
 ## Known Technical Debt
 
@@ -408,11 +408,11 @@ Issues identified but not yet on the roadmap. Fix opportunistically or when touc
 
 | Issue | Location | Severity | Notes |
 |-------|----------|----------|-------|
-| Off-by-one in tool call loops | `openrouter.py:198` vs `openrouter.py:372` | Medium | Streaming uses `range(max_tool_calls + 1)`, non-streaming uses `range(max_tool_calls)` — inconsistent |
-| `datetime.utcnow()` deprecated | `storage.py:36` | Low | Deprecated since Python 3.12; use `datetime.now(datetime.UTC)` |
-| Hardcoded title generation model | `orchestrator.py:206` | Medium | `"google/gemini-2.5-flash"` should be configurable; breaks if model retired |
-| Redundant import | `openrouter.py:455` | Trivial | `import asyncio` inside function, already imported at top |
-| Shared HTTP client unused | `openrouter.py:21-52` | Low | `get_shared_client()` defined but never called; each query creates new client |
+| Off-by-one in tool call loops | `adapters/openrouter_client.py` | Medium | Streaming uses `range(max_tool_calls + 1)`, non-streaming uses `range(max_tool_calls)` — inconsistent |
+| `datetime.utcnow()` deprecated | `adapters/json_storage.py` | Low | Deprecated since Python 3.12; use `datetime.now(datetime.UTC)` |
+| Hardcoded title generation model | `council/ranking.py` | Medium | `"google/gemini-2.5-flash"` should be configurable; breaks if model retired |
+| Redundant import | `adapters/openrouter_client.py` | Trivial | `import asyncio` inside function, already imported at top |
+| Shared HTTP client unused | `adapters/openrouter_client.py` | Low | `get_shared_client()` defined but never called; each query creates new client |
 
 ## Future Enhancements
 
@@ -539,7 +539,7 @@ llm-council query --debate --stream "Question"     # Sequential with token strea
 
 ### Implementation
 
-**Shared HTTP Client (`backend/openrouter.py`):**
+**Shared HTTP Client (`llm_council/adapters/openrouter_client.py`):**
 ```python
 _shared_client: Optional[httpx.AsyncClient] = None
 _client_lock = asyncio.Lock()
@@ -556,7 +556,7 @@ async def get_shared_client() -> httpx.AsyncClient:
         return _shared_client
 ```
 
-**Per-model Timeout (`backend/council/streaming.py`):**
+**Per-model Timeout (`llm_council/council/debate_streaming.py`):**
 ```python
 async def query_with_model(model: str):
     try:
@@ -579,7 +579,7 @@ async def query_with_model(model: str):
 6. synthesis_start → synthesis_complete → complete
 ```
 
-### CLI Display (`cli/runners.py`)
+### CLI Display (`llm_council/cli/runners.py`)
 - `run_debate_parallel()` uses Rich `Live` display with a status table
 - Status states: "⠋ thinking..." → "✓ done" / "✗ error"
 - Panels appear as models complete (fastest first)
@@ -627,21 +627,21 @@ Action: synthesize()
 
 ### Implementation
 
-**`backend/council/react.py`:**
+**`llm_council/council/react.py`:**
 - `synthesize_with_react()` - Async generator implementing the ReAct loop
   - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events
   - Max 3 iterations to prevent infinite loops
   - If model says `synthesize()` without content, asks for synthesis directly
 
-**`backend/council/prompts.py`:**
+**`llm_council/council/prompts.py`:**
 - `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
 - `build_react_context_debate()` - Formats debate rounds for chairman
 - `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
 
-**`backend/council/parsers.py`:**
+**`llm_council/council/parsers.py`:**
 - `parse_react_output()` - Extracts Thought/Action from model output using regex
 
-**`cli/runners.py`:**
+**`llm_council/cli/runners.py`:**
 - `run_react_synthesis()` - Displays ReAct trace with color coding
   - Thought: cyan
   - Action: yellow

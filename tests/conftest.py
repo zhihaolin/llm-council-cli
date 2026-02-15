@@ -153,7 +153,7 @@ def mock_query_model():
             mock_query_model.return_value = {"content": "test response"}
             # ... run test
     """
-    with patch("backend.council.query_model", new_callable=AsyncMock) as mock:
+    with patch("llm_council.council.query_model", new_callable=AsyncMock) as mock:
         yield mock
 
 
@@ -162,7 +162,7 @@ def mock_query_model_with_tools():
     """
     Fixture that patches query_model_with_tools for Stage 1 testing.
     """
-    with patch("backend.council.query_model_with_tools", new_callable=AsyncMock) as mock:
+    with patch("llm_council.council.query_model_with_tools", new_callable=AsyncMock) as mock:
         yield mock
 
 
@@ -171,7 +171,7 @@ def mock_council_models():
     """
     Fixture that patches COUNCIL_MODELS to use a smaller test set.
     """
-    with patch("backend.council.COUNCIL_MODELS", SAMPLE_MODELS):
+    with patch("llm_council.council.COUNCIL_MODELS", SAMPLE_MODELS):
         yield SAMPLE_MODELS
 
 

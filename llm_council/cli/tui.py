@@ -21,13 +21,13 @@ from textual.widgets import (
     TabPane,
 )
 
-from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
-from backend.council import (
+from llm_council.council import (
     calculate_aggregate_rankings,
     stage1_collect_responses,
     stage2_collect_rankings,
     stage3_synthesize_final,
 )
+from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 
 class QueryInput(Static):

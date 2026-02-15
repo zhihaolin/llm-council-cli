@@ -7,9 +7,9 @@ Contains Stage 1-2-3 flow: collect responses, rank, synthesize.
 import asyncio
 from typing import Any
 
-from ..config import CHAIRMAN_MODEL, COUNCIL_MODELS
-from ..openrouter import query_model, query_model_with_tools, query_models_parallel
-from ..search import SEARCH_TOOL, format_search_results, search_web
+from ..adapters.openrouter_client import query_model, query_model_with_tools, query_models_parallel
+from ..adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
+from ..settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 from .aggregation import calculate_aggregate_rankings
 from .parsers import parse_ranking_from_text
 from .prompts import (

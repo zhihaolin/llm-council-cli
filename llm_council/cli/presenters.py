@@ -11,7 +11,11 @@ from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
 
-from cli.chat import CHAT_COMMANDS, format_chat_mode_line, suggest_chat_commands
+from llm_council.cli.chat_commands import (
+    CHAT_COMMANDS,
+    format_chat_mode_line,
+    suggest_chat_commands,
+)
 
 CHAT_THEME = Theme(
     {

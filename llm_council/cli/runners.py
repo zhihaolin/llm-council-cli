@@ -15,8 +15,8 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from backend.config import CHAIRMAN_MODEL, COUNCIL_MODELS
-from backend.council import (
+from llm_council.cli.presenters import build_model_panel, console
+from llm_council.council import (
     calculate_aggregate_rankings,
     debate_round_critique,
     debate_round_defense,
@@ -28,7 +28,7 @@ from backend.council import (
     synthesize_debate,
     synthesize_with_react,
 )
-from cli.presenters import build_model_panel, console
+from llm_council.settings import CHAIRMAN_MODEL, COUNCIL_MODELS
 
 
 async def run_react_synthesis(

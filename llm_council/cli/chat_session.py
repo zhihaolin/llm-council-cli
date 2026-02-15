@@ -7,16 +7,16 @@ Contains run_chat_session and related state management.
 import asyncio
 import uuid
 
-from backend import storage
-from backend.council import generate_conversation_title
-from cli.chat import (
+from llm_council.adapters import json_storage as storage
+from llm_council.cli.chat_commands import (
     CHAT_COMMANDS,
     build_chat_prompt,
     build_context_prompt,
     format_chat_mode_line,
     parse_chat_command,
 )
-from cli.presenters import (
+from llm_council.cli.constants import DEFAULT_DEBATE_ROUNDS
+from llm_council.cli.presenters import (
     console,
     print_chat_banner,
     print_chat_help,
@@ -29,16 +29,14 @@ from cli.presenters import (
     print_stage3,
     print_user_question_panel,
 )
-from cli.runners import (
+from llm_council.cli.runners import (
     run_council_with_progress,
     run_debate_parallel,
     run_debate_streaming,
     run_debate_with_progress,
     run_react_synthesis,
 )
-
-DEFAULT_CONTEXT_TURNS = 6
-DEFAULT_DEBATE_ROUNDS = 2
+from llm_council.council import generate_conversation_title
 
 
 def resolve_conversation_id(prefix: str, conversations: list) -> str | None:
@@ -323,7 +321,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
 
             # If using ReAct, run synthesis separately
             if use_react_here:
-                from backend.council import build_react_context_debate
+                from llm_council.council import build_react_context_debate
 
                 # Only print rounds if batch mode (parallel/streaming already displayed them)
                 if not parallel_enabled and not stream_enabled:
@@ -359,7 +357,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
 
             # If using ReAct, run synthesis separately
             if use_react_here:
-                from backend.council import build_react_context_ranking
+                from llm_council.council import build_react_context_ranking
 
                 # Show Stage 1 and 2 first
                 print_stage1(stage1)
