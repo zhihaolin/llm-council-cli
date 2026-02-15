@@ -362,6 +362,8 @@ async def run_debate_parallel(
     """
     Stream the complete debate flow, yielding events as each model completes.
 
+    Delegates round sequencing to run_debate() with debate_round_parallel executor.
+
     Args:
         user_query: The user's question
         max_rounds: Number of debate rounds (2 = initial + critique + defense)
@@ -378,154 +380,18 @@ async def run_debate_parallel(
     """
     rounds = []
 
-    # Round 1: Initial responses
-    yield {"type": "round_start", "round_number": 1, "round_type": "initial"}
-
-    initial_responses = []
-    async for event in debate_round_parallel(
-        round_type="initial",
-        user_query=user_query,
-        context={},
-    ):
-        if event["type"] == "round_complete":
-            initial_responses = event["responses"]
-            rounds.append(
-                {"round_number": 1, "round_type": "initial", "responses": initial_responses}
-            )
+    async for event in run_debate(user_query, debate_round_parallel, max_rounds):
+        if event["type"] == "debate_complete":
+            rounds = event["rounds"]
+        elif event["type"] == "error":
             yield {
-                "type": "round_complete",
-                "round_number": 1,
-                "round_type": "initial",
-                "responses": initial_responses,
+                "type": "complete",
+                "rounds": rounds,
+                "synthesis": {"model": "error", "response": event["message"]},
             }
+            return
         else:
             yield event
-
-    # Check if we have enough responses to continue
-    if len(initial_responses) < 2:
-        yield {
-            "type": "complete",
-            "rounds": rounds,
-            "synthesis": {
-                "model": "error",
-                "response": "Not enough models responded to conduct a debate. Need at least 2 models.",
-            },
-        }
-        return
-
-    # Round 2: Critiques
-    yield {"type": "round_start", "round_number": 2, "round_type": "critique"}
-
-    critique_responses = []
-    async for event in debate_round_parallel(
-        round_type="critique",
-        user_query=user_query,
-        context={"initial_responses": initial_responses},
-    ):
-        if event["type"] == "round_complete":
-            critique_responses = event["responses"]
-            rounds.append(
-                {"round_number": 2, "round_type": "critique", "responses": critique_responses}
-            )
-            yield {
-                "type": "round_complete",
-                "round_number": 2,
-                "round_type": "critique",
-                "responses": critique_responses,
-            }
-        else:
-            yield event
-
-    # Round 3: Defense/Revision
-    yield {"type": "round_start", "round_number": 3, "round_type": "defense"}
-
-    defense_responses = []
-    async for event in debate_round_parallel(
-        round_type="defense",
-        user_query=user_query,
-        context={
-            "initial_responses": initial_responses,
-            "critique_responses": critique_responses,
-        },
-    ):
-        if event["type"] == "round_complete":
-            defense_responses = event["responses"]
-            rounds.append(
-                {"round_number": 3, "round_type": "defense", "responses": defense_responses}
-            )
-            yield {
-                "type": "round_complete",
-                "round_number": 3,
-                "round_type": "defense",
-                "responses": defense_responses,
-            }
-        else:
-            yield event
-
-    # Additional rounds if requested
-    current_responses = defense_responses
-    round_num = 4
-    while round_num <= max_rounds + 1:  # +1 because max_rounds=2 means 3 actual rounds
-        if round_num % 2 == 0:
-            # Even rounds: critique
-            yield {"type": "round_start", "round_number": round_num, "round_type": "critique"}
-
-            critique_responses = []
-            async for event in debate_round_parallel(
-                round_type="critique",
-                user_query=user_query,
-                context={"initial_responses": current_responses},
-            ):
-                if event["type"] == "round_complete":
-                    critique_responses = event["responses"]
-                    rounds.append(
-                        {
-                            "round_number": round_num,
-                            "round_type": "critique",
-                            "responses": critique_responses,
-                        }
-                    )
-                    yield {
-                        "type": "round_complete",
-                        "round_number": round_num,
-                        "round_type": "critique",
-                        "responses": critique_responses,
-                    }
-                else:
-                    yield event
-        else:
-            # Odd rounds: defense
-            yield {"type": "round_start", "round_number": round_num, "round_type": "defense"}
-
-            defense_responses = []
-            async for event in debate_round_parallel(
-                round_type="defense",
-                user_query=user_query,
-                context={
-                    "initial_responses": current_responses,
-                    "critique_responses": critique_responses,
-                },
-            ):
-                if event["type"] == "round_complete":
-                    defense_responses = event["responses"]
-                    rounds.append(
-                        {
-                            "round_number": round_num,
-                            "round_type": "defense",
-                            "responses": defense_responses,
-                        }
-                    )
-                    yield {
-                        "type": "round_complete",
-                        "round_number": round_num,
-                        "round_type": "defense",
-                        "responses": defense_responses,
-                    }
-                else:
-                    yield event
-            current_responses = defense_responses
-
-        round_num += 1
 
     # Chairman synthesis (skip if using ReAct mode)
     synthesis = None
@@ -553,6 +419,8 @@ async def run_debate_streaming(
     """
     Stream debate with token-level streaming, one model at a time.
 
+    Delegates round sequencing to run_debate() with debate_round_streaming executor.
+
     Args:
         user_query: The user's question
         max_rounds: Number of debate rounds (2 = initial + critique + defense)
@@ -570,205 +438,20 @@ async def run_debate_streaming(
         {'type': 'synthesis_complete', 'synthesis': Dict}
         {'type': 'complete', 'rounds': List, 'synthesis': Dict}
     """
-    query_with_date = get_date_context() + user_query
     rounds = []
-    tools = [SEARCH_TOOL]
 
-    async def stream_initial_round_with_tools():
-        """
-        Initial round with tool support (web search) AND token streaming.
-        Uses query_model_streaming_with_tools for both streaming and tool calling.
-        """
-        yield {"type": "round_start", "round_number": 1, "round_type": "initial"}
-
-        responses = []
-        messages = [{"role": "user", "content": query_with_date}]
-
-        for model in COUNCIL_MODELS:
-            yield {"type": "model_start", "model": model}
-
-            full_content = ""
-            tool_calls_made = []
-
-            try:
-                async for event in query_model_streaming_with_tools(
-                    model=model, messages=messages, tools=tools, tool_executor=execute_tool
-                ):
-                    if event["type"] == "token":
-                        full_content += event["content"]
-                        yield {"type": "token", "model": model, "content": event["content"]}
-                    elif event["type"] == "tool_call":
-                        # Yield tool call event so CLI can show "searching..."
-                        yield {
-                            "type": "tool_call",
-                            "model": model,
-                            "tool": event["tool"],
-                            "args": event["args"],
-                        }
-                    elif event["type"] == "tool_result":
-                        yield {
-                            "type": "tool_result",
-                            "model": model,
-                            "tool": event["tool"],
-                            "result": event["result"],
-                        }
-                    elif event["type"] == "done":
-                        full_content = event.get("content", full_content)
-                        tool_calls_made = event.get("tool_calls_made", [])
-                    elif event["type"] == "error":
-                        yield {"type": "model_error", "model": model, "error": event["error"]}
-                        break
-
-                if full_content:
-                    result = {"model": model, "response": full_content}
-                    if tool_calls_made:
-                        result["tool_calls_made"] = tool_calls_made
-                    responses.append(result)
-                    yield {"type": "model_complete", "model": model, "response": result}
-
-            except Exception as e:
-                yield {"type": "model_error", "model": model, "error": str(e)}
-
-        yield {
-            "type": "round_complete",
-            "round_number": 1,
-            "round_type": "initial",
-            "responses": responses,
-        }
-
-    async def stream_round(
-        round_num: int,
-        round_type: str,
-        build_prompt_fn: Callable[[str], str],
-        with_tools: bool = False,
-    ) -> AsyncGenerator[dict[str, Any], None]:
-        """Stream a single round (critique/defense), one model at a time.
-
-        Args:
-            round_num: The round number
-            round_type: Type of round ("critique" or "defense")
-            build_prompt_fn: Function that takes model name and returns prompt
-            with_tools: If True, enable web search tool for this round
-        """
-        yield {"type": "round_start", "round_number": round_num, "round_type": round_type}
-
-        responses = []
-        round_tools = [SEARCH_TOOL] if with_tools else None
-
-        for model in COUNCIL_MODELS:
-            yield {"type": "model_start", "model": model}
-
-            prompt = build_prompt_fn(model)
-            messages = [{"role": "user", "content": prompt}]
-            full_content = ""
-            tool_calls_made = []
-
-            if with_tools:
-                # Use streaming with tool support
-                async for event in query_model_streaming_with_tools(
-                    model=model, messages=messages, tools=round_tools, tool_executor=execute_tool
-                ):
-                    if event["type"] == "token":
-                        full_content += event["content"]
-                        yield {"type": "token", "model": model, "content": event["content"]}
-                    elif event["type"] == "tool_call":
-                        yield {
-                            "type": "tool_call",
-                            "model": model,
-                            "tool": event["tool"],
-                            "args": event["args"],
-                        }
-                    elif event["type"] == "tool_result":
-                        yield {
-                            "type": "tool_result",
-                            "model": model,
-                            "tool": event["tool"],
-                            "result": event["result"],
-                        }
-                    elif event["type"] == "done":
-                        full_content = event.get("content", full_content)
-                        tool_calls_made = event.get("tool_calls_made", [])
-                    elif event["type"] == "error":
-                        yield {"type": "model_error", "model": model, "error": event["error"]}
-                        break
-            else:
-                # Regular streaming without tools
-                async for event in query_model_streaming(model, messages):
-                    if event["type"] == "token":
-                        full_content += event["content"]
-                        yield {"type": "token", "model": model, "content": event["content"]}
-                    elif event["type"] == "error":
-                        yield {"type": "model_error", "model": model, "error": event["error"]}
-                        break
-
-            if full_content:
-                result = {"model": model, "response": full_content}
-                if round_type == "defense":
-                    result["revised_answer"] = parse_revised_answer(full_content)
-                if tool_calls_made:
-                    result["tool_calls_made"] = tool_calls_made
-                responses.append(result)
-                yield {"type": "model_complete", "model": model, "response": result}
-
-        yield {
-            "type": "round_complete",
-            "round_number": round_num,
-            "round_type": round_type,
-            "responses": responses,
-        }
-
-    # Round 1: Initial responses (with tool support for web search)
-    initial_responses = []
-    async for event in stream_initial_round_with_tools():
-        yield event
-        if event["type"] == "round_complete":
-            initial_responses = event["responses"]
-            rounds.append(
-                {"round_number": 1, "round_type": "initial", "responses": initial_responses}
-            )
-
-    if len(initial_responses) < 2:
-        yield {
-            "type": "complete",
-            "rounds": rounds,
-            "synthesis": {
-                "model": "error",
-                "response": "Not enough models responded to conduct a debate.",
-            },
-        }
-        return
-
-    # Round 2: Critiques
-    responses_text = format_responses_for_critique(initial_responses)
-
-    def build_critique_prompt_for_model(model):
-        return build_critique_prompt(user_query, responses_text, model)
-
-    critique_responses = []
-    async for event in stream_round(2, "critique", build_critique_prompt_for_model):
-        yield event
-        if event["type"] == "round_complete":
-            critique_responses = event["responses"]
-            rounds.append(
-                {"round_number": 2, "round_type": "critique", "responses": critique_responses}
-            )
-
-    # Round 3: Defense
-    model_to_response = {r["model"]: r["response"] for r in initial_responses}
-
-    def build_defense_prompt_for_model(model):
-        original = model_to_response.get(model, "")
-        critiques = extract_critiques_for_model(model, critique_responses)
-        return build_defense_prompt(user_query, original, critiques)
-
-    defense_responses = []
-    async for event in stream_round(3, "defense", build_defense_prompt_for_model, with_tools=True):
-        yield event
-        if event["type"] == "round_complete":
-            defense_responses = event["responses"]
-            rounds.append(
-                {"round_number": 3, "round_type": "defense", "responses": defense_responses}
-            )
+    async for event in run_debate(user_query, debate_round_streaming, max_rounds):
+        if event["type"] == "debate_complete":
+            rounds = event["rounds"]
+        elif event["type"] == "error":
+            yield {
+                "type": "complete",
+                "rounds": rounds,
+                "synthesis": {"model": "error", "response": event["message"]},
+            }
+            return
+        else:
+            yield event
 
     # Chairman synthesis with streaming (skip if using ReAct mode)
     synthesis = None
