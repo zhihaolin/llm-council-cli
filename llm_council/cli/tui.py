@@ -21,7 +21,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from llm_council.council import (
+from llm_council.engine import (
     calculate_aggregate_rankings,
     stage1_collect_responses,
     stage2_collect_rankings,

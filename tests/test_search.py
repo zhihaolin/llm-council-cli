@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from llm_council.council import execute_tool
+from llm_council.engine import execute_tool
 from llm_council.adapters.openrouter_client import query_model_with_tools
 from llm_council.adapters.tavily_search import SEARCH_TOOL, format_search_results, search_web
 
@@ -140,7 +140,7 @@ class TestExecuteTool:
             "results": [{"title": "T", "url": "U", "content": "C"}]
         }
 
-        with patch("llm_council.council.ranking.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("llm_council.engine.ranking.search_web", new_callable=AsyncMock) as mock_search:
             mock_search.return_value = mock_search_result
 
             result = await execute_tool("search_web", {"query": "test"})
@@ -339,16 +339,16 @@ class TestStage1ToolIntegration:
     @pytest.mark.asyncio
     async def test_stage1_returns_tool_calls_made(self):
         """Stage 1 includes tool_calls_made in results when tools are used."""
-        from llm_council.council import stage1_collect_responses
+        from llm_council.engine import stage1_collect_responses
 
         mock_response = {
             "content": "Here's what I found after searching...",
             "tool_calls_made": [{"tool": "search_web", "args": {"query": "test"}, "result_preview": "..."}]
         }
 
-        with patch("llm_council.council.ranking.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch("llm_council.engine.ranking.query_model_with_tools", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = mock_response
-            with patch("llm_council.council.ranking.COUNCIL_MODELS", ["test/model"]):
+            with patch("llm_council.engine.ranking.COUNCIL_MODELS", ["test/model"]):
                 results = await stage1_collect_responses("What is the current price of BTC?")
 
                 assert len(results) == 1
@@ -358,16 +358,16 @@ class TestStage1ToolIntegration:
     @pytest.mark.asyncio
     async def test_stage1_no_tool_calls(self):
         """Stage 1 omits tool_calls_made when no tools are used."""
-        from llm_council.council import stage1_collect_responses
+        from llm_council.engine import stage1_collect_responses
 
         mock_response = {
             "content": "I know this without searching.",
             "tool_calls_made": []
         }
 
-        with patch("llm_council.council.ranking.query_model_with_tools", new_callable=AsyncMock) as mock_query:
+        with patch("llm_council.engine.ranking.query_model_with_tools", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = mock_response
-            with patch("llm_council.council.ranking.COUNCIL_MODELS", ["test/model"]):
+            with patch("llm_council.engine.ranking.COUNCIL_MODELS", ["test/model"]):
                 results = await stage1_collect_responses("What is 2+2?")
 
                 assert len(results) == 1

@@ -16,7 +16,7 @@ from rich.table import Table
 from rich.text import Text
 
 from llm_council.cli.presenters import build_model_panel, console
-from llm_council.council import (
+from llm_council.engine import (
     calculate_aggregate_rankings,
     debate_round_critique,
     debate_round_defense,

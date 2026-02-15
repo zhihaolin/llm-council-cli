@@ -154,7 +154,7 @@ def query(
 
         # If ReAct enabled, run ReAct synthesis separately
         if use_react and not stream and not parallel:
-            from llm_council.council import build_react_context_debate
+            from llm_council.engine import build_react_context_debate
 
             context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
 
@@ -197,7 +197,7 @@ def query(
 
         # If ReAct enabled, run ReAct synthesis separately
         if use_react:
-            from llm_council.council import build_react_context_ranking
+            from llm_council.engine import build_react_context_ranking
 
             context = build_react_context_ranking(question, stage1, stage2)
 

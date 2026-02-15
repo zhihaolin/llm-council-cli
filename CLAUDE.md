@@ -108,10 +108,10 @@ Both modes use a chairman model (configurable) to synthesize the final answer.
 - `format_search_results()`: Converts search results to LLM-readable text
 - Requires `TAVILY_API_KEY` in `.env` (optional - gracefully degrades if missing)
 
-**`council/`** - The Core Logic (v1.6.1 modular structure)
+**`engine/`** - The Core Logic (v1.6.1 modular structure)
 
 ```
-llm_council/council/
+llm_council/engine/
 ├── __init__.py             # Public API exports (backward compatible)
 ├── ranking.py              # Stage 1-2-3 flow
 ├── debate.py               # Debate orchestration
@@ -122,7 +122,7 @@ llm_council/council/
 └── aggregation.py          # Ranking calculations
 ```
 
-Key functions (all exported from `llm_council.council`):
+Key functions (all exported from `llm_council.engine`):
 - `stage1_collect_responses()`: Parallel queries to all council models with tool support
 - `stage2_collect_rankings()`: Anonymizes responses and collects peer rankings
 - `stage3_synthesize_final()`: Chairman synthesizes from all responses + rankings
@@ -230,7 +230,7 @@ llm-council --debate --simple "Question"           # Just final answer
 | Defense format | Structured sections | Easy to parse revised answers |
 | Default rounds | 2 | Sufficient for most questions |
 
-### Debate Functions (in `llm_council/council/debate.py`)
+### Debate Functions (in `llm_council/engine/debate.py`)
 
 **`debate_round_critique(query, initial_responses)`**
 - Each model receives all responses and critiques the others
@@ -246,7 +246,7 @@ llm-council --debate --simple "Question"           # Just final answer
 - Orchestrates complete debate flow
 - `max_rounds=2` produces 3 interaction rounds (initial, critique, defense)
 
-### Parsing Functions (in `llm_council/council/parsers.py`)
+### Parsing Functions (in `llm_council/engine/parsers.py`)
 
 **`extract_critiques_for_model(target_model, critique_responses)`**
 - Parses all critique responses to find sections about a specific model
@@ -356,7 +356,7 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Yields `{'type': 'tool_result', 'tool': str, 'result': str}` after tool execution
   - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
-**`llm_council/council/debate_streaming.py`**
+**`llm_council/engine/debate_streaming.py`**
 - `debate_round_streaming()`: Yields events as each model completes (parallel mode, not token streaming)
 - `run_debate_council_streaming()`: Full debate with model-completion events
 - `run_debate_token_streaming()`: Full debate with token-by-token streaming (sequential)
@@ -400,7 +400,7 @@ def clear_streaming_output():
 3. **Missing Metadata**: Metadata is ephemeral (not persisted), only returned in results
 4. **Web Search Not Working**: Check that `TAVILY_API_KEY` is set in `.env`. Models will say "search not available" if missing
 5. **Max Tool Calls**: If a model keeps calling tools without responding, it hits `max_tool_calls` limit (default 3 for non-streaming, 10 for streaming)
-6. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`llm_council/council/debate_streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`llm_council/council/debate.py` uses plain `query_model`)
+6. **Debate Web Search Asymmetry**: Defense-round web search is enabled in token-streaming (`llm_council/engine/debate_streaming.py`, `with_tools=True` for round 3) but **not** in the non-streaming debate implementation (`llm_council/engine/debate.py` uses plain `query_model`)
 
 ## Known Technical Debt
 
@@ -410,7 +410,7 @@ Issues identified but not yet on the roadmap. Fix opportunistically or when touc
 |-------|----------|----------|-------|
 | Off-by-one in tool call loops | `adapters/openrouter_client.py` | Medium | Streaming uses `range(max_tool_calls + 1)`, non-streaming uses `range(max_tool_calls)` — inconsistent |
 | `datetime.utcnow()` deprecated | `adapters/json_storage.py` | Low | Deprecated since Python 3.12; use `datetime.now(datetime.UTC)` |
-| Hardcoded title generation model | `council/ranking.py` | Medium | `"google/gemini-2.5-flash"` should be configurable; breaks if model retired |
+| Hardcoded title generation model | `engine/ranking.py` | Medium | `"google/gemini-2.5-flash"` should be configurable; breaks if model retired |
 | Redundant import | `adapters/openrouter_client.py` | Trivial | `import asyncio` inside function, already imported at top |
 | Shared HTTP client unused | `adapters/openrouter_client.py` | Low | `get_shared_client()` defined but never called; each query creates new client |
 
@@ -556,7 +556,7 @@ async def get_shared_client() -> httpx.AsyncClient:
         return _shared_client
 ```
 
-**Per-model Timeout (`llm_council/council/debate_streaming.py`):**
+**Per-model Timeout (`llm_council/engine/debate_streaming.py`):**
 ```python
 async def query_with_model(model: str):
     try:
@@ -627,18 +627,18 @@ Action: synthesize()
 
 ### Implementation
 
-**`llm_council/council/react.py`:**
+**`llm_council/engine/react.py`:**
 - `synthesize_with_react()` - Async generator implementing the ReAct loop
   - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events
   - Max 3 iterations to prevent infinite loops
   - If model says `synthesize()` without content, asks for synthesis directly
 
-**`llm_council/council/prompts.py`:**
+**`llm_council/engine/prompts.py`:**
 - `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
 - `build_react_context_debate()` - Formats debate rounds for chairman
 - `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
 
-**`llm_council/council/parsers.py`:**
+**`llm_council/engine/parsers.py`:**
 - `parse_react_output()` - Extracts Thought/Action from model output using regex
 
 **`llm_council/cli/runners.py`:**

@@ -36,7 +36,7 @@ from llm_council.cli.runners import (
     run_debate_with_progress,
     run_react_synthesis,
 )
-from llm_council.council import generate_conversation_title
+from llm_council.engine import generate_conversation_title
 
 
 def resolve_conversation_id(prefix: str, conversations: list) -> str | None:
@@ -321,7 +321,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
 
             # If using ReAct, run synthesis separately
             if use_react_here:
-                from llm_council.council import build_react_context_debate
+                from llm_council.engine import build_react_context_debate
 
                 # Only print rounds if batch mode (parallel/streaming already displayed them)
                 if not parallel_enabled and not stream_enabled:
@@ -357,7 +357,7 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
 
             # If using ReAct, run synthesis separately
             if use_react_here:
-                from llm_council.council import build_react_context_ranking
+                from llm_council.engine import build_react_context_ranking
 
                 # Show Stage 1 and 2 first
                 print_stage1(stage1)

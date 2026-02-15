@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from llm_council.council import (
+from llm_council.engine import (
     debate_round_critique,
     debate_round_defense,
     extract_critiques_for_model,
@@ -178,7 +178,7 @@ class TestDebateRoundCritique:
     @pytest.mark.asyncio
     async def test_critique_round_queries_all_models(self, sample_initial_responses):
         """Test that critique round queries all participating models."""
-        with patch("llm_council.council.debate.query_model", new_callable=AsyncMock) as mock_query:
+        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = {"content": "## Critique of model\nTest critique."}
 
             result = await debate_round_critique(
@@ -204,7 +204,7 @@ class TestDebateRoundCritique:
                 return None  # First model fails
             return {"content": "Valid critique"}
 
-        with patch("llm_council.council.debate.query_model", side_effect=mock_query):
+        with patch("llm_council.engine.debate.query_model", side_effect=mock_query):
             result = await debate_round_critique(
                 "Test question",
                 sample_initial_responses
@@ -230,7 +230,7 @@ Valid points were raised.
 ## Revised Response
 This is my improved answer."""
 
-        with patch("llm_council.council.debate.query_model", new_callable=AsyncMock) as mock_query:
+        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = {"content": defense_content}
 
             result = await debate_round_defense(
@@ -251,7 +251,7 @@ This is my improved answer."""
         sample_critique_responses
     ):
         """Test that each model receives critiques directed at them."""
-        with patch("llm_council.council.debate.query_model", new_callable=AsyncMock) as mock_query:
+        with patch("llm_council.engine.debate.query_model", new_callable=AsyncMock) as mock_query:
             mock_query.return_value = {"content": "## Revised Response\nTest"}
 
             await debate_round_defense(

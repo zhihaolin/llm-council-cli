@@ -5,7 +5,7 @@ The ranking parser extracts structured rankings from model evaluation text.
 These tests cover various edge cases and formats that models might produce.
 """
 
-from llm_council.council import parse_ranking_from_text
+from llm_council.engine import parse_ranking_from_text
 
 
 class TestParseRankingFromText:
@@ -158,7 +158,7 @@ class TestCalculateAggregateRankings:
 
     def test_basic_aggregation(self):
         """Test basic ranking aggregation."""
-        from llm_council.council import calculate_aggregate_rankings
+        from llm_council.engine import calculate_aggregate_rankings
 
         stage2_results = [
             {"model": "model1", "ranking": "FINAL RANKING:\n1. Response A\n2. Response B"},
@@ -179,7 +179,7 @@ class TestCalculateAggregateRankings:
 
     def test_clear_winner(self):
         """Test when one model clearly wins."""
-        from llm_council.council import calculate_aggregate_rankings
+        from llm_council.engine import calculate_aggregate_rankings
 
         stage2_results = [
             {"model": "m1", "ranking": "FINAL RANKING:\n1. Response A\n2. Response B\n3. Response C"},

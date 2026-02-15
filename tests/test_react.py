@@ -47,7 +47,7 @@ class TestParseReactOutput:
 
     def test_parse_thought_and_action(self):
         """Should extract thought and action from well-formed output."""
-        from llm_council.council import parse_react_output
+        from llm_council.engine import parse_react_output
 
         thought, action, action_args = parse_react_output(REACT_RESPONSE_WITH_SEARCH)
 
@@ -57,7 +57,7 @@ class TestParseReactOutput:
 
     def test_parse_synthesize_action(self):
         """Should recognize synthesize() as terminal action."""
-        from llm_council.council import parse_react_output
+        from llm_council.engine import parse_react_output
 
         thought, action, action_args = parse_react_output(REACT_RESPONSE_DIRECT_SYNTHESIZE)
 
@@ -67,7 +67,7 @@ class TestParseReactOutput:
 
     def test_parse_invalid_action(self):
         """Should return None for unrecognized actions."""
-        from llm_council.council import parse_react_output
+        from llm_council.engine import parse_react_output
 
         thought, action, action_args = parse_react_output(REACT_RESPONSE_INVALID_ACTION)
 
@@ -76,7 +76,7 @@ class TestParseReactOutput:
 
     def test_parse_missing_action(self):
         """Should handle output with thought but no action."""
-        from llm_council.council import parse_react_output
+        from llm_council.engine import parse_react_output
 
         thought, action, action_args = parse_react_output(REACT_RESPONSE_NO_ACTION)
 
@@ -94,9 +94,9 @@ class TestReactLoop:
     @pytest.mark.asyncio
     async def test_direct_synthesize_yields_correct_events(self):
         """When chairman synthesizes immediately, should yield thought then synthesis."""
-        from llm_council.council import synthesize_with_react
+        from llm_council.engine import synthesize_with_react
 
-        with patch("llm_council.council.react.query_model_streaming") as mock_stream:
+        with patch("llm_council.engine.react.query_model_streaming") as mock_stream:
             # Mock streaming to yield the full response
             async def mock_generator():
                 yield {"type": "token", "content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
@@ -116,7 +116,7 @@ class TestReactLoop:
     @pytest.mark.asyncio
     async def test_search_then_synthesize_yields_observation(self):
         """When chairman searches, should yield thought, action, observation, then synthesis."""
-        from llm_council.council import synthesize_with_react
+        from llm_council.engine import synthesize_with_react
 
         call_count = 0
 
@@ -130,8 +130,8 @@ class TestReactLoop:
                 # Second call: after search, chairman synthesizes
                 yield {"type": "done", "content": REACT_RESPONSE_AFTER_SEARCH}
 
-        with patch("llm_council.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("llm_council.council.react.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+            with patch("llm_council.engine.react.search_web", new_callable=AsyncMock) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Bitcoin is at $67,234",
@@ -151,14 +151,14 @@ class TestReactLoop:
     @pytest.mark.asyncio
     async def test_max_iterations_prevents_infinite_loop(self):
         """Should stop after max_iterations even without synthesize action."""
-        from llm_council.council import synthesize_with_react
+        from llm_council.engine import synthesize_with_react
 
         # Always return a search action, never synthesize
         async def mock_generator():
             yield {"type": "done", "content": REACT_RESPONSE_WITH_SEARCH}
 
-        with patch("llm_council.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("llm_council.council.react.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+            with patch("llm_council.engine.react.search_web", new_callable=AsyncMock) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Test result",
@@ -176,7 +176,7 @@ class TestReactLoop:
     @pytest.mark.asyncio
     async def test_invalid_action_forces_synthesize(self):
         """Invalid action should trigger forced synthesis."""
-        from llm_council.council import synthesize_with_react
+        from llm_council.engine import synthesize_with_react
 
         call_count = 0
 
@@ -188,7 +188,7 @@ class TestReactLoop:
             else:
                 yield {"type": "done", "content": REACT_RESPONSE_DIRECT_SYNTHESIZE}
 
-        with patch("llm_council.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
             events = []
             async for event in synthesize_with_react("test query", "test context"):
                 events.append(event)
@@ -207,7 +207,7 @@ class TestReactIntegration:
     @pytest.mark.asyncio
     async def test_react_with_ranking_mode(self):
         """ReAct should work with Stage 1/2 results (ranking mode)."""
-        from llm_council.council import build_react_context_ranking
+        from llm_council.engine import build_react_context_ranking
 
         stage1_results = [
             {"model": "gpt", "response": "Python is best"},
@@ -225,7 +225,7 @@ class TestReactIntegration:
     @pytest.mark.asyncio
     async def test_react_with_debate_mode(self):
         """ReAct should work with debate rounds."""
-        from llm_council.council import build_react_context_debate
+        from llm_council.engine import build_react_context_debate
 
         rounds = [
             {
@@ -251,7 +251,7 @@ class TestReactStreaming:
     @pytest.mark.asyncio
     async def test_thought_streams_token_by_token(self):
         """Thought content should stream as tokens arrive."""
-        from llm_council.council import synthesize_with_react
+        from llm_council.engine import synthesize_with_react
 
         tokens = ["Thought: ", "The ", "models ", "agree.\n\n", "Action: ", "synthesize()"]
 
@@ -260,7 +260,7 @@ class TestReactStreaming:
                 yield {"type": "token", "content": token}
             yield {"type": "done", "content": "".join(tokens)}
 
-        with patch("llm_council.council.react.query_model_streaming", return_value=mock_generator()):
+        with patch("llm_council.engine.react.query_model_streaming", return_value=mock_generator()):
             events = []
             async for event in synthesize_with_react("test", "context"):
                 events.append(event)
@@ -272,7 +272,7 @@ class TestReactStreaming:
     @pytest.mark.asyncio
     async def test_observation_not_streamed(self):
         """Observation (search results) should appear as complete block, not streamed."""
-        from llm_council.council import synthesize_with_react
+        from llm_council.engine import synthesize_with_react
 
         call_count = 0
 
@@ -284,8 +284,8 @@ class TestReactStreaming:
             else:
                 yield {"type": "done", "content": REACT_RESPONSE_AFTER_SEARCH}
 
-        with patch("llm_council.council.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
-            with patch("llm_council.council.react.search_web", new_callable=AsyncMock) as mock_search:
+        with patch("llm_council.engine.react.query_model_streaming", side_effect=lambda *args, **kwargs: mock_generator()):
+            with patch("llm_council.engine.react.search_web", new_callable=AsyncMock) as mock_search:
                 # Return proper Tavily response format
                 mock_search.return_value = {
                     "answer": "Bitcoin is at $67,234",
