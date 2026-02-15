@@ -13,7 +13,7 @@ Technical decisions and implementation notes for LLM Council.
 - Module renames for clarity:
   - `config.py` → `settings.py` (avoids confusion with `config.yaml`)
   - `orchestrator.py` → `ranking.py` (parallel with `debate.py`)
-  - `streaming.py` → `debate_streaming.py` (clarifies scope)
+  - `streaming.py` → `debate_streaming.py` → `debate_async.py` (clarifies scope)
   - `chat.py` → `chat_commands.py` (more descriptive)
   - `utils.py` → `constants.py` (matches contents)
 - Introduced `adapters/` subpackage for external service clients (`openrouter_client.py`, `tavily_search.py`, `json_storage.py`)
@@ -31,7 +31,7 @@ llm_council/
 ├── engine/
 │   ├── ranking.py
 │   ├── debate.py
-│   ├── debate_streaming.py
+│   ├── debate_async.py
 │   ├── react.py
 │   ├── prompts.py
 │   ├── parsers.py

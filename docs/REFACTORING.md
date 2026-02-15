@@ -93,14 +93,14 @@ llm_council/engine/
 ├── react.py                # ReAct chairman
 ├── prompts.py              # Prompt templates
 ├── parsers.py              # Text parsing utilities
-├── debate_streaming.py     # Async generators
+├── debate_async.py         # Async execution strategies
 └── aggregation.py          # Ranking calculations
 ```
 
 Each module has **one reason to change**:
 - `parsers.py` changes when parsing logic changes
 - `prompts.py` changes when prompt templates change
-- `debate_streaming.py` changes when streaming behavior changes
+- `debate_async.py` changes when async execution behavior changes
 
 ---
 
@@ -402,9 +402,9 @@ from .debate import (
     run_debate_council,
 )
 
-from .debate_streaming import (
-    run_debate_council_streaming,
-    run_debate_token_streaming,
+from .debate_async import (
+    run_debate_parallel,
+    run_debate_streaming,
 )
 
 from .react import (
@@ -427,7 +427,7 @@ from llm_council.engine import (
 )
 
 # If you need streaming, import from specific submodule
-from llm_council.engine.debate_streaming import run_debate_token_streaming
+from llm_council.engine.debate_async import run_debate_streaming
 ```
 
 ---
@@ -576,7 +576,7 @@ llm_council/engine/
 ├── parsers.py              # Regex/text parsing
 ├── prompts.py              # Prompt templates
 ├── react.py                # ReAct chairman logic
-└── debate_streaming.py     # Event generators
+└── debate_async.py         # Async execution strategies
 ```
 
 ### Phase 4: Apply OCP/DIP (Future)

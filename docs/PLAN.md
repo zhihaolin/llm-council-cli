@@ -15,14 +15,15 @@
 | v1.6.2 | CI Quality Gates | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
 | v1.7 | Unify Debate Logic | ✅ Complete |
-| v1.8 | Strategy Pattern (OCP/DIP) | Planned |
-| v1.9 | Self-Reflection Round | Planned |
-| v1.10 | Workflow State Machine | Planned |
-| v1.11 | Human-in-the-Loop (HITL) | Planned |
-| v1.12 | Observability | Planned |
-| v1.13 | Tool Registry | Planned |
-| v1.14 | Retry & Fallback Logic | Planned |
-| v1.15 | Security Foundations | Planned |
+| v1.8 | Rename Debate Functions | ✅ Complete |
+| v1.9 | Strategy Pattern (OCP/DIP) | Planned |
+| v1.10 | Self-Reflection Round | Planned |
+| v1.11 | Workflow State Machine | Planned |
+| v1.12 | Human-in-the-Loop (HITL) | Planned |
+| v1.13 | Observability | Planned |
+| v1.14 | Tool Registry | Planned |
+| v1.15 | Retry & Fallback Logic | Planned |
+| v1.16 | Security Foundations | Planned |
 
 ---
 
@@ -81,15 +82,21 @@
 
 ### v1.7: Unify Debate Logic
 - Extracted shared per-round query functions: `query_initial()`, `query_critique()`, `query_defense()`
-- Both batch (`debate.py`) and streaming (`debate_streaming.py`) orchestrators delegate to shared functions
+- Both batch (`debate.py`) and async (`debate_async.py`) orchestrators delegate to shared functions
 - Fixed Round 3 (defense) tool asymmetry: batch mode now uses `query_model_with_tools()` (previously only streaming had tools)
 - Consistent web search availability in Rounds 1 and 3 across all modes
+
+### v1.8: Rename Debate Functions for Clarity
+- Renamed `debate_async.py` → `debate_async.py` (file is about async execution strategies, not streaming)
+- `debate_round_streaming()` → `debate_round_parallel()` (runs models in parallel with events)
+- `run_debate_council_streaming()` → `run_debate_parallel()` (full debate, parallel mode)
+- `run_debate_token_streaming()` → `run_debate_streaming()` (actual token streaming)
 
 ---
 
 ## Next Up
 
-### v1.8: Strategy Pattern (OCP/DIP)
+### v1.9: Strategy Pattern (OCP/DIP)
 
 Apply Open/Closed and Dependency Inversion principles for extensibility.
 
@@ -110,7 +117,7 @@ Apply Open/Closed and Dependency Inversion principles for extensibility.
 - Easy to test with mock queriers
 - Swap OpenRouter for Ollama by injecting different querier
 
-### v1.9: Self-Reflection Round
+### v1.10: Self-Reflection Round
 
 Models evaluate and improve their own outputs before peer review.
 
@@ -126,12 +133,12 @@ Round 1: Initial → Round 1.5: Self-Reflection → Round 2: Critique → Round 
 ```
 
 **Implementation:**
-- `ReflectionRound` strategy class (builds on v1.8 strategy pattern)
+- `ReflectionRound` strategy class (builds on v1.9 strategy pattern)
 - Prompt: "Review your response. Identify weaknesses. Provide an improved version."
 - `--reflect` flag to enable
 - Reflection visible in output as separate round
 
-### v1.10: Workflow State Machine
+### v1.11: Workflow State Machine
 
 Formal state management with checkpoints for reliability.
 
@@ -154,11 +161,11 @@ pending ──→ querying ──→ ranking ──→ synthesizing ──→ co
 - `checkpoint_data` stores serialized round results
 - On resume: load checkpoint, skip completed stages
 
-### v1.11: Human-in-the-Loop (HITL)
+### v1.12: Human-in-the-Loop (HITL)
 
-User control during autonomous execution via optional async callbacks. All three features use callbacks passed from CLI → runners → engine → adapters, defaulting to `None` (auto-pilot, fully backward compatible). Absorbs planned v1.17 "Configurable council" (`--models` part).
+User control during autonomous execution via optional async callbacks. All three features use callbacks passed from CLI → runners → engine → adapters, defaulting to `None` (auto-pilot, fully backward compatible). Absorbs planned v1.18 "Configurable council" (`--models` part).
 
-**Prerequisites:** v1.7-v1.10 completed (v1.8 Strategy Pattern in particular introduces `models` parameter and DI patterns that make threading callbacks cleaner).
+**Prerequisites:** v1.7-v1.11 completed (v1.9 Strategy Pattern in particular introduces `models` parameter and DI patterns that make threading callbacks cleaner).
 
 **New type definitions** in `llm_council/engine/types.py`:
 ```python
@@ -178,15 +185,15 @@ Before executing `search_web`, prompt user to approve/reject.
 
 Between rounds, let user inject their perspective into the next round's prompt.
 
-- **Pause location:** `llm_council/engine/debate_streaming.py` — after `round_complete` yield, before next round. `llm_council/engine/debate.py` — after each round completes.
+- **Pause location:** `llm_council/engine/debate_async.py` — after `round_complete` yield, before next round. `llm_council/engine/debate.py` — after each round completes.
 - **Behavior:** `round_intervention: RoundInterventionCallback | None = None` param. After each round, await callback. If returns a string, prepend to next round's prompt via `inject_human_perspective()` in `llm_council/engine/prompts.py`. If returns `None`, continue normally.
 - **CLI:** `--intervene` flag on `query`; `/intervene on|off` in chat REPL
 
 #### Feature 3: Model Selection
 
-Let user choose which models participate (absorbs v1.17 "Configurable council").
+Let user choose which models participate (absorbs v1.18 "Configurable council").
 
-- **Current state:** `COUNCIL_MODELS` (defined in `llm_council/settings.py`) is used directly in `llm_council/engine/ranking.py`, `llm_council/engine/debate.py`, `llm_council/engine/debate_streaming.py`, `llm_council/cli/main.py`, `llm_council/cli/runners.py`, and `llm_council/cli/tui.py`.
+- **Current state:** `COUNCIL_MODELS` (defined in `llm_council/settings.py`) is used directly in `llm_council/engine/ranking.py`, `llm_council/engine/debate.py`, `llm_council/engine/debate_async.py`, `llm_council/cli/main.py`, `llm_council/cli/runners.py`, and `llm_council/cli/tui.py`.
 - **Change:** Add `models: list[str] | None = None` parameter to all debate/streaming functions. Default to `COUNCIL_MODELS` when `None`.
 - **CLI:** `--select-models` (interactive picker); `--models "model-a,model-b"` (explicit); `/select` in chat REPL (minimum 2 models enforced)
 
@@ -196,10 +203,10 @@ Let user choose which models participate (absorbs v1.17 "Configurable council").
 |---|-------|-------|
 | 1 | HITL callback type definitions | `llm_council/engine/types.py`, `llm_council/engine/__init__.py`, `tests/test_hitl_types.py` |
 | 2-3 | `tool_approval` in openrouter | `llm_council/adapters/openrouter_client.py`, `tests/test_tool_approval.py` |
-| 4 | Thread `tool_approval` through streaming/debate | `llm_council/engine/debate_streaming.py`, `llm_council/engine/debate.py` |
+| 4 | Thread `tool_approval` through streaming/debate | `llm_council/engine/debate_async.py`, `llm_council/engine/debate.py` |
 | 5 | `inject_human_perspective` prompt | `llm_council/engine/prompts.py`, `tests/test_hitl_intervention.py` |
-| 6-7 | Thread `round_intervention` into streaming/debate | `llm_council/engine/debate_streaming.py`, `llm_council/engine/debate.py` |
-| 8-9 | `models` parameter in debate/streaming | `llm_council/engine/debate.py`, `llm_council/engine/debate_streaming.py`, `tests/test_model_selection.py` |
+| 6-7 | Thread `round_intervention` into streaming/debate | `llm_council/engine/debate_async.py`, `llm_council/engine/debate.py` |
+| 8-9 | `models` parameter in debate/streaming | `llm_council/engine/debate.py`, `llm_council/engine/debate_async.py`, `tests/test_model_selection.py` |
 | 10-11 | CLI prompt functions + callback wiring | `llm_council/cli/runners.py` |
 | 12 | Chat commands (`/approve`, `/intervene`, `/select`) | `llm_council/cli/chat_commands.py`, `llm_council/cli/chat_session.py`, `llm_council/cli/presenters.py` |
 | 13 | CLI flags (`--approve`, `--intervene`, `--select-models`, `--models`) | `llm_council/cli/main.py` |
@@ -213,7 +220,7 @@ Let user choose which models participate (absorbs v1.17 "Configurable council").
 | Rejected tool calls confuse LLM | Return "rejected by user" as tool result — LLM answers from knowledge |
 | < 2 models selected | Enforce minimum 2 in selection prompt |
 
-### v1.12: Observability
+### v1.13: Observability
 
 Structured logging and tracing for production visibility.
 
@@ -229,7 +236,7 @@ Structured logging and tracing for production visibility.
 - Correlation ID generated per request, flows through all logs
 - Spans: `council.query` → `council.round.{n}` → `council.model.{name}`
 
-### v1.13: Tool Registry
+### v1.14: Tool Registry
 
 Pluggable tools with registration protocol for extensibility.
 
@@ -256,7 +263,7 @@ async def read_file(path: str) -> str:
 - `ENABLED_TOOLS` config to control which tools models can use
 - Sandboxed execution for `execute_code` (subprocess with timeout)
 
-### v1.14: Retry & Fallback Logic
+### v1.15: Retry & Fallback Logic
 
 Graceful handling of API failures with automatic recovery.
 
@@ -286,7 +293,7 @@ Graceful handling of API failures with automatic recovery.
 - `ModelRateLimitError` - Hit rate limits, backoff required
 - `CouncilQuorumError` - Too few models responded
 
-### v1.15: Security Foundations
+### v1.16: Security Foundations
 
 Minimum security layer for CLI usage.
 
@@ -304,14 +311,14 @@ Minimum security layer for CLI usage.
 
 ---
 
-### v1.16+: Future
+### v1.17+: Future
 
 | Version | Feature |
 |---------|---------|
-| v1.16 | Cost tracking & token counting |
-| v1.17 | Export conversations (MD/JSON/PDF) |
-| v1.18 | Image input (multimodal) |
-| v1.19 | Local models (Ollama) |
+| v1.17 | Cost tracking & token counting |
+| v1.18 | Export conversations (MD/JSON/PDF) |
+| v1.19 | Image input (multimodal) |
+| v1.20 | Local models (Ollama) |
 
 ---
 
@@ -328,11 +335,11 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 | Shared HTTP client unused | `llm_council/adapters/openrouter_client.py` | Low | Either use it in all query functions or delete it (YAGNI) |
 
 **Note:** Several other issues (duplicated `execute_tool`, feature asymmetry, storage inefficiency, logging) are addressed by planned versions:
-- v1.8 Strategy Pattern fixes round duplication and feature asymmetry
-- v1.10 Workflow State Machine replaces JSON storage with SQLite
-- v1.12 Observability adds structured logging
-- v1.13 Tool Registry centralizes `execute_tool`
-- v1.14 Retry & Fallback will use the shared client
+- v1.9 Strategy Pattern fixes round duplication and feature asymmetry
+- v1.11 Workflow State Machine replaces JSON storage with SQLite
+- v1.13 Observability adds structured logging
+- v1.14 Tool Registry centralizes `execute_tool`
+- v1.15 Retry & Fallback will use the shared client
 
 ---
 
@@ -356,11 +363,11 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 
 | Practice | Details | Roadmap |
 |----------|---------|---------|
-| SOLID (OCP/DIP) | Strategy pattern, dependency injection | v1.8 |
-| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.10, v1.14 |
-| Structured Logging | JSON logs with correlation IDs | v1.12 |
-| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.14 |
-| Retry with Backoff | Exponential backoff for API failures | v1.14 |
+| SOLID (OCP/DIP) | Strategy pattern, dependency injection | v1.9 |
+| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.11, v1.15 |
+| Structured Logging | JSON logs with correlation IDs | v1.13 |
+| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.15 |
+| Retry with Backoff | Exponential backoff for API failures | v1.15 |
 | Contract Tests | Scheduled daily API schema validation | — |
 | Pre-commit Hooks | Ruff as pre-commit hook | — |
 | Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |

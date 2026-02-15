@@ -115,7 +115,7 @@ llm_council/engine/
 ├── __init__.py             # Public API exports (backward compatible)
 ├── ranking.py              # Stage 1-2-3 flow
 ├── debate.py               # Debate orchestration
-├── debate_streaming.py     # Event generators for parallel/streaming modes
+├── debate_async.py         # Async execution strategies (parallel/streaming)
 ├── react.py                # ReAct chairman logic
 ├── prompts.py              # All prompt templates
 ├── parsers.py              # Regex/text parsing utilities
@@ -374,10 +374,10 @@ llm-council chat                               # REPL (streaming+debate on by de
   - Yields `{'type': 'tool_result', 'tool': str, 'result': str}` after tool execution
   - Uses `index` as primary key for tool call chunks (id only in first chunk)
 
-**`llm_council/engine/debate_streaming.py`**
-- `debate_round_streaming()`: Yields events as each model completes (parallel mode, not token streaming)
-- `run_debate_council_streaming()`: Full debate with model-completion events
-- `run_debate_token_streaming()`: Full debate with token-by-token streaming (sequential)
+**`llm_council/engine/debate_async.py`**
+- `debate_round_parallel()`: Yields events as each model completes (parallel mode, not token streaming)
+- `run_debate_parallel()`: Full debate with model-completion events
+- `run_debate_streaming()`: Full debate with token-by-token streaming (sequential)
 
 **`llm_council/cli/runners.py`**
 - `run_debate_streaming()`: Renders streaming output with Rich
@@ -434,7 +434,7 @@ Issues identified but not yet on the roadmap. Fix opportunistically or when touc
 
 ## Future Enhancements
 
-See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.8+).
+See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
@@ -574,7 +574,7 @@ async def get_shared_client() -> httpx.AsyncClient:
         return _shared_client
 ```
 
-**Per-model Timeout (`llm_council/engine/debate_streaming.py`):**
+**Per-model Timeout (`llm_council/engine/debate_async.py`):**
 ```python
 async def query_with_model(model: str):
     try:
