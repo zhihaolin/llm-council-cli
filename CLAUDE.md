@@ -450,7 +450,7 @@ Issues identified but not yet on the roadmap. Fix opportunistically or when touc
 
 ## Future Enhancements
 
-See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
+See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.10+).
 
 ## Testing
 
