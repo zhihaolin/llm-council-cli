@@ -21,7 +21,6 @@
 | — | Council ReAct | ✅ Complete |
 | — | Chat UI Improvements | ✅ Complete |
 | — | Compact Chat Banner | ✅ Complete |
-| v1.10 | Self-Reflection Round | Planned |
 | v1.11 | Workflow State Machine | Planned |
 | v1.12 | Human-in-the-Loop (HITL) | Planned |
 | v1.13 | Observability | Planned |
@@ -128,27 +127,6 @@
 ---
 
 ## Next Up
-
-### v1.10: Self-Reflection Round
-
-Models evaluate and improve their own outputs before peer review.
-
-**Features:**
-- New round type: `reflection`
-- Each model critiques its OWN previous response
-- Outputs: identified weaknesses + improved response
-- Inserted after Round 1 (initial) when enabled
-
-**Flow with reflection:**
-```
-Round 1: Initial → Round 1.5: Self-Reflection → Round 2: Critique → Round 3: Defense
-```
-
-**Implementation:**
-- `ReflectionRound` strategy class (builds on v1.9 strategy pattern)
-- Prompt: "Review your response. Identify weaknesses. Provide an improved version."
-- `--reflect` flag to enable
-- Reflection visible in output as separate round
 
 ### v1.11: Workflow State Machine
 
