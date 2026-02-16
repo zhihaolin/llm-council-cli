@@ -333,7 +333,8 @@ llm_council/cli/
 - `ChatState` dataclass — holds all mutable REPL state (debate/stream/react toggles, conversation, title)
 - `COMMAND_HANDLERS` dispatch dict — maps command names to `cmd_*(state, argument) -> bool` handlers
 - `cmd_exit`, `cmd_help`, `cmd_history`, `cmd_use`, `cmd_new`, `cmd_debate`, `cmd_rounds`, `cmd_stream`, `cmd_react`, `cmd_mode` — individual command handlers
-- `_print_mode(state)`, `_print_banner(state, resumed)` — helpers to reduce repeated argument passing
+- `_print_mode(state)` — prints `Mode updated: ...` with plain dot-delimited format
+- `_print_banner(state, resumed)` — compact text banner framed by horizontal rules
 - `run_chat_session()` — main REPL loop, dispatches to handlers via dict lookup
 
 ### API Costs
@@ -453,11 +454,11 @@ See [docs/PLAN.md](docs/PLAN.md) for the full roadmap (v1.9+).
 
 ## Testing
 
-### Test Suite (108 tests)
+### Test Suite (111 tests)
 ```
 tests/
 ├── conftest.py                  # Fixtures and mock API responses
-├── test_chat_commands.py        # 11 tests - chat REPL command parsing + model panel indicators
+├── test_chat_commands.py        # 14 tests - chat REPL command parsing + model panel indicators
 ├── test_cli_imports.py          # 1 test - CLI module imports
 ├── test_conversation_context.py # 5 tests - conversation context handling
 ├── test_debate.py               # 24 tests - debate mode + RoundConfig + ReAct
@@ -645,7 +646,7 @@ llm-council query --debate --no-react "Q"       # Disable council ReAct (use nat
 ### Chat REPL Commands
 - `/react on` - Enable council ReAct reasoning
 - `/react off` - Disable council ReAct reasoning
-- `/mode` - Show current mode (includes `[react]` indicator)
+- `/mode` - Show current mode (dot-delimited format: `Debate · 1 round · React on · Stream off`)
 
 ### Implementation
 

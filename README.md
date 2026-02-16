@@ -113,13 +113,11 @@ uv run llm-council chat
 ```
 
 ```
-┌─────────────── Council Chat ───────────────┐
-│ Resumed conversation                       │
-│ Previous Topic Title                       │
-│ ID: abc12345                               │
-│ Mode: Debate (2 rounds) [stream] [react]   │
-└────────────────────────────────────────────┘
-/new /history /use <id>  |  /debate /rounds /stream /react  |  /mode /help /exit
+────────────────────────────────────────────────────────
+  Council Chat  ·  abc12345  ·  Resumed
+  Mode: Debate · 2 rounds · React on · Stream off
+  Commands: /new /history /use <id> · /debate /rounds /stream /react · /mode /help /exit
+────────────────────────────────────────────────────────
 
 council> What is the capital of France?
 ```
