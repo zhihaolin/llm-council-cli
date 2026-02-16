@@ -390,22 +390,23 @@ tests/
 | v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | Token Streaming | ✅ Complete |
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
-| v1.6 | ReAct Chairman | ✅ Complete |
+| v1.6 | Tool Calling for Council | ✅ Complete |
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates (ruff, pyright) | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
 | v1.7 | Unify Debate Logic | ✅ Complete |
 | v1.8 | Rename Debate Functions | ✅ Complete |
 | v1.9 | Strategy Pattern (OCP/DIP) | ✅ Complete |
-| Post-v1.9 | Chairman Reflection + Council ReAct | ✅ Complete |
-| Post-v1.9 | Chat UI Improvements | ✅ Complete |
-| v1.10 | Self-Reflection Round | Planned |
-| v1.11 | Workflow State Machine | Planned |
-| v1.12 | Human-in-the-Loop (HITL) | Planned |
-| v1.13 | Observability (OpenTelemetry) | Planned |
-| v1.14 | Tool Registry (MCP) | Planned |
-| v1.15 | Retry & Fallback Logic | Planned |
-| v1.16 | Security Foundations | Planned |
+| — | Chairman Reflection | ✅ Complete |
+| — | Council ReAct | ✅ Complete |
+| — | Chat UI Improvements | ✅ Complete |
+| — | Compact Chat Banner | ✅ Complete |
+| v1.10 | Workflow State Machine | Planned |
+| v1.11 | Human-in-the-Loop (HITL) | Planned |
+| v1.12 | Observability (OpenTelemetry) | Planned |
+| v1.13 | Tool Registry (MCP) | Planned |
+| v1.14 | Retry & Fallback Logic | Planned |
+| v1.15 | Security Foundations | Planned |
 
 See [docs/PLAN.md](docs/PLAN.md) for the full roadmap and [docs/DEVLOG.md](docs/DEVLOG.md) for development history.
 
