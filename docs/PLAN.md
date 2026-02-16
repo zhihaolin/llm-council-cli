@@ -71,15 +71,12 @@
 - Per-model timeout with `asyncio.wait_for()` (default: 120s)
 - Performance: total time = max(model times) instead of sum
 
-### v1.6: ReAct Chairman
-- Chairman uses ReAct pattern: Reason → Act → Observe → Repeat
-- `search_web` tool to verify facts during synthesis
-- Max 3 iterations to prevent infinite loops
-- Enabled by default for both ranking and debate modes
+### v1.6: Tool Calling for Council
+- *(Originally included ReAct chairman — superseded by Reflection, see Post-v1.9)*
+- Tavily web search via OpenAI-style tool calling for council members
 - `/react on|off` command in chat REPL
 - `--no-react` flag to disable in CLI
 - Works with parallel and streaming modes
-- Color-coded trace display (Thought=cyan, Action=yellow, Observation=dim)
 
 ### v1.7: Unify Debate Logic
 - Extracted shared per-round query functions
