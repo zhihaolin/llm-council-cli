@@ -48,12 +48,27 @@ def test_parse_alias_quit():
 
 def test_format_chat_mode_line_debate():
     line = format_chat_mode_line(True, 3)
-    assert "Debate (3 rounds)" in line
+    assert line == "Debate \u00b7 3 rounds \u00b7 React on \u00b7 Stream off"
+
+
+def test_format_chat_mode_line_debate_single_round():
+    line = format_chat_mode_line(True, 1)
+    assert line == "Debate \u00b7 1 round \u00b7 React on \u00b7 Stream off"
+
+
+def test_format_chat_mode_line_debate_stream_on():
+    line = format_chat_mode_line(True, 2, stream_enabled=True, react_enabled=False)
+    assert line == "Debate \u00b7 2 rounds \u00b7 React off \u00b7 Stream on"
 
 
 def test_format_chat_mode_line_ranking():
     line = format_chat_mode_line(False, 2)
-    assert "Council (ranking)" in line
+    assert line == "Ranking \u00b7 React on"
+
+
+def test_format_chat_mode_line_ranking_react_off():
+    line = format_chat_mode_line(False, 2, react_enabled=False)
+    assert line == "Ranking \u00b7 React off"
 
 
 def test_build_chat_prompt_always_council():

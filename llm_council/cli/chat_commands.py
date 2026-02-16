@@ -60,18 +60,22 @@ def format_chat_mode_line(
     stream_enabled: bool = False,
     react_enabled: bool = True,
 ) -> str:
-    """Format the current chat mode line for display."""
+    """Format the current chat mode as a plain dot-delimited string."""
     if debate_enabled:
-        mode_str = f"Debate ({debate_rounds} rounds)"
-        if stream_enabled:
-            mode_str += r" \[streaming]"
+        round_word = "round" if debate_rounds == 1 else "rounds"
+        parts = [
+            "Debate",
+            f"{debate_rounds} {round_word}",
+            f"React {'on' if react_enabled else 'off'}",
+            f"Stream {'on' if stream_enabled else 'off'}",
+        ]
     else:
-        mode_str = "Council (ranking)"
+        parts = [
+            "Ranking",
+            f"React {'on' if react_enabled else 'off'}",
+        ]
 
-    if react_enabled:
-        mode_str += r" \[react]"
-
-    return f"[chat.meta]Mode:[/chat.meta] [chat.accent]{mode_str}[/chat.accent]"
+    return " \u00b7 ".join(parts)
 
 
 def build_chat_prompt() -> str:

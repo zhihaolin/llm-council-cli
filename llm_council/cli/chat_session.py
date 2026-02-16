@@ -76,14 +76,13 @@ def build_query_with_context(question: str, context: str) -> str:
 
 def _print_mode(state: ChatState) -> None:
     """Print the current mode line."""
-    console.print(
-        format_chat_mode_line(
-            state.debate_enabled,
-            state.debate_rounds,
-            state.stream_enabled,
-            react_enabled=state.react_enabled,
-        )
+    mode_line = format_chat_mode_line(
+        state.debate_enabled,
+        state.debate_rounds,
+        state.stream_enabled,
+        react_enabled=state.react_enabled,
     )
+    console.print(f"[chat.meta]Mode updated: {mode_line}[/chat.meta]")
 
 
 def _print_banner(state: ChatState, resumed: bool) -> None:

@@ -7,6 +7,7 @@ All print_* and display functions for Rich console output.
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
+from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
@@ -43,27 +44,23 @@ def print_chat_banner(
     stream_enabled: bool = False,
     react_enabled: bool = True,
 ) -> None:
-    """Show chat banner with conversation details."""
+    """Show compact chat banner with conversation details."""
     short_id = conversation_id[:8]
-    status = "Resumed" if resumed else "Started"
-    body = (
-        f"[chat.meta]{status} conversation[/chat.meta]\n"
-        f"[chat.accent]{title}[/chat.accent]\n"
-        f"[chat.meta]ID: {short_id}[/chat.meta]\n"
-        f"{format_chat_mode_line(debate_enabled, debate_rounds, stream_enabled, react_enabled=react_enabled)}"
+    status = "Resumed" if resumed else "New Conversation"
+    mode_line = format_chat_mode_line(
+        debate_enabled, debate_rounds, stream_enabled, react_enabled=react_enabled
     )
+
     console.print()
+    console.print(Rule(style=CHAT_BORDER_COLOR))
     console.print(
-        Panel(
-            body,
-            title="[chat.accent]Council Chat[/chat.accent]",
-            border_style=CHAT_BORDER_COLOR,
-            padding=(1, 2),
-        )
+        f"  [chat.accent]Council Chat[/chat.accent]  \u00b7  [chat.accent]{short_id}[/chat.accent]  \u00b7  [chat.accent]{status}[/chat.accent]"
     )
+    console.print(f"  [bold][chat.meta]Mode:[/chat.meta][/bold] [chat.meta]{mode_line}[/chat.meta]")
     console.print(
-        "[chat.meta]/new /history /use <id>  |  /debate /rounds /stream /react  |  /mode /help /exit[/chat.meta]"
+        "  [bold][chat.command]Commands:[/chat.command][/bold] [chat.command]/new /history /use <id> \u00b7 /debate /rounds /stream /react \u00b7 /mode /help /exit[/chat.command]"
     )
+    console.print(Rule(style=CHAT_BORDER_COLOR))
     console.print()
 
 
@@ -255,7 +252,7 @@ def build_model_panel(
     if searched:
         indicators.append("searched")
     if indicators:
-        title += " [dim]" + " ".join(f"\\[{i}]" for i in indicators) + "[/dim]"
+        title += " " + " ".join(f"\\[{i}]" for i in indicators)
     return Panel(
         Markdown(content) if content.strip() else Text("(empty)", style="dim"),
         title=title,
