@@ -62,12 +62,10 @@
 - Web search enabled in defense round (Round 3) for evidence gathering
 
 ### v1.5: Parallel Execution with Progress
-- `--parallel` / `-p` flag for debate mode
-- `/parallel on|off` command in chat REPL (default: on)
+- Parallel is now the default debate execution mode (no flag needed)
 - `asyncio.as_completed()` for parallel execution within rounds
 - Rich Spinner widgets for animated progress indicators
 - Per-model timeout with `asyncio.wait_for()` (default: 120s)
-- Shared `httpx.AsyncClient` for connection reuse
 - Performance: total time = max(model times) instead of sum
 
 ### v1.6: ReAct Chairman
@@ -81,16 +79,15 @@
 - Color-coded trace display (Thought=cyan, Action=yellow, Observation=dim)
 
 ### v1.7: Unify Debate Logic
-- Extracted shared per-round query functions: `query_initial()`, `query_critique()`, `query_defense()`
-- Both batch (`debate.py`) and async (`debate_async.py`) orchestrators delegate to shared functions
-- Fixed Round 3 (defense) tool asymmetry: batch mode now uses `query_model_with_tools()` (previously only streaming had tools)
+- Extracted shared per-round query functions
+- Fixed Round 3 (defense) tool asymmetry: all modes now use `query_model_with_tools()`
 - Consistent web search availability in Rounds 1 and 3 across all modes
 
 ### v1.8: Rename Debate Functions for Clarity
-- Renamed `debate_async.py` → `debate_async.py` (file is about async execution strategies, not streaming)
-- `debate_round_streaming()` → `debate_round_parallel()` (runs models in parallel with events)
-- `run_debate_council_streaming()` → `run_debate_parallel()` (full debate, parallel mode)
-- `run_debate_token_streaming()` → `run_debate_streaming()` (actual token streaming)
+- Consolidated into single `debate.py` (removed `debate_async.py`)
+- `debate_round_parallel()` (runs models in parallel with events)
+- `debate_round_streaming()` (sequential with per-token events)
+- `run_debate_parallel()` / `run_debate_streaming()` in CLI runners
 
 ### v1.9: Consolidate Round-Sequencing with Strategy Pattern
 - Single `run_debate()` orchestrator defines round sequence once (initial → critique → defense → extra rounds)
@@ -174,7 +171,7 @@ Before executing `search_web`, prompt user to approve/reject.
 
 Between rounds, let user inject their perspective into the next round's prompt.
 
-- **Pause location:** `llm_council/engine/debate_async.py` — after `round_complete` yield, before next round. `llm_council/engine/debate.py` — after each round completes.
+- **Pause location:** `llm_council/engine/debate.py` — after `round_complete` yield in `run_debate()`, before next round.
 - **Behavior:** `round_intervention: RoundInterventionCallback | None = None` param. After each round, await callback. If returns a string, prepend to next round's prompt via `inject_human_perspective()` in `llm_council/engine/prompts.py`. If returns `None`, continue normally.
 - **CLI:** `--intervene` flag on `query`; `/intervene on|off` in chat REPL
 
@@ -182,7 +179,7 @@ Between rounds, let user inject their perspective into the next round's prompt.
 
 Let user choose which models participate (absorbs v1.18 "Configurable council").
 
-- **Current state:** `COUNCIL_MODELS` (defined in `llm_council/settings.py`) is used directly in `llm_council/engine/ranking.py`, `llm_council/engine/debate.py`, `llm_council/engine/debate_async.py`, `llm_council/cli/main.py`, `llm_council/cli/runners.py`, and `llm_council/cli/tui.py`.
+- **Current state:** `COUNCIL_MODELS` (defined in `llm_council/settings.py`) is used directly in `llm_council/engine/ranking.py`, `llm_council/engine/debate.py`, `llm_council/cli/main.py`, and `llm_council/cli/runners.py`.
 - **Change:** Add `models: list[str] | None = None` parameter to all debate/streaming functions. Default to `COUNCIL_MODELS` when `None`.
 - **CLI:** `--select-models` (interactive picker); `--models "model-a,model-b"` (explicit); `/select` in chat REPL (minimum 2 models enforced)
 
@@ -192,10 +189,10 @@ Let user choose which models participate (absorbs v1.18 "Configurable council").
 |---|-------|-------|
 | 1 | HITL callback type definitions | `llm_council/engine/types.py`, `llm_council/engine/__init__.py`, `tests/test_hitl_types.py` |
 | 2-3 | `tool_approval` in openrouter | `llm_council/adapters/openrouter_client.py`, `tests/test_tool_approval.py` |
-| 4 | Thread `tool_approval` through streaming/debate | `llm_council/engine/debate_async.py`, `llm_council/engine/debate.py` |
+| 4 | Thread `tool_approval` through debate | `llm_council/engine/debate.py` |
 | 5 | `inject_human_perspective` prompt | `llm_council/engine/prompts.py`, `tests/test_hitl_intervention.py` |
-| 6-7 | Thread `round_intervention` into streaming/debate | `llm_council/engine/debate_async.py`, `llm_council/engine/debate.py` |
-| 8-9 | `models` parameter in debate/streaming | `llm_council/engine/debate.py`, `llm_council/engine/debate_async.py`, `tests/test_model_selection.py` |
+| 6-7 | Thread `round_intervention` into debate | `llm_council/engine/debate.py` |
+| 8-9 | `models` parameter in debate | `llm_council/engine/debate.py`, `tests/test_model_selection.py` |
 | 10-11 | CLI prompt functions + callback wiring | `llm_council/cli/runners.py` |
 | 12 | Chat commands (`/approve`, `/intervene`, `/select`) | `llm_council/cli/chat_commands.py`, `llm_council/cli/chat_session.py`, `llm_council/cli/presenters.py` |
 | 13 | CLI flags (`--approve`, `--intervene`, `--select-models`, `--models`) | `llm_council/cli/main.py` |
@@ -323,8 +320,7 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 | Redundant import | `llm_council/adapters/openrouter_client.py` | Trivial | Delete the inner `import asyncio` |
 | Shared HTTP client unused | `llm_council/adapters/openrouter_client.py` | Low | Either use it in all query functions or delete it (YAGNI) |
 
-**Note:** Several other issues (duplicated `execute_tool`, feature asymmetry, storage inefficiency, logging) are addressed by planned versions:
-- v1.9 Strategy Pattern fixes round duplication and feature asymmetry
+**Note:** Several other issues (duplicated `execute_tool`, storage inefficiency, logging) are addressed by planned versions:
 - v1.11 Workflow State Machine replaces JSON storage with SQLite
 - v1.13 Observability adds structured logging
 - v1.14 Tool Registry centralizes `execute_tool`
@@ -340,7 +336,7 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 |----------|---------|
 | Async/Parallel | `asyncio.gather()` for concurrent API calls |
 | Graceful Degradation | Continues if individual models fail |
-| Test Suite | pytest + pytest-asyncio, 95 tests |
+| Test Suite | pytest + pytest-asyncio, 111 tests |
 | Linting | Ruff check + format in CI |
 | Type Checking | Pyright in basic mode |
 | Type Hints | Function signatures throughout |
@@ -348,6 +344,9 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 | SOLID (SRP/ISP) | Focused modules, clean API exports (v1.6.1) |
 | SOLID (OCP) | Strategy pattern for debate execution (v1.9) |
 | Config Extraction | YAML config file (`config.yaml`) |
+| Chairman Reflection | Deep analysis before synthesis (always on) |
+| Council ReAct | Visible Thought→Action→Observation reasoning for council members |
+| Compact Chat UI | Text-based banner with horizontal rules, dot-delimited mode line |
 
 ### Planned
 
@@ -404,19 +403,20 @@ uv run pytest tests/ -v
 ```
 tests/
 ├── conftest.py                  # Fixtures, mocks
-├── test_chat_commands.py        # 10 tests
+├── test_chat_commands.py        # 14 tests
 ├── test_cli_imports.py          # 1 test
 ├── test_conversation_context.py # 5 tests
-├── test_debate.py               # 23 tests
+├── test_debate.py               # 24 tests
 ├── test_ranking_parser.py       # 14 tests
 ├── test_react.py                # 12 tests
-├── test_search.py               # 17 tests
-├── test_streaming.py            # 13 tests
+├── test_reflection.py           # 6 tests
+├── test_search.py               # 18 tests
+├── test_streaming.py            # 17 tests
 └── integration/                 # CLI tests (planned)
 ```
 
 ---
 
-*Last updated: 2026-02-15*
+*Last updated: 2026-02-16*
 
 For implementation details and session notes, see [DEVLOG.md](DEVLOG.md).
