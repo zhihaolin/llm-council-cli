@@ -90,7 +90,8 @@ llm_council/engine/
 ├── __init__.py             # Public API exports
 ├── ranking.py              # Stage 1-2-3 coordination
 ├── debate.py               # Debate orchestration + async execution
-├── react.py                # ReAct chairman
+├── react.py                # Council member ReAct loop
+├── reflection.py           # Chairman Reflection synthesis
 ├── prompts.py              # Prompt templates
 ├── parsers.py              # Text parsing utilities
 └── aggregation.py          # Ranking calculations
@@ -574,7 +575,8 @@ llm_council/engine/
 ├── ranking.py              # Stage 1-2-3 flow
 ├── parsers.py              # Regex/text parsing
 ├── prompts.py              # Prompt templates
-├── react.py                # ReAct chairman logic
+├── react.py                # Council member ReAct loop
+├── reflection.py           # Chairman Reflection synthesis
 ```
 
 ### Phase 4: Apply OCP (v1.9) ✅
