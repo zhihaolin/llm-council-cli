@@ -21,12 +21,12 @@
 | — | Council ReAct | ✅ Complete |
 | — | Chat UI Improvements | ✅ Complete |
 | — | Compact Chat Banner | ✅ Complete |
-| v1.11 | Workflow State Machine | Planned |
-| v1.12 | Human-in-the-Loop (HITL) | Planned |
-| v1.13 | Observability | Planned |
-| v1.14 | Tool Registry | Planned |
-| v1.15 | Retry & Fallback Logic | Planned |
-| v1.16 | Security Foundations | Planned |
+| v1.10 | Workflow State Machine | Planned |
+| v1.11 | Human-in-the-Loop (HITL) | Planned |
+| v1.12 | Observability | Planned |
+| v1.13 | Tool Registry | Planned |
+| v1.14 | Retry & Fallback Logic | Planned |
+| v1.15 | Security Foundations | Planned |
 
 ---
 
@@ -128,7 +128,7 @@
 
 ## Next Up
 
-### v1.11: Workflow State Machine
+### v1.10: Workflow State Machine
 
 Formal state management with checkpoints for reliability.
 
@@ -151,11 +151,11 @@ pending ──→ querying ──→ ranking ──→ synthesizing ──→ co
 - `checkpoint_data` stores serialized round results
 - On resume: load checkpoint, skip completed stages
 
-### v1.12: Human-in-the-Loop (HITL)
+### v1.11: Human-in-the-Loop (HITL)
 
-User control during autonomous execution via optional async callbacks. All three features use callbacks passed from CLI → runners → engine → adapters, defaulting to `None` (auto-pilot, fully backward compatible). Absorbs planned v1.18 "Configurable council" (`--models` part).
+User control during autonomous execution via optional async callbacks. All three features use callbacks passed from CLI → runners → engine → adapters, defaulting to `None` (auto-pilot, fully backward compatible). Includes configurable council (`--models`).
 
-**Prerequisites:** v1.7-v1.11 completed (v1.9 Strategy Pattern in particular introduces `models` parameter and DI patterns that make threading callbacks cleaner).
+**Prerequisites:** v1.7-v1.10 completed (v1.9 Strategy Pattern in particular introduces `models` parameter and DI patterns that make threading callbacks cleaner).
 
 **New type definitions** in `llm_council/engine/types.py`:
 ```python
@@ -181,7 +181,7 @@ Between rounds, let user inject their perspective into the next round's prompt.
 
 #### Feature 3: Model Selection
 
-Let user choose which models participate (absorbs v1.18 "Configurable council").
+Let user choose which models participate.
 
 - **Current state:** `COUNCIL_MODELS` (defined in `llm_council/settings.py`) is used directly in `llm_council/engine/ranking.py`, `llm_council/engine/debate.py`, `llm_council/cli/main.py`, and `llm_council/cli/runners.py`.
 - **Change:** Add `models: list[str] | None = None` parameter to all debate/streaming functions. Default to `COUNCIL_MODELS` when `None`.
@@ -210,7 +210,7 @@ Let user choose which models participate (absorbs v1.18 "Configurable council").
 | Rejected tool calls confuse LLM | Return "rejected by user" as tool result — LLM answers from knowledge |
 | < 2 models selected | Enforce minimum 2 in selection prompt |
 
-### v1.13: Observability
+### v1.12: Observability
 
 Structured logging and tracing for production visibility.
 
@@ -226,7 +226,7 @@ Structured logging and tracing for production visibility.
 - Correlation ID generated per request, flows through all logs
 - Spans: `council.query` → `council.round.{n}` → `council.model.{name}`
 
-### v1.14: Tool Registry
+### v1.13: Tool Registry
 
 Pluggable tools with registration protocol for extensibility.
 
@@ -253,7 +253,7 @@ async def read_file(path: str) -> str:
 - `ENABLED_TOOLS` config to control which tools models can use
 - Sandboxed execution for `execute_code` (subprocess with timeout)
 
-### v1.15: Retry & Fallback Logic
+### v1.14: Retry & Fallback Logic
 
 Graceful handling of API failures with automatic recovery.
 
@@ -283,7 +283,7 @@ Graceful handling of API failures with automatic recovery.
 - `ModelRateLimitError` - Hit rate limits, backoff required
 - `CouncilQuorumError` - Too few models responded
 
-### v1.16: Security Foundations
+### v1.15: Security Foundations
 
 Minimum security layer for CLI usage.
 
@@ -301,14 +301,14 @@ Minimum security layer for CLI usage.
 
 ---
 
-### v1.17+: Future
+### v1.16+: Future
 
 | Version | Feature |
 |---------|---------|
-| v1.17 | Cost tracking & token counting |
-| v1.18 | Export conversations (MD/JSON/PDF) |
-| v1.19 | Image input (multimodal) |
-| v1.20 | Local models (Ollama) |
+| v1.16 | Cost tracking & token counting |
+| v1.17 | Export conversations (MD/JSON/PDF) |
+| v1.18 | Image input (multimodal) |
+| v1.19 | Local models (Ollama) |
 
 ---
 
@@ -325,10 +325,10 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 | Shared HTTP client unused | `llm_council/adapters/openrouter_client.py` | Low | Either use it in all query functions or delete it (YAGNI) |
 
 **Note:** Several other issues (duplicated `execute_tool`, storage inefficiency, logging) are addressed by planned versions:
-- v1.11 Workflow State Machine replaces JSON storage with SQLite
-- v1.13 Observability adds structured logging
-- v1.14 Tool Registry centralizes `execute_tool`
-- v1.15 Retry & Fallback will use the shared client
+- v1.10 Workflow State Machine replaces JSON storage with SQLite
+- v1.12 Observability adds structured logging
+- v1.13 Tool Registry centralizes `execute_tool`
+- v1.14 Retry & Fallback will use the shared client
 
 ---
 
@@ -356,10 +356,10 @@ Issues not tied to a specific version. Fix opportunistically or when touching re
 
 | Practice | Details | Roadmap |
 |----------|---------|---------|
-| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.11, v1.15 |
-| Structured Logging | JSON logs with correlation IDs | v1.13 |
-| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.15 |
-| Retry with Backoff | Exponential backoff for API failures | v1.15 |
+| Pydantic Models | `CouncilConfig`, `ModelResponse`, `WorkflowRun` | v1.10, v1.14 |
+| Structured Logging | JSON logs with correlation IDs | v1.12 |
+| Custom Exceptions | `CouncilError`, `ModelTimeoutError`, `CouncilQuorumError` | v1.14 |
+| Retry with Backoff | Exponential backoff for API failures | v1.14 |
 | Contract Tests | Scheduled daily API schema validation | — |
 | Pre-commit Hooks | Ruff as pre-commit hook | — |
 | Live API E2E Tests | Scheduled OpenRouter/Tavily tests; CI stays mocked | — |
