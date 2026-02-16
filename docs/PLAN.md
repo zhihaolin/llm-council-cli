@@ -10,13 +10,17 @@
 | v1.3 | Interactive Chat with History | ✅ Complete |
 | v1.4 | Token Streaming | ✅ Complete |
 | v1.5 | Parallel Execution with Progress | ✅ Complete |
-| v1.6 | ReAct Chairman | ✅ Complete |
+| v1.6 | Tool Calling for Council | ✅ Complete |
 | v1.6.1 | SOLID Refactoring | ✅ Complete |
 | v1.6.2 | CI Quality Gates | ✅ Complete |
 | v1.6.3 | Docker Support | ✅ Complete |
 | v1.7 | Unify Debate Logic | ✅ Complete |
 | v1.8 | Rename Debate Functions | ✅ Complete |
 | v1.9 | Strategy Pattern (OCP/DIP) | ✅ Complete |
+| — | Chairman Reflection | ✅ Complete |
+| — | Council ReAct | ✅ Complete |
+| — | Chat UI Improvements | ✅ Complete |
+| — | Compact Chat Banner | ✅ Complete |
 | v1.10 | Self-Reflection Round | Planned |
 | v1.11 | Workflow State Machine | Planned |
 | v1.12 | Human-in-the-Loop (HITL) | Planned |
@@ -98,6 +102,28 @@
 - Removed `run_debate_council()` (dead code, unused by CLI)
 - Removed nested generators `stream_initial_round_with_tools()` and `stream_round()`
 - Net reduction: ~400 lines of duplicated round-sequencing logic
+
+### Post-v1.9: Chairman Reflection
+- Chairman uses Reflection for synthesis (always on, replaces ReAct for chairman)
+- Single streaming call with deep analysis before `## Synthesis` header
+- `synthesize_with_reflection()` in `engine/reflection.py`
+
+### Post-v1.9: Council ReAct
+- Council members use text-based ReAct (Thought → Action → Observation) for visible reasoning
+- `council_react_loop()` in `engine/react.py`
+- Controlled by `--no-react` / `/react on|off` (enabled by default)
+- Applied to tool-enabled rounds only (initial, defense)
+
+### Post-v1.9: Chat UI Improvements
+- Simplified prompt: always `council>` instead of mode-specific prompts
+- Commands grouped by function in banner
+- Model panels show `[reasoned]` and `[searched]` indicators
+- Chairman headers changed to "CHAIRMAN'S REFLECTION"
+
+### Post-v1.9: Compact Chat Banner
+- Replaced Panel-based banner with compact text framed by horizontal rules
+- Dot-delimited mode line: `Debate · 1 round · React on · Stream off`
+- Improved indicator visibility (no longer dim)
 
 ---
 
