@@ -143,9 +143,9 @@ def query(
                 print_debate_round(round_data, round_data["round_number"])
 
         # Always run Reflection synthesis for chairman
-        from llm_council.engine import build_react_context_debate
+        from llm_council.engine import build_chairman_context_debate
 
-        context = build_react_context_debate(question, debate_rounds, len(debate_rounds))
+        context = build_chairman_context_debate(question, debate_rounds, len(debate_rounds))
         synthesis = asyncio.run(run_reflection_synthesis(question, context))
 
         if simple:
@@ -167,9 +167,9 @@ def query(
             print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
 
         # Always run Reflection synthesis for chairman
-        from llm_council.engine import build_react_context_ranking
+        from llm_council.engine import build_chairman_context_ranking
 
-        context = build_react_context_ranking(question, stage1, stage2)
+        context = build_chairman_context_ranking(question, stage1, stage2)
         stage3 = asyncio.run(run_reflection_synthesis(question, context))
 
         if simple:

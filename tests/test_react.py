@@ -85,12 +85,12 @@ class TestParseReactOutput:
 
 
 class TestContextBuilders:
-    """Tests for ReAct context builders (used by Reflection chairman)."""
+    """Tests for chairman context builders (used by Reflection chairman)."""
 
     @pytest.mark.asyncio
-    async def test_react_context_ranking(self):
+    async def test_chairman_context_ranking(self):
         """Context builder works with Stage 1/2 results (ranking mode)."""
-        from llm_council.engine import build_react_context_ranking
+        from llm_council.engine import build_chairman_context_ranking
 
         stage1_results = [
             {"model": "gpt", "response": "Python is best"},
@@ -100,15 +100,15 @@ class TestContextBuilders:
             {"model": "gpt", "ranking": "1. Response A\n2. Response B"},
         ]
 
-        context = build_react_context_ranking("What language?", stage1_results, stage2_results)
+        context = build_chairman_context_ranking("What language?", stage1_results, stage2_results)
 
         assert "Python is best" in context
         assert "JavaScript is best" in context
 
     @pytest.mark.asyncio
-    async def test_react_context_debate(self):
+    async def test_chairman_context_debate(self):
         """Context builder works with debate rounds."""
-        from llm_council.engine import build_react_context_debate
+        from llm_council.engine import build_chairman_context_debate
 
         rounds = [
             {
@@ -118,7 +118,7 @@ class TestContextBuilders:
             }
         ]
 
-        context = build_react_context_debate("Question?", rounds, 1)
+        context = build_chairman_context_debate("Question?", rounds, 1)
 
         assert "Initial answer" in context
         assert "ROUND 1" in context

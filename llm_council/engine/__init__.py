@@ -10,8 +10,9 @@ Public API:
     - Debate: ExecuteRound, RoundConfig, build_round_config,
               run_debate, debate_round_parallel, debate_round_streaming
     - Reflection: synthesize_with_reflection, parse_reflection_output
-    - Council ReAct: council_react_loop, build_react_context_ranking,
-                     build_react_context_debate
+    - Council ReAct: council_react_loop
+    - Chairman context: build_chairman_context_ranking,
+                        build_chairman_context_debate
     - Parsing: parse_ranking_from_text, parse_revised_answer, extract_critiques_for_model,
                parse_react_output
     - Aggregation: calculate_aggregate_rankings
@@ -40,10 +41,10 @@ from .parsers import (
     parse_revised_answer,
 )
 
-# Prompts (for building context)
+# Prompts (for building chairman context)
 from .prompts import (
-    build_react_context_debate,
-    build_react_context_ranking,
+    build_chairman_context_debate,
+    build_chairman_context_ranking,
     get_date_context,
 )
 from .ranking import (
@@ -88,6 +89,6 @@ __all__ = [
     "calculate_aggregate_rankings",
     # Prompts
     "get_date_context",
-    "build_react_context_ranking",
-    "build_react_context_debate",
+    "build_chairman_context_ranking",
+    "build_chairman_context_debate",
 ]

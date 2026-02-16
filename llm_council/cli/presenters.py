@@ -282,16 +282,8 @@ def print_query_header(
     console.print()
     console.print(f"[dim]Council: {', '.join([m.split('/')[-1] for m in council_models])}[/dim]")
     console.print(f"[dim]Chairman: {chairman_model.split('/')[-1]}[/dim]")
-    mode_parts = []
-    if debate:
-        mode_parts.append(f"Debate ({rounds} rounds)")
-        if stream:
-            mode_parts.append("[streaming]")
-    else:
-        mode_parts.append("Ranking")
-    if react:
-        mode_parts.append("[react]")
-    console.print(f"[dim]Mode: {' '.join(mode_parts)}[/dim]")
+    mode_line = format_chat_mode_line(debate, rounds, stream, react_enabled=react)
+    console.print(f"[dim]Mode: {mode_line}[/dim]")
     console.print()
 
 

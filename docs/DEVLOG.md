@@ -477,8 +477,8 @@ The chairman now uses the ReAct (Reasoning + Acting) pattern to verify facts bef
 
 **Backend (`backend/council.py`):**
 - `parse_react_output()` - Extracts Thought/Action from model output using regex
-- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
-- `build_react_context_debate()` - Formats debate rounds for chairman
+- `build_chairman_context_ranking()` - Formats Stage 1/2 results for chairman
+- `build_chairman_context_debate()` - Formats debate rounds for chairman
 - `build_react_prompt()` - Constructs ReAct system prompt with tool descriptions
 - `synthesize_with_react()` - Async generator implementing the ReAct loop
   - Yields: `token`, `thought`, `action`, `observation`, `synthesis` events

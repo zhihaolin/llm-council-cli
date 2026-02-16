@@ -408,8 +408,8 @@ from .debate import (
 
 from .react import (
     synthesize_with_react,
-    build_react_context_debate,
-    build_react_context_ranking,
+    build_chairman_context_debate,
+    build_chairman_context_ranking,
 )
 
 # Internal functions (parsers, prompts) are NOT exported

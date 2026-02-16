@@ -620,8 +620,8 @@ The chairman always uses **Reflection** to synthesize final answers. This is a s
 
 **`llm_council/engine/prompts.py`:**
 - `build_reflection_prompt()` - Instructs chairman to analyse agreement, disagreement, factual claims, quality differences, then produce `## Synthesis`
-- `build_react_context_ranking()` - Formats Stage 1/2 results for chairman
-- `build_react_context_debate()` - Formats debate rounds for chairman
+- `build_chairman_context_ranking()` - Formats Stage 1/2 results for chairman
+- `build_chairman_context_debate()` - Formats debate rounds for chairman
 
 **`llm_council/cli/runners.py`:**
 - `run_reflection_synthesis()` - Streams tokens dimmed, shows analysis panel + synthesis panel

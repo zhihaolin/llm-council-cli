@@ -296,9 +296,9 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
                 continue
 
             # Always run Reflection synthesis for chairman
-            from llm_council.engine import build_react_context_debate
+            from llm_council.engine import build_chairman_context_debate
 
-            context = build_react_context_debate(
+            context = build_chairman_context_debate(
                 full_query, debate_rounds_data, len(debate_rounds_data)
             )
             synthesis = await run_reflection_synthesis(full_query, context)
@@ -323,9 +323,9 @@ async def run_chat_session(max_turns: int, start_new: bool) -> None:
             print_stage2(stage2, metadata["label_to_model"], metadata["aggregate_rankings"])
 
             # Always run Reflection synthesis for chairman
-            from llm_council.engine import build_react_context_ranking
+            from llm_council.engine import build_chairman_context_ranking
 
-            context = build_react_context_ranking(full_query, stage1, stage2)
+            context = build_chairman_context_ranking(full_query, stage1, stage2)
             stage3 = await run_reflection_synthesis(full_query, context)
 
             storage.add_assistant_message(state.conversation_id, stage1, stage2, stage3)

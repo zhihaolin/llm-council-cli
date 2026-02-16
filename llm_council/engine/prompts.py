@@ -272,11 +272,11 @@ After your analysis, provide your final answer under a `## Synthesis` header.
 Begin your analysis:"""
 
 
-def build_react_context_ranking(
+def build_chairman_context_ranking(
     user_query: str, stage1_results: list[dict[str, Any]], stage2_results: list[dict[str, Any]]
 ) -> str:
     """
-    Build context string for ReAct chairman from ranking mode results.
+    Build context string for chairman Reflection from ranking mode results.
 
     Args:
         user_query: Original user question
@@ -303,11 +303,11 @@ STAGE 2 - Peer Rankings:
 {stage2_text}"""
 
 
-def build_react_context_debate(
+def build_chairman_context_debate(
     user_query: str, rounds: list[dict[str, Any]], num_rounds: int
 ) -> str:
     """
-    Build context string for ReAct chairman from debate mode results.
+    Build context string for chairman Reflection from debate mode results.
 
     Args:
         user_query: Original user question
